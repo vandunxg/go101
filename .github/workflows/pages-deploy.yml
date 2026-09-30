@@ -35,7 +35,7 @@ jobs:
 
       - name: Download renderer dependencies
         working-directory: scripts/tmd-renderer
-        run: go mod download
+        run: go mod tidy
 
       - name: Validate translation paths
         run: python3 scripts/build_pages.py --check-only
