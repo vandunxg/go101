@@ -1,0 +1,65 @@
+name: Check Go 101 upstream
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Merge latest upstream into a review branch
+        id: sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/go101/go101.git
+          git fetch origin master
+          git fetch upstream master
+          git checkout -B automation/sync-upstream origin/master
+
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! git merge --no-edit upstream/master; then
+            conflicts="$(git diff --name-only --diff-filter=U | paste -sd ', ' -)"
+            echo "::error title=Upstream merge conflict::Resolve these files before syncing: ${conflicts}"
+            exit 1
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git push --force origin automation/sync-upstream
+
+      - name: Open or update upstream pull request
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="chore: sync latest Go 101 upstream"
+          cat > "$RUNNER_TEMP/upstream-pr-body.md" <<'EOF'
+          This branch merges the latest `go101/go101:master` into this fork.
+
+          Review the upstream changes, then run `python3 scripts/translation_status.py`. Translations whose English source changed stay marked stale until they are reviewed.
+          EOF
+          number="$(gh pr list --repo "$REPOSITORY" --base master --head automation/sync-upstream --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --repo "$REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/upstream-pr-body.md"
+          else
+            gh pr create --repo "$REPOSITORY" --base master --head automation/sync-upstream --title "$title" --body-file "$RUNNER_TEMP/upstream-pr-body.md"
+          fi
