@@ -1,0 +1,264 @@
+### Một số trường hợp sử dụng panic/recover
+
+`panic` và `recover` đã được __giới thiệu trước đó__.
+Phần tiếp theo của bài viết này sẽ giới thiệu một số trường hợp sử dụng
+panic/recover (cả nên dùng lẫn không nên dùng).
+
+    === đã giới thiệu trước đó :: control-flows-more.tmd#panic-recover
+
+@@@ #avoid-crashing
+###========== Trường hợp 1: Ngăn panic làm chương trình bị sập
+
+Đây có lẽ là trường hợp sử dụng panic/recover phổ biến nhất.
+Cách này thường được dùng trong các chương trình đồng thời,
+đặc biệt là chương trình client-server.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "errors"
+import "log"
+import "net"
+
+func main() {
+	listener, err := net.Listen("tcp", ":12345")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+		// Xử lý kết nối của từng client
+		// trong một goroutine mới.
+		go ClientHandler(conn)
+	}
+}
+
+func ClientHandler(c net.Conn) {
+	defer func() {
+		if v := recover(); v != nil {
+			log.Println("capture a panic:", v)
+			log.Println("avoid crashing the program")
+		}
+		c.Close()
+	}()
+	panic(errors.New("just a demo.")) // panic chỉ để minh họa
+}
+'''
+
+Khởi chạy server rồi chạy `telnet localhost 12345` trong một terminal khác,
+bạn sẽ thấy server không bị sập
+khi mỗi goroutine xử lý client phát sinh panic.
+
+Nếu không recover panic có thể xảy ra trong từng goroutine xử lý client,
+panic đó có thể làm chương trình bị sập.
+
+@@@ #auto-restart
+###========== Trường hợp 2: Tự động khởi động lại goroutine bị dừng do panic
+
+Khi phát hiện panic trong một goroutine, ta có thể tạo một goroutine mới để thay thế nó.
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "log"
+import "time"
+
+func shouldNotExit() {
+	for {
+		// Mô phỏng một công việc.
+		time.Sleep(time.Second)
+
+		// Mô phỏng một panic ngoài dự kiến.
+		if time.Now().UnixNano() & 0x3 == 0 {
+			panic("unexpected situation")
+		}
+	}
+}
+
+func NeverExit(name string, f func()) {
+	defer func() {
+		if v := recover(); v != nil {
+			// Đã phát hiện panic.
+			log.Println(name, "is crashed. Restart it now.")
+			go NeverExit(name, f) // khởi động lại
+		}
+	}()
+	f()
+}
+
+func main() {
+	log.SetFlags(0)
+	go NeverExit("job#A", shouldNotExit)
+	go NeverExit("job#B", shouldNotExit)
+	select{} // chặn ở đây mãi mãi
+}
+'''
+
+@@@ #long-jump
+###========== Trường hợp 3: Dùng lời gọi `panic`/`recover` để mô phỏng câu lệnh nhảy xa
+
+Đôi khi, ta có thể dùng panic/recover để
+mô phỏng câu lệnh nhảy xa qua nhiều hàm
+và câu lệnh return vượt qua nhiều hàm,
+dù nhìn chung không nên dùng cách này.
+Cách này làm giảm cả độ dễ đọc của code lẫn hiệu suất thực thi.
+Lợi ích duy nhất là đôi khi nó giúp code ngắn gọn hơn.
+
+Trong ví dụ dưới đây, khi panic được tạo trong một hàm bên trong,
+luồng thực thi sẽ nhảy đến lời gọi được defer.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	n := func () (result int)  {
+		defer func() {
+			if v := recover(); v != nil {
+				if n, ok := v.(int); ok {
+					result = n
+				}
+			}
+		}()
+
+		func () {
+			func () {
+				func () {
+					// ...
+					panic(123) // panic khi thành công
+				}()
+				// ...
+			}()
+		}()
+		// ...
+		return 0
+	}()
+	fmt.Println(n) // 123
+}
+'''
+
+@@@ #avoid-verbose
+###========== Trường hợp 4: Dùng lời gọi `panic`/`recover` để giảm các bước kiểm tra lỗi
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+func doSomething() (err error) {
+	defer func() {
+		switch e := recover().(type) {
+		case nil:
+		case error:
+			err = e
+		default:
+			panic(e) // phát panic trở lại
+		}
+	}()
+
+	doStep1()
+	doStep2()
+	doStep3()
+	doStep4()
+	doStep5()
+
+	return
+}
+
+// Trên thực tế, khai báo của các hàm doStepN có thể khác nhau.
+// Ở đây, mỗi hàm sẽ:
+// * panic với nil khi thành công và không cần tiếp tục.
+// * panic với error khi thất bại và không cần tiếp tục.
+// * không panic để tiếp tục.
+func doStepN() {
+	...
+	if err != nil {
+		panic(err)
+	}
+	...
+	if done {
+		panic(nil)
+	}
+}
+'''
+
+Đoạn code trên ngắn gọn hơn đoạn dưới đây.
+
+@@@ .line-numbers
+''' go
+func doSomething() (err error) {
+	shouldContinue, err := doStep1()
+	if !shouldContinue {
+		return err
+	}
+	shouldContinue, err = doStep2()
+	if !shouldContinue {
+		return err
+	}
+	shouldContinue, err = doStep3()
+	if !shouldContinue {
+		return err
+	}
+	shouldContinue, err = doStep4()
+	if !shouldContinue {
+		return err
+	}
+	shouldContinue, err = doStep5()
+	if !shouldContinue {
+		return err
+	}
+
+	return
+}
+
+// Nếu err khác nil thì shouldContinue phải là true.
+// Nếu shouldContinue là true thì err có thể là nil hoặc khác nil.
+func doStepN() (shouldContinue bool, err error) {
+	...
+	if err != nil {
+		return false, err
+	}
+	...
+	if done {
+		return false, nil
+	}
+	return true, nil
+}
+'''
+
+Tuy nhiên, thông thường không nên dùng mẫu panic/recover này.
+Cách này kém idiomatic hơn trong Go và cũng kém hiệu quả hơn.
+
+Ngoài ra, lưu ý rằng từ Go 1.21, lời gọi `panic(nil)` sẽ trở thành
+__tương đương với `panic(new(runtime.PanicNilError))`__.
+Vì vậy, từ Go 1.21, lời gọi hàm được defer ở trên cần được viết như sau:
+
+@@@ .line-numbers
+''' go
+func doSomething() (err error) {
+	defer func() {
+		switch e := recover().(type) {
+		case nil, *runtime.PanicNilError:
+		case error:
+			err = e
+		default:
+			panic(e) // phát panic trở lại
+		}
+	}()
+
+	doStep1()
+	...
+}
+'''
+
+    === tương đương với ... :: https://github.com/golang/go/issues/25448
+
+
+
+

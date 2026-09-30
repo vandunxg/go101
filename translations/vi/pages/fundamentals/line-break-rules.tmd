@@ -1,0 +1,437 @@
+### Quy tắc xuống dòng trong Go
+
+Nếu đã viết Go đủ nhiều, hẳn bạn biết rằng
+không thể tùy ý sử dụng các kiểu định dạng mã trong Go.
+Cụ thể, ta không thể ngắt dòng mã tại một vị trí dấu cách bất kỳ.
+Phần còn lại của bài viết này sẽ liệt kê chi tiết các quy tắc xuống dòng trong Go.
+
+###========== Quy tắc tự chèn dấu chấm phẩy
+
+Một quy tắc thường được tuân theo trong thực tế là không đặt
+dấu ngoặc nhọn mở (`{`) của một khối mã tường minh ở dòng mới.
+Ví dụ, khối mã vòng lặp `for` sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+	for i := 5; i > 0; i--
+	{ // unexpected newline, expecting { after for clause
+	}
+'''
+
+Để đoạn mã biên dịch được, không được đặt dấu ngoặc nhọn mở ở dòng mới,
+như ví dụ sau:
+
+@@@ .line-numbers
+''' go
+	for i := 5; i > 0; i-- {
+	}
+'''
+
+
+Tuy nhiên, quy tắc vừa nêu có một số ngoại lệ.
+Chẳng hạn, khối vòng lặp `for` không có điều kiện sau vẫn biên dịch được.
+
+@@@ .line-numbers
+''' go
+	for
+	{
+		// thực hiện việc gì đó ...
+	}
+'''
+
+
+Vậy các quy tắc cơ bản về xuống dòng trong lập trình Go là gì?
+Trước khi trả lời, ta cần biết rằng ngữ pháp Go chính thức
+dùng dấu chấm phẩy `;` để kết thúc các dòng mã.
+Tuy nhiên, ta hiếm khi dùng dấu chấm phẩy trong mã Go. Vì sao?
+Vì phần lớn dấu chấm phẩy là tùy chọn và có thể được lược bỏ.
+Khi biên dịch, trình biên dịch Go sẽ tự động chèn lại
+các dấu chấm phẩy đã lược bỏ.
+
+Ví dụ, cả mười dấu chấm phẩy trong chương trình sau đều là tùy chọn.
+
+@@@ .line-numbers
+''' go
+package main;
+
+import "fmt";
+
+func main() {
+	var (
+		i   int;
+		sum int;
+	);
+	for i < 6 {
+		sum += i;
+		i++;
+	};
+	fmt.Println(sum);
+};
+'''
+
+Giả sử chương trình trên được lưu trong tệp có tên `semicolons.go`,
+ta có thể chạy `go fmt semicolons.go` để xóa mọi dấu chấm phẩy
+không cần thiết khỏi tệp đó.
+Khi biên dịch mã nguồn, trình biên dịch sẽ tự động chèn lại
+các dấu chấm phẩy đã xóa (trong bộ nhớ).
+
+Các quy tắc tự chèn dấu chấm phẩy trong Go là gì?
+Hãy đọc __các quy tắc về dấu chấm phẩy trong đặc tả Go__.
+
+    === the semicolon rules ... :: https://golang.org/ref/spec#Semicolons
+
+@@@ .alert;alert-success
+{
+Ngữ pháp chính thức dùng dấu chấm phẩy để kết thúc một số cấu trúc.
+Chương trình Go có thể lược bỏ phần lớn các dấu chấm phẩy này theo hai quy tắc:
+
+*.
+   Khi đầu vào được tách thành các token, dấu chấm phẩy sẽ tự động
+   được chèn vào luồng token ngay sau token cuối cùng của một dòng,
+   nếu token đó là
+   *
+      một __identifier__
+          === identifier :: keywords-and-identifiers.tmd#identifier
+   *
+      một __literal__ kiểu số nguyên, số thực dấu phẩy động, số ảo, rune hoặc chuỗi
+          === literal :: basic-types-and-value-literals.tmd#basic-value-literals
+   *
+      một trong các từ khóa `break`, `continue`,
+      `fallthrough` hoặc `return`
+   *
+      một trong các toán tử và dấu câu `++`,
+      `--`, `)`, `]` hoặc `}`
+
+*.
+   Để cho phép các câu lệnh phức tạp nằm trên một dòng,
+   có thể lược bỏ dấu chấm phẩy ngay trước dấu đóng `)` hoặc `}`.
+}
+
+Trong các trường hợp thuộc quy tắc thứ nhất, ta cũng có thể tự chèn
+dấu chấm phẩy, như các dấu chấm phẩy trong ví dụ mã cuối cùng.
+Nói cách khác, các dấu chấm phẩy đó là tùy chọn khi lập trình.
+
+Quy tắc thứ hai có nghĩa là dấu chấm phẩy cuối cùng trong một khai báo nhiều mục,
+ngay trước dấu đóng `)`, cũng như dấu chấm phẩy cuối cùng trong một khối mã
+hoặc khai báo kiểu (struct hay interface), ngay trước dấu đóng `}` đều là tùy chọn.
+Nếu thiếu dấu chấm phẩy cuối cùng, trình biên dịch sẽ tự động chèn lại.
+
+Quy tắc thứ hai cho phép ta viết đoạn mã hợp lệ sau.
+
+@@@ .line-numbers
+''' go
+import (_ "math"; "fmt")
+var (a int; b string)
+const (M = iota; N)
+type (MyInt int; T struct{x bool; y int32})
+type I interface{m1(int) int; m2() string}
+func f() {print("a"); panic(nil)}
+'''
+
+Trình biên dịch sẽ tự động chèn các dấu chấm phẩy đã lược bỏ,
+như đoạn mã sau minh họa.
+
+@@@ .line-numbers
+''' go
+var (a int; b string;);
+const (M = iota; N;);
+type (MyInt int; T struct{x bool; y int32;};);
+type I interface{m1(int) int; m2() string;};
+func f() {print("a"); panic(nil);};
+'''
+
+
+Trình biên dịch không tự chèn dấu chấm phẩy trong bất kỳ trường hợp nào khác.
+Với những trường hợp khác, ta phải tự chèn dấu chấm phẩy khi cần.
+Ví dụ, dấu chấm phẩy đầu tiên trên mỗi dòng trong đoạn mã cuối cùng là bắt buộc.
+Các dấu chấm phẩy trong ví dụ sau cũng bắt buộc.
+
+@@@ .line-numbers
+''' go
+var a = 1; var b = true
+a++; b = !b
+print(a); print(b)
+'''
+
+Từ hai quy tắc trên, ta biết dấu chấm phẩy sẽ không bao giờ được chèn
+ngay sau từ khóa `for`.
+Đó là lý do ví dụ vòng lặp `for` không có điều kiện ở trên vẫn hợp lệ.
+
+Một hệ quả của quy tắc tự chèn dấu chấm phẩy là phép tăng và giảm
+chỉ có thể xuất hiện dưới dạng câu lệnh.
+Chúng không thể được dùng như biểu thức.
+Ví dụ, đoạn mã sau không hợp lệ.
+
+@@@ .line-numbers
+''' go
+func f() {
+	a := 0
+	// Hai dòng sau đều không biên dịch được.
+	println(a++) // unexpected ++, expecting comma or )
+	println(a--) // unexpected --, expecting comma or )
+}
+'''
+
+Lý do đoạn mã trên không hợp lệ là trình biên dịch sẽ hiểu nó thành
+
+@@@ .line-numbers
+''' go
+func f() {
+	a := 0;
+	println(a++;);
+	println(a--;);
+}
+'''
+
+Một hệ quả khác của quy tắc tự chèn dấu chấm phẩy là
+ta không thể xuống dòng trước dấu chấm `.` trong selector.
+Ta chỉ có thể xuống dòng sau dấu chấm, như đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+	anObject.
+		MethodA().
+		MethodB().
+		MethodC()
+'''
+
+Trong khi đó, đoạn mã sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+	anObject
+		.MethodA()
+		.MethodB()
+		.MethodC()
+'''
+
+Ở phiên bản đã sửa, trình biên dịch sẽ chèn dấu chấm phẩy vào cuối mỗi dòng,
+khiến đoạn mã trên tương đương với đoạn mã sau, vốn rõ ràng không hợp lệ.
+
+@@@ .line-numbers
+''' go
+	anObject;
+		.MethodA();
+		.MethodB();
+		.MethodC();
+'''
+
+Quy tắc tự chèn dấu chấm phẩy giúp ta viết mã gọn gàng hơn.
+Chúng cũng cho phép viết một số đoạn mã hợp lệ nhưng hơi kỳ lạ.
+Ví dụ:
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func alwaysFalse() bool {return false}
+
+func main() {
+	for
+	i := 0
+	i < 6
+	i++ {
+		// sử dụng i ...
+	}
+
+	if x := alwaysFalse()
+	!x {
+		// thực hiện việc gì đó ...
+	}
+
+	switch alwaysFalse()
+	{
+	case true: fmt.Println("true")
+	case false: fmt.Println("false")
+	}
+}
+'''
+
+Cả ba khối điều khiển luồng đều hợp lệ.
+Trình biên dịch sẽ chèn dấu chấm phẩy vào cuối các dòng // 9 //,
+// 10 //, // 15 // và // 20 //.
+
+Lưu ý rằng khối `switch-case` trong ví dụ trên
+sẽ in ra `true` thay vì `false`.
+Điều này khác với đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+	switch alwaysFalse() {
+	case true: fmt.Println("true")
+	case false: fmt.Println("false")
+	}
+'''
+
+Nếu dùng lệnh `go fmt` để định dạng đoạn mã đầu tiên,
+một dấu chấm phẩy sẽ được tự động thêm sau lời gọi
+`alwaysFalse()`, khiến đoạn mã trở thành
+
+@@@ .line-numbers
+''' go
+	switch alwaysFalse();
+	{
+	case true: fmt.Println("true")
+	case false: fmt.Println("false")
+	}
+'''
+
+Phiên bản đã sửa tương đương với đoạn mã sau.
+
+@@@ .line-numbers
+''' go
+	switch alwaysFalse(); true {
+	case true: fmt.Println("true")
+	case false: fmt.Println("false")
+	}
+'''
+
+Đó là lý do đoạn mã sẽ in ra `true`.
+
+Bạn nên thường xuyên chạy `go fmt`
+và `go vet` cho mã của mình.
+
+Trong một trường hợp hiếm gặp, quy tắc tự chèn dấu chấm phẩy còn khiến
+một đoạn mã trông có vẻ hợp lệ nhưng thực ra lại không hợp lệ.
+Ví dụ, đoạn mã sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+func f(x int) {
+	switch x {
+	case 1:
+	{
+		goto A
+		A: // biên dịch được
+	}
+	case 2:
+		goto B
+		B: // lỗi cú pháp: thiếu câu lệnh sau label
+	case 0:
+		goto C
+		C: // biên dịch được
+	}
+}
+'''
+
+Thông báo lỗi biên dịch cho biết phải có một câu lệnh
+theo sau khai báo label.
+Nhưng nhìn vào ví dụ trên, có vẻ không label nào được theo sau bởi câu lệnh.
+Vì sao chỉ khai báo label `B:` là không hợp lệ?
+Nguyên nhân là theo quy tắc tự chèn dấu chấm phẩy thứ hai đã nêu,
+trình biên dịch sẽ chèn một dấu chấm phẩy trước mỗi ký tự `}`
+nằm sau khai báo label `A:` và `C:`, như đoạn mã sau minh họa.
+
+@@@ .line-numbers
+''' go
+func f(x int) {
+	switch x {
+	case 1:
+	{
+		goto A
+		A:
+	;} // dấu chấm phẩy được chèn tại đây
+	case 2:
+		goto B
+		B: // lỗi cú pháp: thiếu câu lệnh sau label
+	case 0:
+		goto C
+		C:
+	;} // dấu chấm phẩy được chèn tại đây
+}
+'''
+
+Thực ra, một dấu chấm phẩy đứng riêng biểu diễn một __câu lệnh rỗng__.
+Đó là lý do các khai báo label `A:` và `C:` đều hợp lệ.
+Ngược lại, khai báo label `B:` được theo sau bởi `case 0:`,
+đây không phải là câu lệnh, nên khai báo label `B:` không hợp lệ.
+
+    === blank statement :: expressions-and-statements.tmd#simple-statements
+
+Ta có thể tự thêm dấu chấm phẩy (một câu lệnh rỗng) vào cuối
+khai báo label `B:` để đoạn mã biên dịch được.
+
+
+@@@ #commas
+###========== Dấu phẩy (`,`) không được tự động chèn
+
+Trong một số dạng cú pháp có nhiều mục cùng loại,
+dấu phẩy được dùng làm dấu phân cách,
+chẳng hạn trong composite literal, danh sách đối số hàm,
+danh sách tham số hàm và danh sách kết quả hàm.
+Trong các dạng cú pháp đó, luôn có thể đặt dấu phẩy sau mục cuối cùng.
+Nếu dấu phẩy đó là ký tự có hiệu lực cuối cùng trên dòng mã tương ứng,
+thì dấu phẩy là bắt buộc; nếu không, dấu phẩy là tùy chọn.
+Trình biên dịch không tự động chèn dấu phẩy trong bất kỳ trường hợp nào.
+
+Ví dụ, đoạn mã sau hợp lệ.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+func f1(a int, b string,) (x bool, y int,) {
+	return true, 789
+}
+var f2 func (a int, b string) (x bool, y int)
+var f3 func (a int, b string, // dấu phẩy cuối là bắt buộc
+) (x bool, y int,             // dấu phẩy cuối là bắt buộc
+)
+var _ = []int{2, 3, 5, 7, 9,} // dấu phẩy cuối là tùy chọn
+var _ = []int{2, 3, 5, 7, 9,  // dấu phẩy cuối là bắt buộc
+}
+var _ = []int{2, 3, 5, 7, 9}
+var _, _ = f1(123, "Go",) // dấu phẩy cuối là tùy chọn
+var _, _ = f1(123, "Go",  // dấu phẩy cuối là bắt buộc
+)
+var _, _ = f1(123, "Go")
+// Tương tự với các phép chuyển đổi tường minh.
+var _ = string(65,) // dấu phẩy cuối là tùy chọn
+var _ = string(65,  // dấu phẩy cuối là bắt buộc
+)
+'''
+
+Tuy nhiên, đoạn mã sau không hợp lệ,
+vì trình biên dịch sẽ chèn dấu chấm phẩy vào cuối từng dòng,
+ngoại trừ dòng thứ hai.
+Ba dòng sẽ gây lỗi cú pháp `unexpected newline`.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+func f1(a int, b string,) (x bool, y int // error
+) {
+	return true, 789
+}
+var _ = []int{2, 3, 5, 7 // error: unexpected newline
+}
+var _, _ = f1(123, "Go" // error: unexpected newline
+)
+'''
+
+
+
+###========== Lời kết
+
+
+
+Cuối cùng, dựa trên các giải thích ở trên, ta có thể tóm tắt quy tắc xuống dòng trong Go như sau.
+
+@@@ .alert;alert-success
+{
+Trong Go, xuống dòng là hợp lệ (không ảnh hưởng đến hành vi của mã) nếu:
+*
+   nó xảy ra ngay sau một từ khóa không phải `break`, `continue` hay `return`,
+   hoặc sau một trong ba từ khóa này khi chúng không được theo sau bởi label hay kết quả trả về;
+*
+   nó xảy ra ngay sau dấu chấm phẩy, dù dấu chấm phẩy được viết tường minh hay được tự động chèn;
+*
+   nó không dẫn đến việc tự động chèn một dấu chấm phẩy.
+}
+
+Giống như một số chi tiết thiết kế khác trong Go,
+quy tắc tự chèn dấu chấm phẩy cũng có cả ý kiến khen lẫn chê.
+Một số lập trình viên không thích quy tắc này,
+vì cho rằng nó hạn chế sự tự do trong cách định dạng mã.
+Những người ủng hộ cho rằng quy tắc giúp biên dịch nhanh hơn,
+đồng thời khiến mã do các lập trình viên khác nhau viết trông tương tự nhau,
+nhờ đó mã của nhau dễ hiểu hơn.

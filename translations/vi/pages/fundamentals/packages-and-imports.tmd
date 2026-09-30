@@ -1,0 +1,678 @@
+### Gói mã và import gói
+
+Giống như nhiều ngôn ngữ lập trình hiện đại,
+mã Go cũng được tổ chức thành các gói mã.
+Để sử dụng các phần tử mã được export (hàm, kiểu, biến, hằng có tên,
+v.v.) trong một gói cụ thể, trước tiên gói đó phải được import,
+ngoại trừ gói mã chuẩn `builtin` (đây là một gói ở phạm vi universe).
+Bài viết này sẽ giải thích về các gói mã và việc import gói trong Go.
+
+@@@ #import
+###========== Giới thiệu về import gói
+
+Hãy xem một chương trình nhỏ có import một gói mã chuẩn.
+(Giả sử mã nguồn của chương trình này được lưu trong tệp có tên `simple-import-demo.go`.)
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Go has", 25, "keywords.")
+}
+'''
+
+Một số giải thích:
+*
+   Dòng đầu tiên chỉ định tên của package chứa tệp mã nguồn `simple-import-demo.go`.
+   Hàm entry `main` của một chương trình phải nằm trong package có tên `main`.
+*
+   Dòng thứ ba import package chuẩn `fmt` bằng từ khóa `import`.
+   Identifier `fmt` là tên package.
+   Nó cũng được dùng làm tên import và đại diện cho package chuẩn này trong scope của tệp mã nguồn chứa khai báo import.
+   (Tên import sẽ được giải thích ở một phần bên dưới.)
+   Package chuẩn này khai báo nhiều hàm định dạng để các package khác sử dụng.
+   Hàm `Println` là một trong số đó.
+   Hàm này in biểu diễn dạng chuỗi của
+   một số lượng tùy ý đối số ra standard output.
+*
+   Dòng thứ sáu gọi hàm `Println`.
+   Lưu ý rằng tên hàm được đặt tiền tố `fmt.` trong lời gọi,
+   trong đó `fmt` là tên package chứa hàm được gọi.
+   Dạng `aImportName.AnExportedIdentifier` được gọi là
+   __qualified identifier__.
+   `AnExportedIdentifier` được gọi là unqualified identifier.
+*
+   Lời gọi hàm `fmt.Println` không đặt yêu cầu nào
+   lên các đối số, vì vậy trong chương trình này, ba đối số của nó
+   sẽ được suy ra lần lượt là các giá trị có kiểu mặc định
+   `string`, `int` và `string`.
+*
+   Với mỗi lời gọi `fmt.Println`,
+   một dấu cách được chèn vào giữa
+   biểu diễn dạng chuỗi của mỗi cặp đối số liên tiếp,
+   và một ký tự xuống dòng được in ở cuối.
+
+    === qualified identifier :: https://golang.org/ref/spec#Qualified_identifiers
+
+Khi chạy chương trình này, bạn sẽ nhận được kết quả sau:
+@@@ .output
+'''
+$ go run simple-import-demo.go
+Go has 25 keywords.
+'''
+
+Lưu ý, chỉ các phần tử mã được export trong một package mới có thể được sử dụng
+trong tệp mã nguồn import package đó.
+Tên của một phần tử mã được export phải là một
+__exported identifier__.
+Ví dụ, ký tự đầu tiên của identifier `Println`
+là chữ hoa (do đó hàm `Println` được export),
+vì vậy hàm `Println`
+được khai báo trong package chuẩn `fmt` có thể được sử dụng
+trong chương trình ví dụ phía trên.
+
+    === exported identifier :: keywords-and-identifiers.tmd#identifier
+
+Các hàm dựng sẵn `print` và `println`
+có chức năng tương tự như các hàm tương ứng trong
+package chuẩn `fmt`.
+Bạn có thể sử dụng các hàm dựng sẵn mà không cần import package nào.
+
+Lưu ý, không nên sử dụng hai hàm dựng sẵn `print` và `println`
+trong môi trường production,
+vì không có gì đảm bảo chúng sẽ được giữ lại trong các phiên bản Go tương lai.
+
+Tất cả package chuẩn được liệt kê
+__ở đây`` https://golang.org/pkg/__ (trang chính thức) hoặc
+__ở đây`` https://docs.go101.org/std/index.html__ (trang không chính thức,
+do Go 101 duy trì).
+Bạn cũng có thể __chạy một máy chủ cục bộ__ để xem tài liệu Go.
+
+    === run a local server :: go-toolchain.tmd#doc
+
+Trong Go, về mặt thuật ngữ chính thức, việc import một package cũng được gọi là khai báo import.
+Khai báo import chỉ hiển thị trong tệp mã nguồn chứa khai báo đó.
+Nó không hiển thị trong các tệp mã nguồn khác thuộc cùng package.
+
+Hãy xem một ví dụ khác:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "math/rand"
+
+func main() {
+	fmt.Printf("Next pseudo-random number is %v.\n", rand.Uint32())
+}
+'''
+
+Ví dụ này import thêm một package chuẩn nữa là package `math/rand`,
+một package con của package chuẩn `math`.
+Package này cung cấp một số hàm tạo số giả ngẫu nhiên.
+
+Một số giải thích:
+*
+   Trong ví dụ này, tên package `rand` được dùng làm tên import
+   của package chuẩn `math/rand` đã import.
+   Lời gọi `rand.Uint32()` trả về
+   một số nguyên `uint32` ngẫu nhiên.
+*
+   `Printf` là một hàm thường dùng khác
+   trong package chuẩn `fmt`.
+   Lời gọi hàm `Printf` phải nhận ít nhất một đối số.
+   Đối số đầu tiên của lời gọi hàm `Printf` phải là một giá trị `string`,
+   chỉ định định dạng của kết quả được in.
+   `%v` trong đối số đầu tiên được gọi là format verb,
+   nó sẽ được thay bằng biểu diễn dạng chuỗi của đối số thứ hai.
+   Như đã học trong bài viết
+   __các kiểu cơ bản và literal của chúng__, `\n` trong một
+   string literal đặt trong dấu ngoặc kép sẽ được escape thành ký tự xuống dòng.
+
+    === basic types and their literals :: basic-types-and-value-literals.tmd
+
+Chương trình phía trên sẽ luôn in ra:
+@@@ .output
+'''
+Next pseudo-random number is 2596996162.
+'''
+
+Lưu ý: trước Go 1.20,
+nếu muốn chương trình phía trên tạo ra một số ngẫu nhiên khác nhau sau mỗi lần chạy,
+ta nên đặt seed khác bằng cách gọi hàm `rand.Seed`
+khi chương trình vừa bắt đầu.
+
+Nếu một tệp mã nguồn import nhiều package,
+ta có thể nhóm chúng vào một khai báo import bằng cách đặt
+các package trong cặp dấu `()`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+// Có thể import nhiều package cùng lúc.
+import (
+	"fmt"
+	"math/rand"
+)
+
+func main() {
+	fmt.Printf("Next pseudo-random number is %v.\n", rand.Uint32())
+}
+'''
+
+Một số giải thích:
+*
+   ví dụ này import thêm một package,
+   package chuẩn `time`,
+   cung cấp nhiều tiện ích liên quan đến thời gian.
+*
+   hàm `time.Now()` trả về thời điểm hiện tại,
+   dưới dạng một giá trị có kiểu `time.Time`.
+
+###========== Tìm hiểu thêm về format verb của `fmt.Printf`
+
+Như đã đề cập phía trên, nếu đối số đầu tiên
+của lời gọi `fmt.Printf` có một format verb, nó sẽ được thay bằng biểu diễn
+dạng chuỗi của đối số thứ hai.
+Thực tế, đối số `string` đầu tiên có thể chứa nhiều format verb. Format verb thứ hai sẽ được thay bằng biểu diễn dạng chuỗi
+của đối số thứ ba, và cứ tiếp tục như vậy.
+
+Trong Go 101, chỉ các format verb được liệt kê sau đây sẽ được sử dụng.
+*
+   `%v` sẽ được thay bằng biểu diễn dạng chuỗi tổng quát của đối số tương ứng.
+*
+   `%T` sẽ được thay bằng tên kiểu hoặc literal kiểu của đối số tương ứng.
+*
+   `%x` sẽ được thay bằng biểu diễn dạng chuỗi hex của đối số tương ứng.
+   Lưu ý, biểu diễn dạng chuỗi hex cho giá trị của một số loại kiểu không được định nghĩa.
+   Nhìn chung, đối số tương ứng của `%x` nên là string, số nguyên,
+   mảng số nguyên hoặc slice số nguyên (mảng và slice sẽ được giải thích trong bài viết sau).
+*
+   `%s` sẽ được thay bằng biểu diễn dạng chuỗi của đối số tương ứng.
+   Đối số tương ứng phải là string hoặc byte slice.
+*
+   Format verb `//` biểu diễn dấu phần trăm.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a, b := 123, "Go"
+	fmt.Printf("a == %v == 0x%x, b == %s\n", a, a, b)
+	fmt.Printf("type of a: %T, type of b: %T\n", a, b)
+	fmt.Printf("1// 50// 99//\n")
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+a == 123 == 0x7b, b == Go
+type of a: int, type of b: string
+1% 50% 99%
+'''
+
+Để tìm hiểu thêm về các format verb của `Printf`, hãy đọc __tài liệu trực tuyến của package `fmt`__
+hoặc xem cùng tài liệu đó bằng cách chạy một máy chủ tài liệu cục bộ.
+Bạn cũng có thể chạy `go doc fmt` để xem tài liệu của package chuẩn `fmt`,
+và chạy `go doc fmt.Printf` để xem tài liệu của hàm `fmt.Printf`
+trong terminal.
+
+    === `fmt` package documentation :: https://golang.org/pkg/fmt/
+
+@@@ #package
+###========== Thư mục package, import path của package và quan hệ phụ thuộc giữa các package
+
+Một package mã có thể gồm nhiều tệp mã nguồn.
+Các tệp mã nguồn này nằm trong cùng một thư mục.
+Các tệp mã nguồn trong một thư mục (không tính các thư mục con) phải thuộc cùng một package.
+Vì vậy, một thư mục tương ứng với một package mã và ngược lại.
+Thư mục chứa các tệp mã nguồn của một package mã được gọi là thư mục của package đó.
+
+Đối với Go Toolchain, package có import path chứa tên thư mục `internal`
+được xem là một package đặc biệt. Chỉ các package
+nằm trong và bên dưới thư mục cha trực tiếp của thư mục `internal` mới có thể import package đó.
+Ví dụ, package `.../a/b/c/internal/d/e/f` và package `.../a/b/c/internal`
+chỉ có thể được import bởi các package có import path bắt đầu bằng `.../a/b/c`.
+
+{ %%
+Tùy từng tình huống, thư mục tên `vendor` cũng có thể được xem
+là một thư mục package đặc biệt. Các đoạn sau sẽ giải thích khi nào điều này xảy ra.
+
+Go Toolchain 1.11 giới thiệu tính năng modules.
+Có thể xem một module là tập hợp các package có chung một thư mục gốc (một cây package).
+Mỗi module gắn với một import path gốc và một __phiên bản ngữ nghĩa__.
+Phiên bản major phải nằm trong import path gốc,
+ngoại trừ các phiên bản major `v0` hoặc `v1`.
+Các module có import path gốc khác nhau được xem là các module khác nhau.
+
+    === a semantic version :: https://semver.org/
+
+Go Toolchain 1.11 cũng giới thiệu biến môi trường `GO111MODULE`.
+Giá trị của nó có thể là `auto`, `on` hoặc `off`.
+Cho đến thời điểm hiện tại (Go Toolchain v1.15), giá trị mặc định (và được khuyến nghị) là `auto`.
+Tùy vào ngữ cảnh, các phiên bản Go Toolchain khác nhau diễn giải `auto`
+thành `on` hoặc `off` theo những quy tắc khác nhau.
+Hãy xem __wiki chính thức__ để biết chi tiết.
+
+    === the official wiki :: https://go.dev/wiki/Modules
+
+Nếu một package nằm trong thư mục `GOPATH/src`,
+và tính năng modules đang tắt, import path của nó là đường dẫn tương đối đến
+thư mục `GOPATH/src` hoặc thư mục `vendor` gần nhất
+chứa package đó.
+
+Ví dụ, khi tính năng modules tắt, với cấu trúc thư mục phân cấp sau đây,
+*
+   import path của hai package `foo` đều là `w/foo`.
+*
+   import path của các package `x`, `y` và `z`
+   lần lượt là `x`, `x/y` và `x/z`.
+
+Lưu ý:
+*
+   khi tệp `y.go` import package có import path `w/foo`,
+   package được import là package trong thư mục `GOPATH/src/x/y/vendor/w/foo`.
+*
+   khi tệp `x.go` hoặc `z.go` import package có import path `w/foo`,
+   package được import là package trong thư mục `GOPATH/src/x/vendor/w/foo`.
+
+@@@ .disable-line-numbers111
+''' go
+_ GOPATH
+  |_ src
+     |_ x
+        |_ vendor
+        |  |_ w
+        |     |_ foo
+        |        |_ foo.go    // package foo
+        |_ y
+        |  |_ vendor
+        |  |  |_ w
+        |  |     |_ foo
+        |  |        |_ foo.go // package foo
+        |  |_ y.go            // package y
+        |_ z
+        |  |_ z.go            // package z
+        |_ x.go               // package x
+'''
+
+Khi tính năng modules được bật, import path gốc của một module
+thường (nhưng không bắt buộc) được chỉ định trong tệp `go.mod`
+nằm trực tiếp trong thư mục package gốc của module đó.
+Ta thường dùng import path gốc để định danh module.
+Import path gốc là tiền tố chung của tất cả package trong module.
+
+Chỉ thư mục `vendor` nằm ngay dưới đường dẫn gốc của module mới được xem là một thư mục đặc biệt.
+
+Ví dụ, khi tính năng modules được bật, trong module có định danh `example.com/mypkg` được minh họa bên dưới,
+*
+   import path của package `foo` thứ nhất là `w/foo`.
+   Thư mục `MyProject/vendor` được xem là một thư mục đặc biệt.
+*
+   import path của package `foo` còn lại là`example.com/mypkg/x/y/vendor/w/foo`.
+   Lưu ý, thư mục `MyProject/x/y/vendor` được xem là thư mục package thông thường.
+*
+   import path của các package `x`, `y` và `z`
+   lần lượt là `example.com/mypkg/x`, `example.com/mypkg/x/y` và `example.com/mypkg/x/z`.
+
+Lưu ý, khi các tệp `x.go`, `y.go` hoặc `z.go` import package có import path `w/foo`,
+package được import luôn là package trong thư mục `MyProject/vendor/w/foo`.
+
+@@@ .disable-line-numbers111
+''' go
+_ MyProject
+     |_ go.mod                // module example.com/mypkg
+     |_ vendor
+     |  |_ w
+     |     |_ foo
+     |        |_ foo.go       // package foo
+     |_ x
+        |_ y
+        |  |_ vendor
+        |  |  |_ w
+        |  |     |_ foo
+        |  |        |_ foo.go // package foo
+        |  |_ y.go            // package y
+        |_ z
+        |  |_ z.go            // package z
+        |_ x.go               // package x
+'''
+
+}
+
+Khi một tệp mã nguồn trong một package import package khác,
+ta nói package đang import phụ thuộc vào package được import.
+
+Go không hỗ trợ quan hệ phụ thuộc vòng giữa các package.
+Nếu package `a` phụ thuộc vào package `b`
+và package `b` phụ thuộc vào package `c`,
+thì các tệp mã nguồn trong package `c` không thể import package `a` và `b`,
+còn các tệp mã nguồn trong package `b` không thể import package `a`.
+
+Đương nhiên, các tệp mã nguồn trong một package không thể và cũng không cần import chính package đó.
+
+{ %%
+Tương tự quan hệ phụ thuộc giữa các package, một module cũng có thể phụ thuộc vào một số module khác.
+Các module phụ thuộc trực tiếp và phiên bản của chúng thường được chỉ định trong tệp `go.mod` của module.
+Go hỗ trợ quan hệ phụ thuộc vòng giữa các module, dù tình huống này hiếm gặp trong thực tế.
+}
+
+Về sau, ta sẽ gọi các package có tên `main`
+và chứa hàm entry `main` là **program package** (hoặc **command package**),
+đồng thời gọi các package khác là **library package**.
+Không thể import program package.
+Mỗi chương trình Go phải chứa duy nhất một program package.
+
+Tên thư mục của một package không bắt buộc phải trùng với tên package.
+Tuy nhiên, với library package, người dùng sẽ bối rối nếu tên package
+khác tên thư mục của package.
+Nguyên nhân gây nhầm lẫn là import path mặc định của package là tên package,
+nhưng thành phần nằm trong import path của package lại là tên thư mục.
+Vì vậy, hãy cố gắng đặt hai tên này giống nhau cho mỗi library package.
+
+Mặt khác, nên đặt cho mỗi thư mục program package
+một tên có ý nghĩa, thay vì tên package `main`.
+
+@@@ #init
+###========== Các hàm `init`
+
+Trong một package, có thể khai báo nhiều hàm tên `init`,
+kể cả trong cùng một tệp mã nguồn.
+Các hàm tên `init` không được có
+tham số đầu vào và cũng không được trả về kết quả.
+
+Lưu ý, trong block cấp package trên cùng,
+identifier `init` chỉ có thể được dùng trong khai báo hàm.
+Ta không thể khai báo biến/hằng/kiểu cấp package có tên `init`.
+
+Khi chạy, mỗi hàm `init` sẽ được gọi tuần tự đúng một lần
+(trước khi gọi hàm entry `main`).
+Vì vậy, ý nghĩa của các hàm `init` gần giống các block khởi tạo tĩnh trong Java.
+
+Sau đây là một ví dụ đơn giản có hai hàm `init`:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func init() {
+	fmt.Println("hi,", bob)
+}
+
+func main() {
+	fmt.Println("bye")
+}
+
+func init() {
+	fmt.Println("hello,", smith)
+}
+
+func titledName(who string) string {
+	return "Mr. " + who
+}
+
+var bob, smith = titledName("Bob"), titledName("Smith")
+'''
+
+Kết quả của chương trình này:
+@@@ .output
+'''
+hi, Mr. Bob
+hello, Mr. Smith
+bye
+'''
+
+@@@ #initialization-order
+###========== Thứ tự khởi tạo tài nguyên
+
+Khi chạy, một package sẽ được nạp sau tất cả package phụ thuộc vào nó.
+Mỗi package chỉ được nạp đúng một lần.
+
+Tất cả hàm `init` trong mọi package liên quan của một chương trình
+sẽ được gọi tuần tự.
+Chắc chắn một hàm `init` trong package đang import
+sẽ được gọi sau tất cả hàm `init`
+được khai báo trong các package phụ thuộc của package đang import.
+Tất cả hàm `init` sẽ được gọi
+trước khi gọi hàm entry `main`.
+
+Thứ tự gọi các hàm `init` trong cùng một tệp mã nguồn
+là từ trên xuống dưới. Go specification khuyến nghị, nhưng không bắt buộc, gọi
+các hàm `init` trong những tệp mã nguồn khác nhau thuộc cùng package
+theo thứ tự alphabet của tên tệp chứa chúng.
+Vì vậy, không nên tạo quan hệ phụ thuộc giữa
+hai hàm `init` trong hai tệp mã nguồn khác nhau.
+
+Tất cả biến cấp package được khai báo trong một package đều được khởi tạo trước khi
+bất kỳ hàm `init` nào được khai báo trong cùng package được gọi.
+
+Go runtime sẽ cố gắng khởi tạo các biến cấp package trong một package
+theo thứ tự khai báo, nhưng chắc chắn một biến cấp package sẽ được
+khởi tạo sau tất cả biến mà nó phụ thuộc vào.
+Ví dụ, trong đoạn mã sau, bốn biến cấp package được khởi tạo theo thứ tự `y`, `z`,
+`x` và `w`.
+
+@@@ .line-numbers
+''' go
+func f() int {
+	return z + y
+}
+
+func g() int {
+	return y/2
+}
+
+var (
+	w       = x
+	x, y, z = f(), 123, g()
+)
+'''
+
+Để biết quy tắc chi tiết hơn về thứ tự khởi tạo biến cấp package,
+hãy đọc bài viết __thứ tự đánh giá biểu thức__.
+
+    === expression evaluation order :: evaluation-orders.tmd#package-level-variables
+
+###========== Các dạng import package đầy đủ
+
+Thực tế, dạng đầy đủ của khai báo import là
+
+@@@ .disable-line-numbers111
+''' go
+import importname "path/to/package"
+'''
+
+trong đó `importname` là thành phần tùy chọn,
+giá trị mặc định của nó là tên (không phải tên thư mục) của package được import.
+
+Thực tế, trong các khai báo import đã dùng phía trên,
+phần `importname` đều được lược bỏ
+vì chúng trùng với tên package tương ứng.
+Các khai báo import này tương đương với những khai báo sau:
+
+@@@ .disable-line-numbers111
+''' go
+import fmt "fmt"        // <=> import "fmt"
+import rand "math/rand" // <=> import "math/rand"
+import time "time"      // <=> import "time"
+'''
+
+Nếu phần `importname` xuất hiện trong một khai báo import,
+thì các token tiền tố được dùng trong qualified identifier phải là `importname`
+thay vì tên package được import.
+
+Dạng khai báo import đầy đủ không được dùng phổ biến.
+Tuy nhiên, đôi khi ta phải dùng nó.
+Ví dụ, nếu một tệp mã nguồn import hai package trùng tên,
+để tránh làm compiler nhầm lẫn, ta phải dùng dạng import đầy đủ
+để đặt `importname` tùy chỉnh cho ít nhất một trong hai package.
+
+Sau đây là ví dụ sử dụng dạng khai báo import đầy đủ.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	format "fmt"
+	random "math/rand"
+)
+
+func main() {
+	format.Print("A random number: ", random.Uint32(), "\n")
+
+	// Dòng sau không biên dịch được,
+	// vì "rand" chưa được định danh.
+	/*
+	fmt.Print("A random number: ", rand.Uint32(), "\n")
+	*/
+}
+'''
+
+Một số giải thích:
+*
+   ta phải dùng `format` và `random` làm
+   token tiền tố trong các qualified identifier, thay vì tên package thực tế
+   `fmt` và `rand`.
+*
+   `Print` là một hàm khác trong package chuẩn `fmt`.
+   Tương tự lời gọi hàm `Println`,
+   lời gọi hàm `Print` có thể nhận số lượng đối số tùy ý.
+   Hàm này lần lượt in biểu diễn dạng chuỗi của các đối số được truyền vào.
+   Nếu hai đối số liên tiếp đều không phải giá trị string,
+   một dấu cách sẽ tự động được chèn vào giữa chúng trong kết quả in.
+
+`importname` trong khai báo import dạng đầy đủ có thể là dấu chấm
+(`.`). Những import như vậy được gọi là dot import.
+Để sử dụng các phần tử được export trong những package được dot import,
+phải lược bỏ phần tiền tố trong qualified identifier.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	. "fmt"
+	. "time"
+)
+
+func main() {
+	Println("Current time:", Now())
+}
+'''
+
+Trong ví dụ phía trên, phải dùng `Println` thay vì `fmt.Println`,
+và dùng `Now` thay vì `time.Now`.
+
+Nhìn chung, dot import làm giảm khả năng đọc hiểu mã, vì vậy không nên dùng chúng trong các dự án chính thức.
+
+`importname` trong khai báo import dạng đầy đủ có thể là blank identifier
+(`_`). Những import như vậy được gọi là anonymous import (một số bài viết khác cũng gọi là blank import).
+Các tệp mã nguồn đang import không thể dùng những phần tử mã được export
+trong các package được import theo cách ẩn danh. Mục đích của anonymous import là khởi tạo các package được import
+(mỗi hàm `init` trong các package được import theo cách ẩn danh sẽ được gọi một lần).
+
+Trong ví dụ sau, tất cả hàm `init` được khai báo trong
+__package chuẩn `net/http/pprof`__ sẽ được gọi trước khi
+hàm entry `main` được gọi.
+
+    === the `net/http/pprof` standard package :: https://golang.org/pkg/net/http/pprof/
+
+@@@ .line-numbers
+''' go
+package main
+
+import _ "net/http/pprof"
+
+func main() {
+	... // thực hiện một số việc
+}
+'''
+
+###========== Mỗi import không ẩn danh phải được sử dụng ít nhất một lần
+
+Ngoại trừ anonymous import, các import khác phải được sử dụng ít nhất một lần.
+Ví dụ sau không biên dịch được.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"net/http" // error: imported and not used
+	. "time"   // error: imported and not used
+)
+
+import (
+	format "fmt"  // okay: it is used once below
+	_ "math/rand" // okay: it is not required to be used
+)
+
+func main() {
+	format.Println() // use the imported "fmt" package
+}
+'''
+
+
+{ %%
+###========== Import path của package
+
+todo: hiện tại phần này còn khá lộn xộn. Sẽ tốt hơn nếu hoàn thiện phần này trong Go 1.12.
+
+Trước Go Toolchain 1.11, __các công cụ Go chính thức`` go-toolchain.tmd__ khuyến nghị,
+và thường yêu cầu, thư mục chứa package bên thứ ba phải được đặt trong thư mục `src`
+bên dưới một đường dẫn bất kỳ được chỉ định trong biến môi trường `GOPATH`.
+Import path của package bên thứ ba là đường dẫn tương đối từ thư mục `src` đến
+thư mục package.
+Dấu phân cách trong đường dẫn luôn phải là `/`, không thể là `\`.
+Ví dụ, nếu đường dẫn của một package là `OneGoPath/src/a/b/pkg`
+(hoặc `OneGoPath\src\a\b\pkg` trên Windows),
+thì import path của nó là `a/b/pkg`.
+
+Kể từ Go Toolchain 1.6 (thử nghiệm từ phiên bản 1.5), mỗi thư mục package mã
+có thể chứa một thư mục con `vendor`, dùng để lưu
+các package phụ thuộc của package mã đó.
+Các package nằm trong thư mục con `vendor` có mức ưu tiên
+cao hơn khi tìm package.
+
+Kể từ phiên bản 1.11, Go Toolchain bắt đầu hỗ trợ modules.
+Biến môi trường `GOPATH` vẫn được giữ lại,
+nhưng mã nguồn package Go có thể được đặt ở bất cứ đâu.
+Một biến môi trường mới `GO111MODULE` được dùng để
+
+Mã nguồn Go có thể được đặt ở bất cứ đâu và không cần biến môi trường `GOPATH`
+
+GO111MODULE
+
+Package chuẩn có mức ưu tiên import cao hơn package bên thứ ba
+nếu chúng có import path giống nhau.
+Vì vậy, hãy cố tránh dùng import path của package chuẩn
+làm import path của package bên thứ ba.
+
+go tools sẽ bỏ qua các tệp nằm trong những thư mục có tên "testdata".
+
+}
+
+###========== Modules
+
+Một module là tập hợp gồm nhiều package.
+Sau khi được tải xuống máy, tất cả các package này đều nằm trong cùng một thư mục,
+được gọi là thư mục gốc của module.
+Một module có thể có nhiều phiên bản, tuân theo
+đặc tả __Semantic Versioning__.
+Để tìm hiểu các khái niệm liên quan đến modules và cách quản lý, sử dụng chúng,
+hãy đọc __tài liệu chính thức__.
+
+    === Semantic Versioning :: https://semver.org/
+    === official documentation :: https://golang.org/ref/mod

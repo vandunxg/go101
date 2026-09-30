@@ -1,0 +1,761 @@
+### Cách đóng channel một cách an toàn
+
+Vài ngày trước, tôi đã viết bài giải thích
+__các quy tắc về channel trong Go__.
+Bài viết nhận được nhiều lượt bình chọn trên __reddit__ và __HN__,
+nhưng cũng có ý kiến chỉ trích một số chi tiết trong thiết kế channel của Go.
+
+    === các quy tắc về channel trong Go :: channel.tmd
+    === reddit :: https://www.reddit.com/r/golang/comments/5k489v/the_full_list_of_channel_rules_in_golang/
+    === HN :: https://news.ycombinator.com/item?id=13252416
+
+Tôi đã tổng hợp một số ý kiến chỉ trích về các thiết kế và quy tắc sau của channel trong Go:
+*.
+   Không có cách đơn giản và phổ quát để kiểm tra channel đã đóng hay chưa mà không thay đổi trạng thái của nó.
+*.
+   Đóng channel đã đóng sẽ gây panic, nên nguy hiểm nếu bên đóng không biết channel đã đóng hay chưa.
+*.
+   Gửi giá trị vào channel đã đóng sẽ gây panic, nên nguy hiểm nếu bên gửi không biết channel đã đóng hay chưa.
+
+Những ý kiến chỉ trích này nghe có vẻ hợp lý, nhưng thực tế thì không.
+Đúng là không có hàm dựng sẵn để kiểm tra channel đã đóng hay chưa.
+
+    === bài viết trước :: channel-use-cases.tmd#check-closed-status
+
+Thực ra có cách đơn giản để kiểm tra channel đã đóng hay chưa,
+nếu bạn có thể bảo đảm chưa từng có giá trị nào được gửi vào channel và sẽ không có giá trị nào được gửi vào đó.
+Cách này đã được trình bày trong __bài viết trước__.
+Để nội dung liền mạch hơn, ví dụ sau trình bày lại cách đó.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type T int
+
+func IsClosed(ch <-chan T) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+
+	return false
+}
+
+func main() {
+	c := make(chan T)
+	fmt.Println(IsClosed(c)) // false
+	close(c)
+	fmt.Println(IsClosed(c)) // true
+}
+'''
+
+Như đã nói ở trên, đây không phải cách phổ quát để kiểm tra channel đã đóng hay chưa.
+
+Thực tế, ngay cả khi có hàm dựng sẵn `closed` để kiểm tra channel đã đóng hay chưa,
+tính hữu dụng của nó cũng rất hạn chế, tương tự hàm dựng sẵn `len`
+dùng để kiểm tra số giá trị hiện có trong buffer của channel.
+Lý do là trạng thái channel có thể thay đổi ngay sau khi các hàm này trả về,
+khiến giá trị trả về không còn phản ánh trạng thái mới nhất.
+Nếu `closed(ch)` trả về `true`, bạn có thể dừng gửi giá trị vào channel `ch`.
+Nhưng nếu `closed(ch)` trả về `false`, việc đóng channel hoặc tiếp tục gửi vào channel vẫn không an toàn.
+
+###=========== Nguyên tắc đóng channel
+
+Một nguyên tắc chung khi sử dụng channel trong Go là
+**không đóng channel từ phía receiver
+và không đóng channel nếu có nhiều sender đồng thời**.
+Nói cách khác, chỉ nên đóng channel trong sender goroutine
+nếu goroutine đó là sender duy nhất của channel.
+
+// (Sau đây gọi nguyên tắc trên là **nguyên tắc đóng channel**.)
+
+Dĩ nhiên đây không phải nguyên tắc phổ quát để đóng channel.
+Nguyên tắc phổ quát là **không đóng (hoặc gửi giá trị vào) channel đã đóng**.
+Nếu bảo đảm không goroutine nào còn đóng hay gửi giá trị vào channel khác nil chưa đóng,
+thì một goroutine có thể đóng channel an toàn.
+Tuy nhiên, để receiver hoặc một trong nhiều sender bảo đảm điều đó thường cần nhiều công sức
+và khiến code phức tạp. Ngược lại, tuân theo **nguyên tắc đóng channel** ở trên đơn giản hơn nhiều.
+
+###=========== Các cách đóng channel một cách thô bạo
+
+    === cơ chế recover :: control-flows-more.tmd#panic-recover
+
+Nếu vẫn muốn đóng channel từ phía receiver hoặc từ một trong nhiều sender,
+bạn có thể dùng __cơ chế recover__ để ngăn panic làm chương trình bị crash.
+Ví dụ sau giả định kiểu phần tử channel là `T`.
+@@@ .line-numbers
+''' go
+func SafeClose(ch chan T) (justClosed bool) {
+	defer func() {
+		if recover() != nil {
+			// Giá trị trả về có thể được thay đổi
+			// trong lời gọi hàm defer.
+			justClosed = false
+		}
+	}()
+
+	// giả định ch != nil ở đây.
+	close(ch)   // panic nếu ch đã đóng
+	return true // <=> justClosed = true; return
+}
+'''
+
+Cách này rõ ràng vi phạm **nguyên tắc đóng channel**.
+
+Có thể áp dụng ý tưởng tương tự khi gửi giá trị vào channel có thể đã đóng.
+@@@ .line-numbers
+''' go
+func SafeSend(ch chan T, value T) (closed bool) {
+	defer func() {
+		if recover() != nil {
+			closed = true
+		}
+	}()
+
+	ch <- value  // panic nếu ch đã đóng
+	return false // <=> closed = false; return
+}
+'''
+
+Giải pháp thô bạo này không chỉ vi phạm **nguyên tắc đóng channel**,
+mà còn có thể gây data race trong quá trình thực thi.
+
+###=========== Các cách đóng channel một cách nhẹ nhàng
+
+Nhiều người thích dùng `sync.Once` để đóng channel:
+@@@ .line-numbers
+''' go
+type MyChannel struct {
+	C    chan T
+	once sync.Once
+}
+
+func NewMyChannel() *MyChannel {
+	return &MyChannel{C: make(chan T)}
+}
+
+func (mc *MyChannel) SafeClose() {
+	mc.once.Do(func() {
+		close(mc.C)
+	})
+}
+'''
+
+Ta cũng có thể dùng `sync.Mutex` để tránh đóng channel nhiều lần:
+@@@ .line-numbers
+''' go
+type MyChannel struct {
+	C      chan T
+	closed bool
+	mutex  sync.Mutex
+}
+
+func NewMyChannel() *MyChannel {
+	return &MyChannel{C: make(chan T)}
+}
+
+func (mc *MyChannel) SafeClose() {
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
+	if !mc.closed {
+		close(mc.C)
+		mc.closed = true
+	}
+}
+
+func (mc *MyChannel) IsClosed() bool {
+	mc.mutex.Lock()
+	defer mc.mutex.Unlock()
+	return mc.closed
+}
+'''
+
+Các cách này có thể xem là nhẹ nhàng, nhưng chưa chắc tránh được data race.
+Hiện tại, đặc tả Go không bảo đảm rằng sẽ không có data race
+khi thao tác đóng channel và gửi vào channel được thực hiện đồng thời.
+Nếu `SafeClose` được gọi đồng thời với thao tác gửi vào cùng channel,
+data race có thể xảy ra (dù thường không gây hại).
+
+###=========== Các cách đóng channel một cách uyển chuyển
+
+Một nhược điểm của hàm `SafeSend` ở trên là không thể dùng lời gọi hàm
+làm thao tác gửi theo sau từ khóa `case` trong khối `select`.
+Nhược điểm khác của `SafeSend` và `SafeClose` là nhiều người, trong đó có tôi,
+cho rằng giải pháp dùng `panic`/`recover` và package `sync` chưa uyển chuyển.
+Sau đây là một số giải pháp chỉ dùng channel, không dùng `panic`/`recover`
+hay package `sync`, dành cho nhiều tình huống.
+
+//
+(Trong các ví dụ sau, `sync.WaitGroup` được dùng để hoàn thiện ví dụ.
+Khi áp dụng thực tế, không phải lúc nào cũng cần dùng nó.)
+
+###----------- 1. M receiver, một sender; sender báo “không gửi thêm nữa” bằng cách đóng data channel
+
+Đây là tình huống đơn giản nhất: hãy để sender đóng data channel
+khi không muốn gửi thêm nữa.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"sync"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	// ...
+	const Max = 100000
+	const NumReceivers = 100
+
+	wgReceivers := sync.WaitGroup{}
+	wgReceivers.Add(NumReceivers)
+
+	// ...
+	dataCh := make(chan int)
+
+	// sender
+	go func() {
+		for {
+			if value := rand.Intn(Max); value == 0 {
+				// Sender duy nhất có thể đóng
+				// channel an toàn bất cứ lúc nào.
+				close(dataCh)
+				return
+			} else {
+				dataCh <- value
+			}
+		}
+	}()
+
+	// các receiver
+	for i := 0; i < NumReceivers; i++ {
+		go func() {
+			defer wgReceivers.Done()
+
+			// Nhận giá trị cho đến khi dataCh được
+			// đóng và hàng đợi buffer giá trị của
+			// dataCh trở nên rỗng.
+			for value := range dataCh {
+				log.Println(value)
+			}
+		}()
+	}
+
+	wgReceivers.Wait()
+}
+'''
+
+###----------- 2. Một receiver, N sender; receiver duy nhất báo “hãy dừng gửi” bằng cách đóng signal channel bổ sung
+
+Tình huống này phức tạp hơn một chút so với trường hợp trên.
+Ta không thể để receiver đóng data channel để dừng truyền dữ liệu,
+vì làm vậy sẽ vi phạm **nguyên tắc đóng channel**.
+Thay vào đó, receiver có thể đóng signal channel bổ sung
+để thông báo cho các sender dừng gửi giá trị.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"sync"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	// ...
+	const Max = 100000
+	const NumSenders = 1000
+
+	wgReceivers := sync.WaitGroup{}
+	wgReceivers.Add(1)
+
+	// ...
+	dataCh := make(chan int)
+	stopCh := make(chan struct{})
+		// stopCh là signal channel bổ sung.
+		// Sender của nó là receiver của channel
+		// dataCh; các receiver của nó là các
+		// sender của channel dataCh.
+
+	// các sender
+	for i := 0; i < NumSenders; i++ {
+		go func() {
+			for {
+				// Thao tác thử nhận nhằm cố gắng
+				// cho goroutine thoát sớm nhất có thể.
+				// Trong ví dụ cụ thể này, thao tác đó
+				// không bắt buộc.
+				select {
+				case <- stopCh:
+					return
+				default:
+				}
+
+				// Ngay cả khi stopCh đã đóng, nhánh đầu
+				// trong select thứ hai vẫn có thể không
+				// được chọn trong vài vòng lặp nếu
+				// thao tác gửi vào dataCh cũng không bị chặn.
+				// Điều này chấp nhận được trong
+				// ví dụ này, nên khối select đầu tiên
+				// ở trên có thể được bỏ qua.
+				select {
+				case <- stopCh:
+					return
+				case dataCh <- rand.Intn(Max):
+				}
+			}
+		}()
+	}
+
+	// receiver
+	go func() {
+		defer wgReceivers.Done()
+
+		for value := range dataCh {
+			if value == Max-1 {
+				// Receiver của channel dataCh đồng thời
+				// là sender của stopCh. Đóng stop channel
+				// tại đây là an toàn.
+				close(stopCh)
+				return
+			}
+
+			log.Println(value)
+		}
+	}()
+
+	// ...
+	wgReceivers.Wait()
+}
+'''
+
+Như các comment đã nêu, sender của signal channel bổ sung chính là receiver của data channel.
+Signal channel này được sender duy nhất đóng,
+nên vẫn tuân thủ **nguyên tắc đóng channel**.
+
+Trong ví dụ này, channel `dataCh` không bao giờ được đóng.
+Channel không bắt buộc phải được đóng.
+Channel cuối cùng sẽ được garbage collection nếu không còn goroutine nào tham chiếu đến,
+dù nó có được đóng hay không.
+Vì vậy, ở đây đóng channel uyển chuyển có nghĩa là không đóng channel.
+
+###----------- 3. M receiver, N sender; bất kỳ ai cũng có thể nói “kết thúc thôi” bằng cách báo moderator đóng signal channel bổ sung
+
+Đây là tình huống phức tạp nhất.
+Ta không thể để receiver hay sender nào đóng data channel.
+Ta cũng không thể để receiver đóng signal channel bổ sung
+để thông báo cho tất cả sender và receiver kết thúc.
+Cả hai cách đều vi phạm **nguyên tắc đóng channel**.
+Tuy nhiên, ta có thể thêm vai trò moderator để đóng signal channel bổ sung.
+Một mẹo trong ví dụ sau là dùng thao tác thử gửi
+để báo moderator đóng signal channel bổ sung.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"strconv"
+	"sync"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	// ...
+	const Max = 100000
+	const NumReceivers = 10
+	const NumSenders = 1000
+
+	wgReceivers := sync.WaitGroup{}
+	wgReceivers.Add(NumReceivers)
+
+	// ...
+	dataCh := make(chan int)
+	stopCh := make(chan struct{})
+		// stopCh là signal channel bổ sung.
+		// Sender của nó là moderator goroutine ở bên dưới
+		// và các receiver của nó là toàn bộ sender
+		// cùng receiver của dataCh.
+	toStop := make(chan string, 1)
+		// Channel toStop dùng để báo cho
+		// moderator đóng signal channel bổ sung
+		// (stopCh). Sender của nó là bất kỳ sender nào
+		// hoặc receiver nào của dataCh; receiver của nó là
+		// moderator goroutine ở bên dưới.
+		// Channel này phải có buffer.
+
+	var stoppedBy string
+
+	// moderator
+	go func() {
+		stoppedBy = <-toStop
+		close(stopCh)
+	}()
+
+	// các sender
+	for i := 0; i < NumSenders; i++ {
+		go func(id string) {
+			for {
+				value := rand.Intn(Max)
+				if value == 0 {
+					// Thao tác thử gửi ở đây dùng để
+					// báo moderator đóng
+					// signal channel bổ sung.
+					select {
+					case toStop <- "sender#" + id:
+					default:
+					}
+					return
+				}
+
+				// Thao tác thử nhận ở đây nhằm cố gắng
+				// cho sender goroutine thoát
+				// sớm nhất có thể. Các khối select thử nhận
+				// và thử gửi được tối ưu hóa riêng
+				// bởi Go compiler chuẩn,
+				// nên thực thi rất hiệu quả.
+				select {
+				case <- stopCh:
+					return
+				default:
+				}
+
+				// Ngay cả khi stopCh đã đóng, nhánh đầu
+				// trong select này có thể vẫn không được
+				// chọn trong một số vòng lặp
+				// (về lý thuyết có thể mãi mãi) nếu thao tác gửi
+				// vào dataCh cũng không bị chặn. Nếu
+				// điều này không chấp nhận được, thao tác thử nhận
+				// ở trên là cần thiết.
+				select {
+				case <- stopCh:
+					return
+				case dataCh <- value:
+				}
+			}
+		}(strconv.Itoa(i))
+	}
+
+	// các receiver
+	for i := 0; i < NumReceivers; i++ {
+		go func(id string) {
+			defer wgReceivers.Done()
+
+			for {
+				// Tương tự sender goroutine,
+				// thao tác thử nhận ở đây nhằm cố gắng
+				// cho receiver goroutine thoát
+				// sớm nhất có thể.
+				select {
+				case <- stopCh:
+					return
+				default:
+				}
+
+				// Ngay cả khi stopCh đã đóng, nhánh đầu
+				// trong select này có thể vẫn không được
+				// chọn trong một số vòng lặp
+				// (về lý thuyết có thể mãi mãi) nếu thao tác nhận
+				// từ dataCh cũng không bị chặn. Nếu
+				// điều này không chấp nhận được, thao tác thử nhận
+				// ở trên là cần thiết.
+				select {
+				case <- stopCh:
+					return
+				case value := <-dataCh:
+					if value == Max-1 {
+						// Ở đây cũng dùng mẹo tương tự để
+						// báo moderator
+						// đóng signal channel
+						// bổ sung.
+						select {
+						case toStop <- "receiver#" + id:
+						default:
+						}
+						return
+					}
+
+					log.Println(value)
+				}
+			}
+		}(strconv.Itoa(i))
+	}
+
+	// ...
+	wgReceivers.Wait()
+	log.Println("stopped by", stoppedBy)
+}
+'''
+
+Trong ví dụ này, **nguyên tắc đóng channel** vẫn được tuân thủ.
+
+Lưu ý buffer của channel `toStop` có dung lượng bằng một.
+Điều này giúp tránh bỏ lỡ thông báo đầu tiên
+nếu nó được gửi trước khi moderator goroutine sẵn sàng nhận thông báo
+từ `toStop`.
+
+Ta cũng có thể đặt dung lượng channel `toStop`
+bằng tổng số sender và receiver,
+khi đó không cần khối `select` thử gửi để báo moderator.
+@@@ .line-numbers
+''' go
+...
+toStop := make(chan string, NumReceivers + NumSenders)
+...
+			value := rand.Intn(Max)
+			if value == 0 {
+				toStop <- "sender#" + id
+				return
+			}
+...
+				if value == Max-1 {
+					toStop <- "receiver#" + id
+					return
+				}
+...
+'''
+
+###----------- 4. Biến thể của tình huống “M receiver, một sender”: yêu cầu đóng được đưa ra bởi goroutine bên thứ ba
+
+Đôi khi cần để goroutine bên thứ ba đưa ra yêu cầu đóng.
+Trong trường hợp đó, ta có thể dùng signal channel bổ sung để báo sender
+đóng data channel. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"sync"
+	"time"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	// ...
+	const Max = 100000
+	const NumReceivers = 100
+	const NumThirdParties = 15
+
+	wgReceivers := sync.WaitGroup{}
+	wgReceivers.Add(NumReceivers)
+
+	// ...
+	dataCh := make(chan int)
+	closing := make(chan struct{}) // signal channel
+	closed := make(chan struct{})
+	
+	// Có thể gọi hàm stop
+	// an toàn nhiều lần.
+	stop := func() {
+		select {
+		case closing<-struct{}{}:
+			<-closed
+		case <-closed:
+		}
+	}
+	
+	// một số goroutine bên thứ ba
+	for i := 0; i < NumThirdParties; i++ {
+		go func() {
+			r := 1 + rand.Intn(3)
+			time.Sleep(time.Duration(r) * time.Second)
+			stop()
+		}()
+	}
+
+	// sender
+	go func() {
+		defer func() {
+			close(closed)
+			close(dataCh)
+		}()
+
+		for {
+			select{
+			case <-closing: return
+			default:
+			}
+
+			select{
+			case <-closing: return
+			case dataCh <- rand.Intn(Max):
+			}
+		}
+	}()
+
+	// các receiver
+	for i := 0; i < NumReceivers; i++ {
+		go func() {
+			defer wgReceivers.Done()
+
+			for value := range dataCh {
+				log.Println(value)
+			}
+		}()
+	}
+
+	wgReceivers.Wait()
+}
+'''
+
+Ý tưởng dùng trong hàm `stop` được rút ra từ __một comment__ của Roger Peppe.
+
+    === một comment :: https://groups.google.com/forum/#!msg/golang-nuts/lEKehHH7kZY/SRmCtXDZAAAJ
+
+###----------- 5. Biến thể tình huống “N sender”: cần đóng data channel để báo receiver việc gửi dữ liệu đã kết thúc
+
+Trong các giải pháp cho tình huống N sender ở trên, để tuân thủ **nguyên tắc đóng channel**,
+ta tránh đóng data channel. Tuy nhiên, đôi khi cần đóng data channel khi kết thúc
+để receiver biết việc gửi dữ liệu đã hoàn tất.
+Trong trường hợp đó, có thể chuyển tình huống N sender thành một sender bằng channel trung gian.
+Channel trung gian chỉ có một sender, vì vậy có thể đóng nó thay cho data channel ban đầu.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"strconv"
+	"sync"
+	"time"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	// ...
+	const Max = 1000000
+	const NumReceivers = 10
+	const NumSenders = 1000
+	const NumThirdParties = 15
+
+	wgReceivers := sync.WaitGroup{}
+	wgReceivers.Add(NumReceivers)
+
+	// ...
+	dataCh := make(chan int)     // sẽ được đóng
+	middleCh := make(chan int)   // sẽ không bao giờ được đóng
+	closing := make(chan string) // signal channel
+	closed := make(chan struct{})
+
+	var stoppedBy string
+
+	// Có thể gọi hàm stop
+	// an toàn nhiều lần.
+	stop := func(by string) {
+		select {
+		case closing <- by:
+			<-closed
+		case <-closed:
+		}
+	}
+	
+	// lớp trung gian
+	go func() {
+		exit := func(v int, needSend bool) {
+			close(closed)
+			if needSend {
+				dataCh <- v
+			}
+			close(dataCh)
+		}
+
+		for {
+			select {
+			case stoppedBy = <-closing:
+				exit(0, false)
+				return
+			case v := <- middleCh:
+				select {
+				case stoppedBy = <-closing:
+					exit(v, true)
+					return
+				case dataCh <- v:
+				}
+			}
+		}
+	}()
+	
+	// một số goroutine bên thứ ba
+	for i := 0; i < NumThirdParties; i++ {
+		go func(id string) {
+			r := 1 + rand.Intn(3)
+			time.Sleep(time.Duration(r) * time.Second)
+			stop("3rd-party#" + id)
+		}(strconv.Itoa(i))
+	}
+
+	// các sender
+	for i := 0; i < NumSenders; i++ {
+		go func(id string) {
+			for {
+				value := rand.Intn(Max)
+				if value == 0 {
+					stop("sender#" + id)
+					return
+				}
+
+				select {
+				case <- closed:
+					return
+				default:
+				}
+
+				select {
+				case <- closed:
+					return
+				case middleCh <- value:
+				}
+			}
+		}(strconv.Itoa(i))
+	}
+
+	// các receiver
+	for range [NumReceivers]struct{}{} {
+		go func() {
+			defer wgReceivers.Done()
+
+			for value := range dataCh {
+				log.Println(value)
+			}
+		}()
+	}
+
+	// ...
+	wgReceivers.Wait()
+	log.Println("stopped by", stoppedBy)
+}
+'''
+
+###----------- Còn tình huống nào khác không?
+
+Có thể còn nhiều biến thể tình huống khác, nhưng các ví dụ trên là những trường hợp cơ bản và phổ biến nhất.
+Bằng cách sử dụng channel cùng các kỹ thuật lập trình đồng thời khác một cách khéo léo,
+tôi tin rằng luôn có thể tìm ra giải pháp tuân thủ **nguyên tắc đóng channel** cho từng biến thể.
+
+###=========== Kết luận
+
+Không có tình huống nào buộc bạn phải vi phạm **nguyên tắc đóng channel**.
+Nếu gặp tình huống như vậy, hãy xem xét lại thiết kế và viết lại code.
+
+Lập trình với channel trong Go giống như tạo ra nghệ thuật.
+
+

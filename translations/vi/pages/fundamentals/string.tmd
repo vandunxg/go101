@@ -1,0 +1,539 @@
+### Chuỗi trong Go
+
+Giống như nhiều ngôn ngữ lập trình khác, string cũng là một kiểu quan trọng trong Go.
+Bài viết này trình bày đầy đủ các đặc điểm của string.
+
+###========== Cấu Trúc Nội Bộ Của Kiểu String
+
+Với Go compiler chuẩn,
+cấu trúc nội bộ của mọi kiểu string được khai báo như sau:
+@@@ .line-numbers
+''' go
+type _string struct {
+	elements *byte // underlying bytes
+	len      int   // number of bytes
+}
+'''
+Từ khai báo này, ta biết string thực chất là một wrapper cho một dãy `byte`.
+Trên thực tế, có thể xem string là một byte slice không thể thay đổi phần tử.
+
+Lưu ý, trong Go, `byte` là alias có sẵn của kiểu `uint8`.
+
+###========== Một Số Đặc Điểm Cơ Bản Của String
+
+
+Từ các bài viết trước, ta đã biết những điều sau về string:
+*
+   Giá trị string có thể được dùng làm hằng số (cùng với giá trị boolean và mọi kiểu số).
+*
+   Go hỗ trợ __hai kiểu string literal__:
+   kiểu dấu ngoặc kép (hay interpreted literal)
+   và kiểu dấu nháy ngược (hay raw string literal).
+*
+   Zero value của kiểu string là chuỗi rỗng, có thể biểu diễn
+   bằng `""` hoặc ` ^```` trong literal.
+*
+   Có thể nối string bằng các toán tử `+` và `+=`.
+*
+   Mọi kiểu string đều so sánh được (bằng toán tử `==` và `!=`).
+   Cũng như giá trị số nguyên và số dấu phẩy động, hai giá trị cùng kiểu string còn có thể so sánh bằng
+   các toán tử `>`, `<`, `>=` và `<=`.
+   Khi so sánh hai string, các byte nền tảng được so sánh lần lượt từng byte.
+   Nếu một string là tiền tố của string còn lại và string kia dài hơn,
+   thì string dài hơn được xem là lớn hơn.
+
+    === ... string literals :: basic-types-and-value-literals.tmd#string-literals
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	const World = "world"
+	var hello = "hello"
+
+	// Nối các chuỗi.
+	var helloWorld = hello + " " + World
+	helloWorld += "!"
+	fmt.Println(helloWorld) // hello world!
+
+	// So sánh các chuỗi.
+	fmt.Println(hello == "hello")   // true
+	fmt.Println(hello > helloWorld) // false
+}
+'''
+
+
+Một số đặc điểm khác của kiểu và giá trị string trong Go:
+*
+   Giống như Java, nội dung (các byte nền tảng) của giá trị string là bất biến.
+   Độ dài của giá trị string cũng không thể được thay đổi riêng biệt.
+   Có thể gán đè toàn bộ một giá trị string có thể lấy địa chỉ bằng một giá trị string khác.
+*
+   Kiểu có sẵn `string` không có method (giống như phần lớn kiểu có sẵn khác trong Go), nhưng ta có thể:
+   -
+      dùng các function trong __standard package `strings`__
+      để thực hiện nhiều thao tác với string.
+   -
+      gọi function có sẵn `len` để lấy độ dài của string (số byte được lưu trong string).
+   -
+      dùng cú pháp truy cập phần tử `aString[i]` được giới thiệu trong
+      __truy cập phần tử container__
+      để lấy giá trị `byte` thứ **i** được lưu trong `aString`.
+      Biểu thức `aString[i]` không thể lấy địa chỉ.
+      Nói cách khác, không thể sửa giá trị `aString[i]`.
+   -
+      dùng __cú pháp subslice__ `aString[start:end]`
+      để lấy một substring của `aString`.
+      Ở đây, `start` và `end` đều là chỉ số byte được lưu trong `aString`.
+
+*
+   Với Go compiler chuẩn,
+   biến đích và giá trị nguồn trong phép gán string sẽ
+   cùng tham chiếu đến một dãy byte nền tảng trong bộ nhớ.
+   Kết quả của biểu thức substring `aString[start:end]`
+   cũng cùng tham chiếu đến dãy byte nền tảng trong bộ nhớ với string gốc
+   `aString`.
+
+    === standard package `strings` :: https://golang.org/pkg/strings/
+    === truy cập phần tử container :: container.tmd#element-access
+    === cú pháp subslice :: container.tmd#subslice
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var helloWorld = "hello world!"
+
+	var hello = helloWorld[:5] // substring
+	// 104 là mã ASCII (và Unicode) của ký tự 'h'.
+	fmt.Println(hello[0])         // 104
+	fmt.Printf("%T \n", hello[0]) // uint8
+
+	// hello[0] không thể lấy địa chỉ và là bất biến,
+	// nên hai dòng sau sẽ không biên dịch được.
+	/*
+	hello[0] = 'H'         // error
+	fmt.Println(&hello[0]) // error
+	*/
+
+	// Câu lệnh tiếp theo in ra: 5 12 true
+	fmt.Println(len(hello), len(helloWorld),
+			strings.HasPrefix(helloWorld, hello))
+}
+'''
+
+Lưu ý, nếu `aString` và các chỉ số trong biểu thức `aString[i]` và `aString[start:end]` đều là hằng số,
+thì chỉ số hằng nằm ngoài phạm vi sẽ khiến quá trình biên dịch thất bại.
+Cũng cần lưu ý rằng kết quả tính toán của các biểu thức này luôn không phải hằng số
+(__điều này có thể thay đổi hoặc không ở một phiên bản Go sau này__).
+Ví dụ, chương trình sau sẽ in ra `4 0`.
+
+    === ... một phiên bản Go sau này :: https://github.com/golang/go/issues/28591
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+const s = "Go101.org" // len(s) == 9
+
+// len(s) là biểu thức hằng,
+// còn len(s[:]) thì không.
+var a byte = 1 << len(s) / 128
+var b byte = 1 << len(s[:]) / 128
+
+func main() {
+	fmt.Println(a, b) // 4 0
+}
+'''
+
+Để biết vì sao biến `a` và `b` được tính ra các giá trị khác nhau,
+hãy đọc __quy tắc suy diễn kiểu đặc biệt trong phép dịch bit__
+và __những lời gọi function được đánh giá tại thời điểm biên dịch__.
+
+    === ... phép dịch bit :: operators.tmd#bitwise-shift-left-operand-type-deduction
+    === ... tại thời điểm biên dịch :: summaries.tmd#compile-time-evaluation
+
+###========== Mã Hóa String Và Code Point Unicode
+
+Tiêu chuẩn Unicode quy định một giá trị duy nhất cho mỗi ký tự trong mọi ngôn ngữ của con người.
+Tuy nhiên, đơn vị cơ bản của Unicode không phải là ký tự mà là code point.
+Phần lớn code point tương ứng với một ký tự,
+nhưng một số ít ký tự được tạo thành từ nhiều code point.
+
+Trong Go, code point được biểu diễn dưới dạng __giá trị `rune`__.
+`rune` là alias có sẵn của kiểu `int32` trong Go.
+
+    === giá trị rune :: basic-types-and-value-literals.tmd#rune
+
+Trong ứng dụng, có nhiều cách mã hóa để biểu diễn code point, chẳng hạn UTF-8 và UTF-16.
+Hiện nay, UTF-8 là cách mã hóa được dùng phổ biến nhất.
+Trong Go, mọi string constant được xem là mã hóa theo UTF-8.
+Nếu string constant có mã UTF-8 không hợp lệ, quá trình biên dịch sẽ thất bại.
+Tuy nhiên, khi chạy chương trình, Go runtime không thể ngăn một số string có mã UTF-8 không hợp lệ.
+
+Với UTF-8, mỗi giá trị code point có thể được lưu bằng một hoặc nhiều byte (tối đa bốn byte).
+Ví dụ, mỗi code point tiếng Anh (tương ứng với một ký tự tiếng Anh) được lưu bằng một byte,
+trong khi mỗi code point tiếng Trung (tương ứng với một ký tự tiếng Trung) được lưu bằng ba byte.
+
+@@@ #conversions
+###========== Các Phép Chuyển Đổi Liên Quan Đến String
+
+Trong bài viết __hằng số và biến__,
+ta đã biết số nguyên có thể được chuyển đổi tường minh sang string (nhưng không thể chuyển đổi ngược lại).
+
+    === hằng số và biến :: constants-and-variables.tmd#explicit-conversion
+
+Bài viết này giới thiệu thêm hai quy tắc chuyển đổi liên quan đến string trong Go:
+*.
+   có thể chuyển đổi tường minh một giá trị string thành byte slice và ngược lại.
+   Byte slice là slice có kiểu phần tử với underlying type là `[]byte`.
+*.
+   có thể chuyển đổi tường minh một giá trị string thành rune slice và ngược lại.
+   Rune slice là slice có kiểu phần tử với underlying type là `[]rune`.
+
+Khi chuyển rune slice thành string,
+mỗi phần tử của slice (một giá trị rune) sẽ được mã hóa UTF-8 thành từ một đến bốn byte
+và lưu vào string kết quả.
+Nếu giá trị rune của phần tử slice nằm ngoài phạm vi code point Unicode hợp lệ,
+nó sẽ được xem là `0xFFFD`, code point của ký tự thay thế Unicode.
+`0xFFFD` được mã hóa UTF-8 thành ba byte (`0xef 0xbf 0xbd`).
+
+Khi chuyển string thành rune slice, các byte được lưu trong string
+được xem là các biểu diễn chuỗi byte UTF-8 liên tiếp
+của nhiều code point Unicode. Các biểu diễn UTF-8 không hợp lệ sẽ
+được chuyển thành giá trị rune `0xFFFD`.
+
+Khi chuyển string thành byte slice,
+byte slice kết quả là một bản sao sâu của
+dãy byte nền tảng của string.
+Khi chuyển byte slice thành string,
+dãy byte nền tảng của string kết quả
+cũng là một bản sao sâu của byte slice.
+Cần cấp phát bộ nhớ để lưu bản sao sâu
+trong mỗi phép chuyển đổi như vậy.
+Bản sao sâu là cần thiết vì phần tử slice có thể thay đổi,
+còn byte được lưu trong string là bất biến,
+nên byte slice và string không thể dùng chung các phần tử byte.
+
+Lưu ý, với phép chuyển đổi giữa string và byte slice:
+*
+   byte có mã UTF-8 không hợp lệ vẫn được chấp nhận và giữ nguyên.
+*
+   Go compiler chuẩn tối ưu hóa
+   một số trường hợp đặc biệt của các phép chuyển đổi này,
+   nhờ đó không cần tạo bản sao sâu.
+   Các trường hợp này sẽ được giới thiệu bên dưới.
+
+Go không hỗ trợ trực tiếp việc chuyển đổi giữa byte slice và rune slice.
+Có thể thực hiện việc này theo những cách sau:
+*
+   dùng giá trị string làm trung gian. Cách này tiện lợi nhưng không hiệu quả lắm vì cần hai lần sao chép sâu.
+*
+   dùng các function trong standard package __unicode/utf8__.
+*
+   dùng __function `Runes` trong standard package bytes__
+   để chuyển giá trị `[]byte` thành giá trị `[]rune`.
+   Package này không có function chuyển rune slice thành byte slice.
+
+    === unicode/utf8 :: https://golang.org/pkg/unicode/utf8/
+    === function `Runes` ... :: https://golang.org/pkg/bytes/#Runes
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"bytes"
+	"unicode/utf8"
+)
+
+func Runes2Bytes(rs []rune) []byte {
+	n := 0
+	for _, r := range rs {
+		n += utf8.RuneLen(r)
+	}
+	n, bs := 0, make([]byte, n)
+	for _, r := range rs {
+		n += utf8.EncodeRune(bs[n:], r)
+	}
+	return bs
+}
+
+func main() {
+	s := "Color Infection is a fun game."
+	bs := []byte(s) // string -> []byte
+	s = string(bs)  // []byte -> string
+	rs := []rune(s) // string -> []rune
+	s = string(rs)  // []rune -> string
+	rs = bytes.Runes(bs) // []byte -> []rune
+	bs = Runes2Bytes(rs) // []rune -> []byte
+}
+'''
+
+{ %%
+https://github.com/golang/go/issues/23536
+todo: nếu sau này ý nghĩa của "byte slice" thay đổi.
+Phần mở đầu của bài viết này có thể cũng
+cần thay đổi. "a `byte` sequence" nên đổi thành "a byte sequence".
+
+Có thể đây không phải chủ ý: với Go compiler chuẩn
+(ít nhất đến phiên bản 1.11),
+có vẻ string cũng có thể được chuyển thành một slice type có
+underlying type của phần tử là `byte`,
+nhưng không thể chuyển ngược lại.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type MyByte byte
+	str := "hello"
+	bs := []MyByte(str) // compile okay
+	str = string(bs)    // error: cannot use []MyByte as []byte
+}
+'''
+}
+
+
+@@@ #conversion-optimizations
+###========== Tối Ưu Hóa Của Compiler Cho Phép Chuyển Đổi Giữa String Và Byte Slice
+
+Hãy đọc chương "String and Byte Slices" trong sách
+__Go Optimizations 101__.
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+{ %%
+https://groups.google.com/forum/#!topic/golang-nuts/EPhPFpuMTWI
+
+fd không được tối ưu hóa vì phép nối trong đó có khả năng áp dụng được một tối ưu hóa khác,
+tiếc là ...
+}
+
+###========== Dùng `for-range` Với String
+
+Luồng điều khiển vòng lặp `for-range` áp dụng được với string.
+Tuy nhiên, lưu ý rằng `for-range` duyệt qua các code point Unicode
+(dưới dạng giá trị `rune`), thay vì các byte trong string.
+Các biểu diễn UTF-8 không hợp lệ trong string sẽ
+được diễn giải thành giá trị rune `0xFFFD`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	s := "éक्षिaπ囧"
+	for i, rn := range s {
+		fmt.Printf("%2v: 0x%x %v \n", i, rn, string(rn))
+	}
+	fmt.Println(len(s))
+}
+'''
+
+Kết quả của chương trình trên:
+@@@ .output
+'''
+ 0: 0x65 e
+ 1: 0x301 ́
+ 3: 0x915 क
+ 6: 0x94d ्
+ 9: 0x937 ष
+12: 0x93f ि
+15: 0x61 a
+16: 0x3c0 π
+18: 0x56e7 囧
+21
+'''
+
+Từ kết quả trên, ta có thể thấy:
+
+*. Giá trị chỉ số khi duyệt có thể không liên tiếp. Nguyên nhân là chỉ số là chỉ số byte trong string được duyệt, trong khi một code point có thể cần nhiều byte để biểu diễn.
+*. Ký tự đầu tiên, `é`, gồm hai rune (tổng cộng 3 byte).
+*. Ký tự thứ hai, `क्षि`, gồm bốn rune (tổng cộng 12 byte).
+*. Ký tự tiếng Anh `a` gồm một rune (1 byte).
+*. Ký tự `π` gồm một rune (2 byte).
+*. Ký tự tiếng Trung `囧` gồm một rune (3 byte).
+
+Vậy làm thế nào để duyệt từng byte trong string? Có thể làm như sau:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	s := "éक्षिaπ囧"
+	for i := 0; i < len(s); i++ {
+		fmt.Printf("The byte at index %v: 0x%x \n", i, s[i])
+	}
+}
+'''
+
+Ta cũng có thể tận dụng tối ưu hóa compiler đã nêu ở trên để duyệt byte trong string.
+Với Go compiler chuẩn, cách này hiệu quả hơn một chút so với cách trên.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	s := "éक्षिaπ囧"
+	// Các byte nền tảng của s không bị sao chép.
+	for i, b := range []byte(s) {
+		fmt.Printf("The byte at index %v: 0x%x \n", i, b)
+	}
+}
+'''
+
+Từ một số ví dụ trên, ta biết rằng
+`len(s)` trả về số byte trong string `s`.
+Độ phức tạp thời gian của `len(s)` là // `O(1)` //.
+Làm thế nào để lấy số rune trong một string?
+Có thể dùng vòng lặp `for-range` để duyệt và đếm tất cả rune, hoặc dùng
+function __RuneCountInString__ trong standard package `unicode/utf8`.
+Hiệu năng của hai cách gần như tương đương.
+Cách thứ ba là dùng `len([]rune(s))` để lấy số rune trong string `s`.
+Từ Go Toolchain 1.11, Go compiler chuẩn tối ưu hóa cách thứ ba
+để tránh một lần sao chép sâu không cần thiết, nhờ đó hiệu quả tương đương hai cách trước.
+Lưu ý rằng độ phức tạp thời gian của các cách này đều là // `O(n)` //.
+
+    === RuneCountInString :: https://golang.org/pkg/unicode/utf8/#RuneCountInString
+
+@@@ #string-concatenation
+###========== Các Cách Nối String Khác
+
+Hãy đọc chương "String and Byte Slices" trong sách
+__Go Optimizations 101__.
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+@@@ #use-string-as-byte-slice
+###========== Cú Pháp Rút Gọn: Dùng String Như Byte Slice
+
+Trong bài viết __array, slice và map__,
+ta đã biết có thể dùng các function có sẵn `copy` và
+`append` để sao chép và nối các phần tử slice.
+Trên thực tế, trong một trường hợp đặc biệt,
+nếu đối số thứ nhất của lời gọi một trong hai
+function này là byte slice, thì đối số thứ hai có thể là string
+(nếu lời gọi là `append`, đối số string
+phải theo sau bởi ba dấu chấm `...`).
+Nói cách khác, trong trường hợp đặc biệt này, có thể dùng string như byte slice.
+
+    === array, slice và map :: container.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	hello := []byte("Hello ")
+	world := "world!"
+
+	// Cách thông thường:
+	// helloWorld := append(hello, []byte(world)...)
+	helloWorld := append(hello, world...) // cách rút gọn
+	fmt.Println(string(helloWorld))
+
+	helloWorld2 := make([]byte, len(hello) + len(world))
+	copy(helloWorld2, hello)
+	// Cách thông thường:
+	// copy(helloWorld2[len(hello):], []byte(world))
+	copy(helloWorld2[len(hello):], world) // cách rút gọn
+	fmt.Println(string(helloWorld2))
+}
+'''
+
+@@@ #comparison
+###========== Tìm Hiểu Thêm Về So Sánh String
+
+Ở trên đã đề cập rằng thực chất so sánh hai string là so sánh các byte nền tảng của chúng.
+Thông thường, Go compiler thực hiện các tối ưu hóa sau khi so sánh string:
+*
+   Với phép so sánh `==` và `!=`,
+   nếu độ dài của hai string được so sánh không bằng nhau,
+   thì chắc chắn chúng không bằng nhau (không cần so sánh byte).
+*
+   Nếu các con trỏ đến dãy byte nền tảng
+   của hai string được so sánh bằng nhau,
+   thì kết quả so sánh cũng giống như
+   so sánh độ dài của hai string.
+
+Vì vậy, với hai string bằng nhau, độ phức tạp thời gian khi so sánh
+phụ thuộc vào việc các con trỏ đến dãy byte nền tảng của chúng có bằng nhau hay không.
+Nếu bằng nhau, độ phức tạp thời gian là // `O(1)` //;
+nếu không, độ phức tạp là // `O(n)` //,
+trong đó //`n`// là độ dài của hai string.
+
+Như đã nói ở trên, với Go compiler chuẩn, khi gán giá trị string,
+giá trị string đích và giá trị string nguồn
+cùng tham chiếu đến một dãy byte nền tảng trong bộ nhớ.
+Vì vậy, chi phí so sánh hai string đó rất nhỏ.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	bs := make([]byte, 1<<26)
+	s0 := string(bs)
+	s1 := string(bs)
+	s2 := s1
+
+	// s0, s1 và s2 là ba string bằng nhau.
+	// Các byte nền tảng của s0 là bản sao của bs.
+	// Các byte nền tảng của s1 cũng là bản sao của bs.
+	// Các byte nền tảng của s0 và s1 nằm trong hai
+	// bản sao khác nhau của bs.
+	// s2 dùng chung byte nền tảng với s1.
+
+	startTime := time.Now()
+	_ = s0 == s1
+	duration := time.Now().Sub(startTime)
+	fmt.Println("duration for (s0 == s1):", duration)
+
+	startTime = time.Now()
+	_ = s1 == s2
+	duration = time.Now().Sub(startTime)
+	fmt.Println("duration for (s1 == s2):", duration)
+}
+'''
+
+Output:
+@@@ .output
+'''
+duration for (s0 == s1): 10.462075ms
+duration for (s1 == s2): 136ns
+'''
+
+1ms là 1000000ns! Vì vậy, hãy cố gắng tránh so sánh hai string dài
+nếu chúng không dùng chung dãy byte nền tảng.

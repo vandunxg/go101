@@ -1,0 +1,631 @@
+### Hàm trong Go
+
+__Khai báo và lời gọi hàm__ đã được giải thích trước đây.
+Bài viết này sẽ đề cập đến một số khái niệm và chi tiết liên quan đến hàm trong Go.
+
+    === ... khai báo và lời gọi hàm :: function-declarations-and-calls.tmd
+
+Thực tế, hàm là một trong những kiểu dữ liệu hạng nhất trong Go.
+Nói cách khác, ta có thể dùng hàm như một giá trị.
+Mặc dù Go là ngôn ngữ tĩnh, hàm Go rất linh hoạt.
+Cảm giác khi dùng hàm Go khá giống với việc dùng hàm trong nhiều ngôn ngữ động.
+
+Go có một số hàm dựng sẵn.
+Các hàm này được tài liệu hóa trong những package chuẩn mã __`builtin`__ và __`unsafe`__.
+Hàm dựng sẵn có một số điểm khác với hàm do người dùng định nghĩa.
+Những điểm khác biệt này sẽ được đề cập bên dưới.
+
+    === builtin :: https://docs.go101.org/std/pkg/builtin.html
+    === unsafe :: https://docs.go101.org/std/pkg/unsafe.html
+
+###=========== Chữ ký hàm và kiểu hàm
+
+Literal của một kiểu hàm gồm từ khóa `func` và một literal chữ ký hàm.
+Chữ ký hàm gồm hai danh sách kiểu: một danh sách kiểu của các tham số đầu vào,
+và một danh sách kiểu của các kết quả đầu ra.
+Tên tham số và tên kết quả có thể xuất hiện trong literal kiểu hàm và chữ ký hàm,
+nhưng tên không quan trọng.
+
+Trong thực tế, từ khóa `func` có thể xuất hiện hoặc không trong literal chữ ký.
+Vì vậy, ta có thể xem kiểu hàm và chữ ký hàm là cùng một khái niệm.
+
+Sau đây là một literal kiểu hàm:
+@@@ .disable-line-numbers111
+''' go
+func (a int, b string, c string) (x int, y int, z bool)
+'''
+
+Trong bài __khai báo và lời gọi hàm__, ta đã biết rằng các tham số và kết quả liên tiếp
+có cùng kiểu có thể được khai báo cùng nhau.
+Vì vậy, literal trên tương đương với
+@@@ .disable-line-numbers111
+''' go
+func (a int, b, c string) (x, y int, z bool)
+'''
+
+Vì tên tham số và tên kết quả không quan trọng trong các literal
+(miễn là không có tên nào trùng lặp, ngoại trừ tên trắng),
+các literal trên tương đương với literal sau.
+@@@ .disable-line-numbers111
+''' go
+func (x int, y, z string) (a, b int, c bool)
+'''
+
+Tên biến (tham số và kết quả) có thể là định danh trắng `_`.
+Các literal trên tương đương với literal sau.
+@@@ .disable-line-numbers111
+''' go
+func (_ int, _, _ string) (_, _ int, _ bool)
+'''
+
+Tên tham số phải hoặc đều có mặt, hoặc đều vắng mặt (ẩn danh).
+Quy tắc tương tự áp dụng cho tên kết quả.
+Các literal trên tương đương với những literal sau.
+@@@ .disable-line-numbers111
+''' go
+func (int, string, string) (int, int, bool) // dạng chuẩn
+func (a int, b string, c string) (int, int, bool)
+func (x int, _ string, z string) (int, int, bool)
+func (int, string, string) (x int, y int, z bool)
+func (int, string, string) (a int, b int, _ bool)
+'''
+
+Tất cả literal kiểu hàm trên đều biểu thị cùng một kiểu hàm (không định danh).
+
+Trong một literal, mỗi danh sách tham số phải được đặt trong `()`,
+kể cả khi danh sách đó rỗng.
+Nếu danh sách kết quả của một kiểu hàm rỗng thì có thể lược bỏ khỏi literal kiểu hàm.
+Nếu danh sách kết quả có tối đa một kết quả, không cần đặt danh sách trong `()`
+nếu literal danh sách đó không chứa tên kết quả.
+
+@@@ .disable-line-numbers111
+''' go
+// Ba kiểu hàm sau giống hệt nhau.
+func () (x int)
+func () (int)
+func () int
+
+// Hai kiểu hàm sau giống hệt nhau.
+func (a int, b string) ()
+func (a int, b string)
+'''
+
+@@@ #variadic-parameter
+###----- Tham số variadic và kiểu hàm variadic
+
+Tham số cuối cùng của một hàm có thể là tham số variadic.
+Mỗi hàm có nhiều nhất một tham số variadic.
+Kiểu của tham số variadic luôn là kiểu slice.
+Để chỉ ra tham số cuối cùng là variadic,
+hãy đặt ba dấu chấm `...` trước kiểu phần tử của kiểu slice đó
+trong khai báo. Ví dụ:
+@@@ .disable-line-numbers111
+''' go
+func (values ...int64) (sum int64)
+func (sep string, tokens ...string) string
+'''
+
+Kiểu hàm có tham số variadic được gọi là kiểu hàm variadic.
+Kiểu hàm variadic và kiểu hàm không variadic hoàn toàn không giống nhau.
+
+Một số ví dụ về hàm variadic sẽ xuất hiện trong phần bên dưới.
+
+###--------- Kiểu hàm là kiểu không thể so sánh
+
+Go 101 đã __đề cập__ nhiều lần rằng kiểu hàm là kiểu không thể so sánh.
+Tuy nhiên, giống như giá trị map và slice, giá trị hàm có thể được so sánh
+với định danh `nil` không định kiểu.
+(Giá trị hàm sẽ được giải thích ở phần cuối bài viết này.)
+
+    === được đề cập :: type-system-overview.tmd#types-not-support-comparison
+
+Vì kiểu hàm là kiểu không thể so sánh,
+chúng không thể được dùng làm kiểu khóa của kiểu map.
+
+@@@ #prototype
+###===========+++ Prototype hàm
+
+Function prototype gồm tên hàm và một kiểu hàm (hoặc chữ ký hàm).
+Literal của nó gồm từ khóa `func`, tên hàm và literal của một chữ ký hàm.
+
+Ví dụ về literal function prototype:
+@@@ .disable-line-numbers111
+''' go
+func Double(n int) (result int)
+'''
+
+Nói cách khác, function prototype là một khai báo hàm không có phần thân.
+Khai báo hàm gồm function prototype và phần thân hàm.
+
+@@@ #variadic-function
+###=========== Khai báo hàm variadic và lời gọi hàm variadic
+
+Khai báo và lời gọi hàm thông thường đã được giải thích trong
+__khai báo và lời gọi hàm__.
+Phần này giới thiệu cách khai báo và gọi hàm variadic.
+
+###------ Khai báo hàm variadic
+
+Khai báo hàm variadic tương tự khai báo hàm thông thường.
+Điểm khác biệt là tham số cuối cùng của hàm variadic phải là tham số variadic.
+Lưu ý, tham số variadic của hàm variadic được xem là một slice
+ở bên trong phần thân hàm.
+
+@@@ .line-numbers
+''' go
+// Tính tổng rồi trả về các số đầu vào.
+func Sum(values ...int64) (sum int64) {
+	// Kiểu của values là []int64.
+	sum = 0
+	for _, v := range values {
+		sum += v
+	}
+	return
+}
+
+// Hàm nối chuỗi kém hiệu quả.
+func Concat(sep string, tokens ...string) string {
+	// Kiểu của tokens là []string.
+	r := ""
+	for i, t := range tokens {
+		if i != 0 {
+			r += sep
+		}
+		r += t
+	}
+	return r
+}
+'''
+
+Từ hai khai báo hàm variadic trên, ta có thể thấy nếu tham số variadic
+được khai báo với phần kiểu là `...T`, thì thực tế kiểu của tham số đó là `[]T`.
+
+Thực tế, các hàm `Print`, `Println` và `Printf` trong package chuẩn `fmt`
+đều là hàm variadic.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+func Print(a ...interface{}) (n int, err error)
+func Printf(format string, a ...interface{}) (n int, err error)
+func Println(a ...interface{}) (n int, err error)
+'''
+
+Kiểu tham số variadic của cả ba hàm là `[]interface{}`;
+kiểu phần tử `interface{}` là một kiểu interface.
+Kiểu và giá trị interface sẽ được giải thích sau trong __interface trong Go__.
+
+    === interface trong Go :: interface.tmd
+
+@@@ #variadic-call
+###------ Lời gọi hàm variadic
+
+Có hai cách truyền đối số cho tham số variadic có kiểu `[]T`:
+*. truyền một giá trị slice làm đối số duy nhất.
+   Slice đó phải có thể gán cho giá trị kiểu `[]T`,
+   và phải theo sau bởi ba dấu chấm `...`.
+   Slice được truyền vào được gọi là đối số variadic.
+*. truyền không hoặc nhiều đối số có thể gán cho giá trị kiểu `T`.
+   Các đối số này sẽ được sao chép (hoặc chuyển đổi) thành các phần tử
+   của một giá trị slice mới được cấp phát, có kiểu `[]T`,
+   rồi slice mới được truyền vào tham số variadic.
+
+Lưu ý, không thể kết hợp hai cách trên trong cùng một lời gọi hàm variadic.
+
+Chương trình ví dụ dùng một số lời gọi hàm variadic:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func Sum(values ...int64) (sum int64) {
+	sum = 0
+	for _, v := range values {
+		sum += v
+	}
+	return
+}
+
+func main() {
+	a0 := Sum()
+	a1 := Sum(2)
+	a3 := Sum(2, 3, 5)
+	// Ba dòng trên tương đương với
+	// ba dòng tương ứng sau đây.
+	b0 := Sum([]int64{}...) // <=> Sum(nil...)
+	b1 := Sum([]int64{2}...)
+	b3 := Sum([]int64{2, 3, 5}...)
+	fmt.Println(a0, a1, a3) // 0 2 10
+	fmt.Println(b0, b1, b3) // 0 2 10
+}
+'''
+
+Một ví dụ khác:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func Concat(sep string, tokens ...string) (r string) {
+	for i, t := range tokens {
+		if i != 0 {
+			r += sep
+		}
+		r += t
+	}
+	return
+}
+
+func main() {
+	tokens := []string{"Go", "C", "Rust"}
+	// cách 1
+	langsA := Concat(",", tokens...)
+	// cách 2
+	langsB := Concat(",", "Go", "C","Rust")
+	fmt.Println(langsA == langsB) // true
+}
+'''
+
+Ví dụ sau không biên dịch được,
+vì hai cách gọi hàm variadic bị kết hợp với nhau.
+@@@ .line-numbers
+''' go
+package main
+
+// Xem các ví dụ trên để biết đầy đủ khai báo
+// của hai hàm sau.
+func Sum(values ...int64) (sum int64)
+func Concat(sep string, tokens ...string) string
+
+func main() {
+	// Cả hai dòng sau đều không biên dịch được
+	// với cùng một lỗi:
+	// quá nhiều đối số trong lời gọi.
+	_ = Sum(2, []int64{3, 5}...)
+	_ = Concat(",", "Go", []string{"C", "Rust"}...)
+}
+'''
+
+###=========== Thêm về khai báo và lời gọi hàm
+
+###------ Hàm có thể trùng tên
+
+Thông thường, tên các hàm được khai báo trong cùng một package mã
+không được trùng nhau. Tuy nhiên, có hai ngoại lệ.
+*. Một ngoại lệ là mỗi package mã có thể khai báo nhiều hàm
+   __cùng tên `init` và cùng kiểu `func ()`__.
+*. Ngoại lệ còn lại là có thể khai báo nhiều hàm với tên
+   là định danh trắng `_`; trong trường hợp này,
+   các hàm đã khai báo không thể được gọi.
+
+    === cùng tên ... :: packages-and-imports.tmd#init
+
+@@@ #compile-time-evaluated-calls
+###------ Một số lời gọi hàm được tính toán tại thời điểm biên dịch
+
+Hầu hết lời gọi hàm được tính toán tại thời điểm chạy.
+Tuy nhiên, lời gọi đến các hàm trong package chuẩn `unsafe`
+luôn được tính toán tại thời điểm biên dịch.
+Lời gọi đến một số hàm dựng sẵn khác, chẳng hạn `len` và `cap`,
+__có thể được tính toán tại thời điểm biên dịch hoặc thời điểm chạy__,
+tùy thuộc vào các đối số được truyền vào.
+Kết quả của lời gọi hàm được tính toán tại thời điểm biên dịch
+có thể được gán cho hằng số.
+
+    === có thể được tính toán tại ... :: summaries.tmd#compile-time-evaluation
+
+###------ Mọi đối số hàm đều được truyền bằng cách sao chép
+
+Xin nhắc lại, giống như mọi phép gán giá trị trong Go,
+tất cả đối số hàm trong Go đều được truyền bằng cách sao chép.
+Khi một giá trị được sao chép, __chỉ phần trực tiếp của nó được sao chép__
+(còn gọi là sao chép nông).
+
+    === ... chỉ phần trực tiếp được sao chép :: value-part.tmd#about-value-copy
+
+###------ Khai báo hàm không có phần thân
+
+Ta có thể cài đặt một hàm bằng __Go assembly__.
+Các tệp mã nguồn Go assembly được lưu trong các tệp `*.a`.
+Một hàm được cài đặt bằng Go assembly vẫn cần được khai báo trong tệp `*.go`,
+nhưng chỉ cần có function prototype của hàm đó.
+Phần thân của khai báo hàm phải được lược bỏ khỏi tệp `*.go`.
+
+    === Go assembly :: https://golang.org/doc/asm
+
+###------ Một số hàm có kết quả trả về nhưng không bắt buộc phải return
+
+Nếu một hàm có kết quả trả về, câu lệnh cuối cùng trong phần thân khai báo
+của hàm phải là một __câu lệnh kết thúc__.
+Ngoài câu lệnh kết thúc `return`, còn có một số loại câu lệnh kết thúc khác.
+Vì vậy, phần thân hàm không bắt buộc phải chứa câu lệnh return. Ví dụ:
+@@@ .line-numbers
+''' go
+func fa() int {
+	a:
+	goto a
+}
+
+func fb() bool {
+	for{}
+}
+'''
+
+    === câu lệnh kết thúc :: https://golang.org/ref/spec#Terminating_statements
+
+###------ Có thể bỏ kết quả của lời gọi hàm tự định nghĩa, nhưng không thể làm vậy với lời gọi một số hàm dựng sẵn
+
+Có thể bỏ toàn bộ các kết quả trả về của một lời gọi hàm tự định nghĩa.
+Tuy nhiên, không thể bỏ kết quả trả về của lời gọi hàm dựng sẵn,
+ngoại trừ `recover` và `copy`, dù có thể bỏ qua chúng bằng cách gán
+cho một số định danh trắng.
+Không thể dùng lời gọi hàm có kết quả không thể bị bỏ qua làm lời gọi hàm `defer`
+hoặc lời gọi goroutine.
+
+@@@ #call-as-expression
+###------ Dùng lời gọi hàm làm biểu thức
+
+Lời gọi hàm có một kết quả trả về luôn có thể được dùng như một giá trị đơn.
+Ví dụ, lời gọi đó có thể được lồng làm đối số trong một lời gọi hàm khác,
+và cũng có thể xuất hiện như một giá trị đơn trong các biểu thức và câu lệnh khác.
+
+Nếu không bỏ kết quả trả về của lời gọi hàm có nhiều kết quả,
+thì lời gọi đó chỉ có thể được dùng như một biểu thức nhiều giá trị trong hai trường hợp.
+*. Có thể dùng lời gọi đó làm các giá trị nguồn trong phép gán.
+   Tuy nhiên, lời gọi đó không thể kết hợp với các giá trị nguồn khác trong phép gán.
+*. Có thể lồng lời gọi đó trong một lời gọi hàm khác làm các đối số.
+   Tuy nhiên, lời gọi đó không thể kết hợp với các đối số khác.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func HalfAndNegative(n int) (int, int) {
+	return n/2, -n
+}
+
+func AddSub(a, b int) (int, int) {
+	return a+b, a-b
+}
+
+func Dummy(values ...int) {}
+
+func main() {
+	// Các dòng này biên dịch được.
+	AddSub(HalfAndNegative(6))
+	AddSub(AddSub(AddSub(7, 5)))
+	AddSub(AddSub(HalfAndNegative(6)))
+	Dummy(HalfAndNegative(6))
+	_, _ = AddSub(7, 5)
+
+	// Các dòng sau không biên dịch được.
+	/*
+	_, _, _ = 6, AddSub(7, 5)
+	Dummy(AddSub(7, 5), 9)
+	Dummy(AddSub(7, 5), HalfAndNegative(6))
+	*/
+}
+'''
+
+Lưu ý, với Go compiler chuẩn,
+__một số hàm dựng sẵn phá vỡ tính phổ quát__ của các quy tắc vừa nêu.
+
+    === một số hàm dựng sẵn phá vỡ tính phổ quát :: exceptions.tmd#nest-function-calls
+
+###=========== Giá trị hàm
+
+Như đã đề cập ở trên, kiểu hàm là một trong các kiểu của Go.
+Giá trị có kiểu hàm được gọi là giá trị hàm.
+Giá trị zero của kiểu hàm được biểu diễn bằng định danh khai báo sẵn `nil`.
+
+Khi khai báo một hàm tự định nghĩa, thực tế ta cũng đồng thời khai báo
+một giá trị hàm bất biến.
+Giá trị hàm được nhận diện bằng tên hàm.
+Kiểu của giá trị hàm được biểu diễn bằng literal nhận được
+khi lược bỏ tên hàm khỏi literal function prototype.
+
+Lưu ý, không thể dùng hàm dựng sẵn làm giá trị.
+Cũng không thể dùng hàm `init` làm giá trị.
+
+Bất kỳ giá trị hàm nào cũng có thể được gọi giống như một hàm đã khai báo.
+Gọi một hàm nil để bắt đầu một goroutine sẽ gây ra lỗi nghiêm trọng.
+Không thể recover lỗi nghiêm trọng này và nó sẽ làm toàn bộ chương trình bị crash.
+Trong các trường hợp khác, lời gọi giá trị hàm nil sẽ tạo ra panic có thể recover,
+kể cả lời gọi hàm `defer`.
+
+Từ bài __các phần của giá trị__, ta biết rằng giá trị hàm khác nil
+là giá trị gồm nhiều phần.
+Sau khi một giá trị hàm được gán cho giá trị hàm khác,
+hai hàm sẽ dùng chung các phần nền tảng (cơ bản) của chúng.
+Nói cách khác, hai hàm biểu diễn cùng một function object nội bộ.
+Tác động khi gọi hai hàm là như nhau.
+
+    === các phần của giá trị :: value-part.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func Double(n int) int {
+	return n + n
+}
+
+func Apply(n int, f func(int) int) int {
+	return f(n) // kiểu của f là "func(int) int"
+}
+
+func main() {
+	fmt.Printf("%T\n", Double) // func(int) int
+	// Double = nil // lỗi: Double là bất biến.
+
+	var f func(n int) int // giá trị mặc định là nil.
+	f = Double
+	g := Apply // để compiler tự suy luận kiểu của g
+	fmt.Printf("%T\n", g) // func(int, func(int) int) int
+
+	fmt.Println(f(9))         // 18
+	fmt.Println(g(6, Double)) // 12
+	fmt.Println(Apply(6, f))  // 12
+}
+'''
+
+Trong ví dụ trên, `g(6, Double)` và `Apply(6, f)` tương đương nhau.
+
+Trong thực tế, ta thường gán hàm ẩn danh cho biến hàm,
+để có thể gọi hàm ẩn danh nhiều lần.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	// Hàm này trả về một hàm (closure).
+	isMultipleOfX := func (x int) func(int) bool {
+		return func(n int) bool {
+			return n%x == 0
+		}
+	}
+
+	var isMultipleOf3 = isMultipleOfX(3)
+	var isMultipleOf5 = isMultipleOfX(5)
+	fmt.Println(isMultipleOf3(6))  // true
+	fmt.Println(isMultipleOf3(8))  // false
+	fmt.Println(isMultipleOf5(10)) // true
+	fmt.Println(isMultipleOf5(12)) // false
+
+	isMultipleOf15 := func(n int) bool {
+		return isMultipleOf3(n) && isMultipleOf5(n)
+	}
+	fmt.Println(isMultipleOf15(32)) // false
+	fmt.Println(isMultipleOf15(60)) // true
+}
+'''
+
+Trong Go, có thể xem mọi hàm là closure.
+Đây là một lý do quan trọng khiến Go, dù là ngôn ngữ tĩnh,
+vẫn linh hoạt như nhiều ngôn ngữ script động.
+
+@@@ #range
+###=========== Duyệt range trên hàm (từ Go 1.23)
+
+Kể từ Go 1.23, có thể duyệt giá trị của các kiểu hàm có kiểu nền
+là một trong các kiểu sau bằng vòng lặp `for-range`.
+
+@@@ .disable-line-numbers111
+''' go
+// K và V là một số kiểu.
+
+func(yield func() bool)
+
+func(yield func(V) bool)
+
+func(yield func(K, V) bool)
+'''
+
+Các giá trị như vậy được gọi là push iterator, thường gọi ngắn gọn là iterator.
+
+Khi vòng lặp `for-range` duyệt một giá trị hàm iterator như vậy,
+giá trị hàm iterator sẽ được gọi (một lần)
+với một hàm callback `yield` được tạo ngầm.
+Hàm callback `yield` trả về kết quả `bool`.
+Khi nó trả về `false`, hàm iterator không được gọi hàm `yield` thêm nữa.
+
+Sau đây là một số ví dụ dùng các iterator như vậy.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func Loop3(yield func() bool) {
+	if (!yield()) {
+		return
+	}
+	if (!yield()) {
+		return
+	}
+	yield()
+}
+
+func OneDigitNumbers(onValue func(int) bool) {
+	for i := range 10 {
+		if (!onValue(i)) {
+			return
+		}
+	}
+}
+
+func SquareLessThan50(onKeyValue func(int, int) bool) {
+	for i := range 8 {
+		if (!onKeyValue(i, i*i)) {
+			return
+		}
+	}
+}
+
+func main() {
+	var n = 0
+	for range Loop3 {
+		fmt.Print(n)
+		n++
+	}
+	fmt.Println()
+	// Output: 012
+	
+	for i := range OneDigitNumbers {
+		fmt.Print(i)
+	}
+	fmt.Println()
+	// Output: 0123456789
+	
+	for i, ii := range SquareLessThan50 {
+		fmt.Printf("%v:%v ", i, ii)
+	}
+	fmt.Println()
+	// Output: 0:0 1:1 2:4 3:9 4:16 5:25 6:36 7:49 
+}
+'''
+
+Với các trường hợp cụ thể trong ví dụ trên,
+các vòng lặp `for-range` lần lượt tương đương với những lời gọi hàm sau.
+
+@@@ .line-numbers
+''' go
+func main() {
+	var n = 0
+	Loop3(func() bool {
+		fmt.Print(n)
+		n++
+		return true
+	})
+	fmt.Println()
+	
+	OneDigitNumbers(func(i int) bool {
+		fmt.Print(i)
+		return true
+	})
+	fmt.Println()
+	
+	SquareLessThan50(func(i, ii int) bool {
+		fmt.Printf("%v:%v ", i, ii)
+		return true
+	})
+	fmt.Println()
+}
+'''
+
+Tuy nhiên, lưu ý rằng trong một số trường hợp khác,
+các cách viết tương đương như vậy có thể không còn đúng.
+
+Để tìm hiểu thêm về iterator trong Go, hãy đọc __bài blog chính thức này__ và __bài viết này__.
+
+    === bài blog chính thức này :: https://go.dev/blog/range-functions
+    === bài viết này :: https://go101.org/blog/2025-03-15-some-facts-about-iterators.html

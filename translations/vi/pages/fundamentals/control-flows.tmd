@@ -1,0 +1,835 @@
+### Các luồng điều khiển cơ bản
+
+Các khối mã điều khiển luồng trong Go khá giống với những ngôn ngữ lập trình phổ biến khác,
+nhưng cũng có nhiều điểm khác biệt.
+Bài viết này trình bày những điểm giống và khác đó.
+
+###========== Giới thiệu về luồng điều khiển trong Go
+
+Go có ba loại khối mã điều khiển luồng cơ bản:
+*
+   Khối thực thi có điều kiện hai nhánh `if-else`.
+*
+   Khối vòng lặp `for`.
+*
+   Khối thực thi có điều kiện nhiều nhánh `switch-case`.
+
+Go còn có một số khối mã điều khiển luồng liên quan đến những kiểu dữ liệu nhất định.
+*
+   Khối vòng lặp `for-range` dùng để duyệt số nguyên,
+   mọi loại __container`` container.tmd#iteration__,
+   __channel`` channel.tmd#range__,
+   và __một số hàm`` function.tmd#range__.
+*
+   Khối thực thi có điều kiện nhiều nhánh `type-switch` dành cho
+   __interface`` interface.tmd#type-switch__.
+*
+   Khối `select-case` dành cho
+   __channel`` channel.tmd#select__.
+
+Giống nhiều ngôn ngữ phổ biến khác, Go cũng hỗ trợ các câu lệnh nhảy luồng thực thi `break`,
+`continue` và `goto`.
+Ngoài ra, Go còn có một câu lệnh nhảy đặc biệt là `fallthrough`.
+
+Trong sáu loại khối điều khiển luồng kể trên,
+ngoại trừ `if-else`,
+năm loại còn lại được gọi là **khối điều khiển luồng có thể thoát bằng `break`**.
+Ta có thể dùng câu lệnh `break` để chuyển luồng thực thi ra khỏi các khối này.
+
+Các khối vòng lặp `for` và `for-range` được gọi là
+**khối điều khiển luồng dạng vòng lặp**.
+Trong khối điều khiển luồng dạng vòng lặp, ta có thể dùng câu lệnh `continue` để kết thúc sớm một lượt lặp,
+tức là chuyển sang lượt lặp kế tiếp.
+
+Lưu ý rằng mỗi khối điều khiển luồng kể trên đều là một câu lệnh,
+và bên trong có thể chứa nhiều câu lệnh con khác.
+
+Các câu lệnh điều khiển luồng vừa nêu là những câu lệnh theo nghĩa hẹp.
+Các cơ chế được giới thiệu ở bài viết tiếp theo,
+__goroutine, lời gọi hàm trì hoãn và
+panic/recover__, cùng các kỹ thuật đồng bộ hóa đồng thời được giới thiệu
+ở bài viết sau nữa
+__tổng quan về đồng bộ hóa đồng thời__
+cũng có thể được xem là câu lệnh điều khiển luồng theo nghĩa rộng.
+
+    === goroutines, ... :: control-flows-more.tmd
+    === concurrency synchronization overview :: concurrent-synchronization-overview.tmd
+
+Bài viết này chủ yếu giải thích các khối mã điều khiển luồng cơ bản
+và các câu lệnh nhảy luồng thực thi. Bài viết cũng đề cập đến vòng lặp `for range anInteger {...}`
+được giới thiệu trong Go 1.22. Các khối điều khiển luồng khác sẽ được giải thích
+trong nhiều bài Go 101 tiếp theo.
+
+@@@ #if-else
+###========== Khối điều khiển luồng `if-else`
+
+Dạng đầy đủ của khối mã `if-else` như sau:
+@@@ .line-numbers
+''' go
+if InitSimpleStatement; Condition {
+	// thực hiện thao tác
+} else {
+	// thực hiện thao tác
+}
+'''
+
+`if` và `else` là các keyword.
+Giống nhiều ngôn ngữ lập trình khác, nhánh `else` là tùy chọn.
+
+Phần `InitSimpleStatement` cũng là tùy chọn.
+Nếu có mặt, phần này phải là một __câu lệnh đơn giản__.
+Nếu không có, ta có thể xem nó là câu lệnh rỗng (một loại câu lệnh đơn giản).
+Trong thực tế, `InitSimpleStatement` thường là
+một khai báo biến ngắn hoặc một phép gán thuần túy.
+`Condition` phải là một __biểu thức__ cho kết quả kiểu boolean.
+Phần `Condition` có thể được đặt trong một cặp `()` hoặc không,
+nhưng không thể đặt chung với phần `InitSimpleStatement` trong cùng cặp ngoặc.
+
+    === simple statement :: expressions-and-statements.tmd#simple-statements
+    === expression :: expressions-and-statements.tmd#expressions
+
+Nếu phần `InitSimpleStatement` trong khối `if-else` có mặt,
+nó sẽ được thực thi trước các câu lệnh khác trong khối `if-else`.
+Nếu không có `InitSimpleStatement`,
+dấu chấm phẩy theo sau nó là tùy chọn.
+
+Mỗi cấu trúc điều khiển luồng `if-else` tạo thành
+một khối mã ngầm định, một khối mã tường minh cho nhánh `if`
+và một khối mã tùy chọn cho nhánh `else`.
+Hai khối mã nhánh đều nằm bên trong khối mã ngầm định.
+Khi thực thi, nếu biểu thức `Condition` cho kết quả `true`,
+khối nhánh `if` sẽ được thực thi; nếu không,
+khối nhánh `else` sẽ được thực thi.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+)
+
+func main() {
+	if n := rand.Int(); n%2 == 0 {
+		fmt.Println(n, "is an even number.")
+	} else {
+		fmt.Println(n, "is an odd number.")
+	}
+
+	n := rand.Int() % 2 // n này không phải biến n ở trên.
+	if n % 2 == 0 {
+		fmt.Println("An even number.")
+	}
+
+	if ; n % 2 != 0 {
+		fmt.Println("An odd number.")
+	}
+}
+'''
+
+Nếu `InitSimpleStatement` trong khối mã `if-else` là một khai báo biến ngắn,
+các biến được khai báo sẽ được xem như khai báo trong khối mã ngầm định ngoài cùng của khối `if-else`.
+
+Khối mã nhánh `else` có thể là ngầm định nếu `else`
+được theo sau bởi một khối `if-else` khác; trong trường hợp còn lại, nó phải tường minh.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	if h := time.Now().Hour(); h < 12 {
+		fmt.Println("Now is AM time.")
+	} else if h > 19 {
+		fmt.Println("Now is evening time.")
+	} else {
+		fmt.Println("Now is afternoon time.")
+		h := h // biến h ở vế phải được khai báo phía trên
+		// Biến "h" vừa được khai báo
+		// che khuất biến cùng tên ở phía trên.
+		_ = h
+	}
+
+	// h không hiển thị ở đây.
+}
+'''
+
+@@@ #for
+###========== Khối điều khiển vòng lặp `for`
+
+Dạng đầy đủ của khối vòng lặp `for` là:
+@@@ .line-numbers
+''' go
+for InitSimpleStatement; Condition; PostSimpleStatement {
+	// thực hiện thao tác
+}
+'''
+
+`for` là một keyword.
+Hai phần `InitSimpleStatement` và `PostSimpleStatement`
+đều phải là câu lệnh đơn giản; riêng `PostSimpleStatement` không được là khai báo biến ngắn.
+`Condition` phải là biểu thức có kết quả kiểu boolean.
+Cả ba phần đều là tùy chọn.
+
+Khác với nhiều ngôn ngữ lập trình khác, ba phần vừa nêu theo sau
+keyword `for` không thể được đặt trong một cặp `()`.
+
+Mỗi cấu trúc điều khiển luồng `for` tạo ra ít nhất hai khối mã,
+một khối ngầm định và một khối tường minh.
+Khối tường minh nằm bên trong khối ngầm định.
+
+Phần `InitSimpleStatement` trong khối vòng lặp `for`
+được thực thi (chỉ một lần) trước các câu lệnh khác trong khối vòng lặp.
+
+Biểu thức `Condition` được đánh giá ở mỗi lượt lặp.
+Nếu kết quả đánh giá là `false`, vòng lặp kết thúc.
+Nếu không, phần thân vòng lặp (tức khối mã tường minh) được thực thi.
+
+`PostSimpleStatement` được thực thi ở cuối mỗi lượt lặp.
+
+Ví dụ vòng lặp `for` sau in các số nguyên từ
+`0` đến `9`.
+@@@ .line-numbers
+''' go
+for i := 0; i < 10; i++ {
+	fmt.Println(i)
+}
+'''
+
+Nếu cả hai phần `InitSimpleStatement` và `PostSimpleStatement`
+đều không có (có thể xem chúng là các câu lệnh rỗng),
+thì có thể bỏ hai dấu chấm phẩy ở cạnh chúng.
+Dạng này được gọi là vòng lặp `for` chỉ có điều kiện.
+Nó tương đương vòng lặp `while` trong các ngôn ngữ khác.
+@@@ .line-numbers
+''' go
+var i = 0
+for ; i < 10; {
+	fmt.Println(i)
+	i++
+}
+for i < 20 {
+	fmt.Println(i)
+	i++
+}
+'''
+
+Nếu không có phần `Condition`,
+compiler sẽ xem điều kiện là `true`.
+@@@ .line-numbers
+''' go
+for i := 0; ; i++ { // <=> for i := 0; true; i++ {
+	if i >= 10 {
+		// Câu lệnh "break" sẽ được giải thích bên dưới.
+		break
+	}
+	fmt.Println(i)
+}
+
+// Bốn vòng lặp vô hạn dưới đây
+// tương đương nhau (trong phần lớn trường hợp).
+for ; true; {
+}
+for true {
+}
+for ; ; {
+}
+for {
+}
+'''
+
+Nếu phần `InitSimpleStatement` trong khối `for`
+là một câu lệnh khai báo biến ngắn,
+các biến vòng lặp được khai báo sẽ được xem như khai báo
+trong khối mã ngầm định ngoài cùng của khối `for`.
+Ví dụ, đoạn mã sau in `012` thay vì `0`.
+
+@@@ .line-numbers
+''' go
+for i := 0; i < 3; i++ {
+	fmt.Print(i)
+	// i ở bên trái là biến mới được khai báo,
+	// còn i ở bên phải là biến vòng lặp.
+	i := i
+	// Biến mới khai báo bị thay đổi,
+	// còn biến cũ (biến vòng lặp) thì chưa.
+	i = 10
+	_ = i
+}
+'''
+
+@@@ #for-semantic-change
+Lưu ý: Go 1.22 đã thay đổi ngữ nghĩa của các khối vòng lặp `for`.
+*
+   Trước Go 1.22, mọi biến vòng lặp được khai báo và dùng trong một khối `for`
+   đều được chia sẻ giữa tất cả các lượt lặp khi vòng lặp chạy.
+*
+   Từ Go 1.22, mỗi biến vòng lặp được khai báo và dùng trong vòng lặp `for`
+   sẽ được khởi tạo thành một thực thể riêng ở đầu mỗi lượt lặp.
+
+
+Trong phần lớn trường hợp, thay đổi ngữ nghĩa này không làm thay đổi hành vi của mã.
+Nhưng __đôi khi có thay đổi__.
+Vì vậy, thay đổi này phá vỡ khả năng tương thích ngược.
+Từ Go 1.22, __mỗi file nguồn Go cần chỉ định một phiên bản Go__ để
+hạn chế tối đa ảnh hưởng.
+
+    === sometimes, it does :: control-flows-more.tmd#argument-evaluation-moment
+    === every Go source ... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+Có thể dùng câu lệnh `break` để chuyển luồng thực thi ra khỏi
+một khối điều khiển vòng lặp `for` sớm,
+nếu khối `for` đó là khối điều khiển luồng gần nhất có thể thoát bằng `break`
+chứa câu lệnh `break`.
+Ví dụ, đoạn mã sau cũng in các số từ `0` đến `9`.
+
+@@@ .line-numbers
+''' go
+i := 0
+for {
+	if i >= 10 {
+		break
+	}
+	fmt.Println(i)
+	i++
+}
+'''
+
+Có thể dùng câu lệnh `continue` để kết thúc sớm lượt lặp hiện tại
+(`PostSimpleStatement` vẫn được thực thi),
+nếu khối `for` là khối điều khiển vòng lặp gần nhất
+chứa câu lệnh `continue`.
+Ví dụ, đoạn mã sau in `13579`.
+
+@@@ .line-numbers
+''' go
+for i := 0; i < 10; i++ {
+	if i % 2 == 0 {
+		continue
+	}
+	fmt.Print(i)
+}
+'''
+
+@@@ #for-range-integer
+###========== Dùng khối điều khiển `for-range` để duyệt số nguyên
+
+Có thể dùng khối vòng lặp `for-range` để duyệt số nguyên,
+mọi loại __container__, __channel__ và __một số hàm__.
+Bài viết này chỉ giải thích cách dùng khối vòng lặp `for-range`
+để duyệt số nguyên.
+
+    === containers :: container.tmd#iteration
+    === channels :: channel.tmd#range
+    === some functions :: function.tmd#range
+
+Lưu ý: chỉ từ Go 1.22 mới hỗ trợ dùng khối vòng lặp `for-range` để duyệt số nguyên.
+
+Đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+// i được khai báo từ trước.
+for i = range anInteger {
+	...
+}
+'''
+
+thực chất là dạng rút gọn của:
+
+@@@ .line-numbers
+''' go
+for i = 0; i < anInteger; i++ {
+	...
+}
+'''
+
+Tương tự,
+
+@@@ .line-numbers
+''' go
+for i := range anInteger {
+	...
+}
+'''
+
+thực chất là dạng rút gọn của:
+
+@@@ .line-numbers
+''' go
+for i := 0; i < anInteger; i++ {
+	...
+}
+'''
+
+với ngữ nghĩa của Go 1.22 trở lên.
+
+Ví dụ, đoạn mã cuối trong phần trước tương đương với:
+
+@@@ .line-numbers
+''' go
+for i := range 10 {
+	if i % 2 == 0 {
+		continue
+	}
+	fmt.Print(i)
+}
+'''
+
+@@@ #switch-case
+###========== Khối điều khiển luồng `switch-case`
+
+Khối điều khiển luồng `switch-case` là
+một loại khối điều khiển thực thi có điều kiện.
+
+Dạng đầy đủ của khối `switch-case` là:
+@@@ .line-numbers
+''' go
+switch InitSimpleStatement; CompareOperand0 {
+case CompareOperandList1:
+	// thực hiện thao tác
+case CompareOperandList2:
+	// thực hiện thao tác
+...
+case CompareOperandListN:
+	// thực hiện thao tác
+default:
+	// thực hiện thao tác
+}
+'''
+
+Ở dạng đầy đủ:
+*
+   `switch`, `case` và `default` là ba keyword.
+*
+   Phần `InitSimpleStatement` phải là một câu lệnh đơn giản.
+   Phần `CompareOperand0` là một biểu thức được xem như
+   một giá trị có kiểu (nếu đó là giá trị chưa định kiểu,
+   nó được xem như một giá trị có kiểu mặc định),
+   vì vậy nó không thể là `nil` chưa định kiểu.
+   Trong đặc tả Go, `CompareOperand0` được gọi là biểu thức switch.
+*
+   Mỗi phần `CompareOperandListX`
+   (trong đó `X` có thể nhận giá trị từ `1` đến `N`)
+   phải là một danh sách biểu thức phân tách bằng dấu phẩy.
+   Mỗi biểu thức trong danh sách phải có thể so sánh với `CompareOperand0`.
+   Trong đặc tả Go, mỗi biểu thức này được gọi là biểu thức case.
+   Nếu biểu thức case là một giá trị chưa định kiểu,
+   nó phải có thể được chuyển đổi ngầm định sang kiểu của biểu thức switch
+   trong cùng cấu trúc điều khiển luồng `switch-case`.
+   Nếu không thể chuyển đổi, quá trình biên dịch sẽ thất bại.
+
+Mỗi `case CompareOperandListX:` hoặc `default:`
+mở ra (và được theo sau bởi) một khối mã ngầm định.
+Khối mã ngầm định cùng với `case CompareOperandListX:` hoặc `default:` tương ứng tạo thành một nhánh.
+Mỗi nhánh như vậy đều là tùy chọn.
+Từ đây về sau, ta gọi khối mã ngầm định trong nhánh đó là khối mã nhánh.
+
+Trong một khối điều khiển luồng `switch-case` có nhiều nhất một nhánh `default`.
+
+Ngoài các khối mã nhánh,
+mỗi cấu trúc điều khiển luồng `switch-case` tạo thành hai khối mã:
+một khối ngầm định và một khối tường minh.
+Khối tường minh nằm bên trong khối ngầm định.
+Tất cả các khối mã nhánh đều nằm trong khối tường minh
+(và gián tiếp nằm trong khối ngầm định).
+
+Khối điều khiển luồng `switch-case` có thể thoát bằng `break`,
+do đó cũng có thể dùng câu lệnh `break` trong bất kỳ khối mã nhánh nào
+của khối `switch-case` để chuyển luồng thực thi ra khỏi
+khối `switch-case` sớm.
+
+Khi một cấu trúc điều khiển luồng `switch-case` được thực thi,
+`InitSimpleStatement` được thực thi trước tiên,
+và chỉ chạy một lần trong suốt quá trình thực thi cấu trúc đó.
+Sau khi `InitSimpleStatement` được thực thi,
+biểu thức switch `CompareOperand0` được đánh giá đúng một lần.
+Kết quả đánh giá luôn là một giá trị có kiểu.
+Giá trị này được so sánh (bằng toán tử `==`)
+với kết quả đánh giá của từng biểu thức case trong
+các danh sách biểu thức `CompareOperandListX`,
+theo thứ tự từ trên xuống dưới và từ trái sang phải.
+Nếu tìm thấy biểu thức case bằng `CompareOperand0`,
+quá trình so sánh dừng lại và khối mã nhánh tương ứng
+với biểu thức đó được thực thi.
+Nếu không có biểu thức case nào bằng `CompareOperand0`,
+khối mã nhánh `default` (nếu có) sẽ được thực thi.
+
+Ví dụ về cấu trúc điều khiển luồng `switch-case`:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+)
+
+func main() {
+	switch n := rand.Intn(100); n%9 {
+	case 0:
+		fmt.Println(n, "is a multiple of 9.")
+
+		// Khác với nhiều ngôn ngữ khác,
+		// trong Go, luồng thực thi tự động
+		// thoát khỏi khối switch-case ở cuối
+		// mỗi khối nhánh.
+		// Ở đây không cần câu lệnh "break".
+	case 1, 2, 3:
+		fmt.Println(n, "mod 9 is 1, 2 or 3.")
+		// Ở đây, câu lệnh "break" này không có tác dụng.
+		break
+	case 4, 5, 6:
+		fmt.Println(n, "mod 9 is 4, 5 or 6.")
+	// case 6, 7, 8:
+		// Dòng case ở trên có thể không biên dịch được,
+		// vì 6 bị trùng với giá trị 6 trong case trước.
+		// Hành vi này phụ thuộc vào compiler.
+	default:
+		fmt.Println(n, "mod 9 is 7 or 8.")
+	}
+}
+'''
+
+Hàm `rand.Intn` trả về một giá trị `int` ngẫu nhiên không âm,
+nhỏ hơn đối số được chỉ định.
+
+{ %%
+https://github.com/golang/go/issues/28357
+https://github.com/golang/go/blob/5a7cfbc0117bce314c3f079ece459173b9efc854/src/cmd/compile/internal/gc/swt.go#L637
+}
+Lưu ý, nếu compiler có thể phát hiện tại thời điểm biên dịch rằng hai biểu thức case bất kỳ
+trong cùng một khối điều khiển luồng `switch-case` bằng nhau, compiler có thể từ chối biểu thức xuất hiện sau.
+Ví dụ, compiler Go tiêu chuẩn cho rằng dòng `case 6, 7, 8` trong ví dụ trên không hợp lệ
+nếu bỏ comment dòng đó.
+Tuy nhiên, compiler khác có thể chấp nhận dòng này.
+Trên thực tế, compiler Go tiêu chuẩn hiện tại (phiên bản 1.25.n)
+__cho phép các biểu thức case boolean trùng lặp__,
+còn gccgo (v8.2) cho phép cả biểu thức case boolean và string trùng lặp.
+
+    === allows duplicate ... :: https://github.com/golang/go/issues/28357
+
+Như các comment trong ví dụ trên mô tả,
+khác với nhiều ngôn ngữ khác, trong Go,
+ở cuối mỗi khối mã nhánh, luồng thực thi tự động
+thoát khỏi khối điều khiển `switch-case` tương ứng.
+Vậy làm thế nào để luồng thực thi chuyển sang khối mã nhánh kế tiếp?
+Go cung cấp keyword `fallthrough` để thực hiện việc này.
+Ví dụ, trong đoạn mã sau, tất cả các khối mã nhánh
+đều được thực thi theo thứ tự từ trên xuống dưới.
+
+@@@ .line-numbers
+''' go
+switch n := rand.Intn(100) % 5; n {
+case 0, 1, 2, 3, 4:
+	fmt.Println("n =", n)
+	// Câu lệnh "fallthrough" chuyển luồng thực thi
+	// sang nhánh kế tiếp.
+	fallthrough
+case 5, 6, 7, 8:
+	// Một biến mới cũng tên "n" được khai báo,
+	// và chỉ hiển thị trong khối mã nhánh hiện tại.
+	n := 99
+	fmt.Println("n =", n) // 99
+	fallthrough
+default:
+	// "n" này là biểu thức switch "n".
+	fmt.Println("n =", n)
+}
+'''
+
+Lưu ý:
+*
+   Câu lệnh `fallthrough` phải là câu lệnh cuối cùng trong một nhánh.
+*
+   Câu lệnh `fallthrough` không được xuất hiện
+   trong nhánh cuối cùng của khối điều khiển luồng `switch-case`.
+
+Ví dụ, các cách dùng `fallthrough` sau đều không hợp lệ.
+@@@ .line-numbers
+''' go
+switch n := rand.Intn(100) % 5; n {
+case 0, 1, 2, 3, 4:
+	fmt.Println("n =", n)
+	// Khối if, chứ không phải câu lệnh fallthrough,
+	// mới là câu lệnh cuối trong nhánh này.
+	if true {
+		fallthrough // lỗi: không phải câu lệnh cuối cùng
+	}
+case 5, 6, 7, 8:
+	n := 99
+	fallthrough // lỗi: không phải câu lệnh cuối cùng
+	_ = n
+default:
+	fmt.Println(n)
+	fallthrough // lỗi: xuất hiện trong nhánh cuối cùng
+}
+'''
+
+Hai phần `InitSimpleStatement` và `CompareOperand0`
+trong cấu trúc điều khiển luồng `switch-case` đều là tùy chọn.
+Nếu không có phần `CompareOperand0`,
+nó sẽ được xem là `true`,
+một giá trị có kiểu thuộc kiểu dựng sẵn `bool`.
+Nếu không có phần `InitSimpleStatement`,
+có thể bỏ dấu chấm phẩy theo sau phần đó.
+
+Như đã đề cập ở trên, tất cả các nhánh đều là tùy chọn.
+Vì vậy, các khối mã sau đều hợp lệ và có thể được xem là không thực hiện thao tác nào.
+
+@@@ .line-numbers
+''' go
+switch n := 5; n {
+}
+
+switch 5 {
+}
+
+switch _ = 5; {
+}
+
+switch {
+}
+'''
+
+Với hai khối điều khiển luồng `switch-case` cuối trong ví dụ trên,
+như đã đề cập, mỗi phần `CompareOperand0` bị lược bỏ
+đều được xem là giá trị có kiểu `true`
+thuộc kiểu dựng sẵn `bool`.
+Do đó, đoạn mã sau sẽ in `hello`.
+
+@@@ .line-numbers
+''' go
+switch { // <=> switch true {
+case true: fmt.Println("hello")
+default: fmt.Println("bye")
+}
+'''
+
+@@@ #default-branch-placement
+
+Một điểm khác biệt dễ nhận thấy so với nhiều ngôn ngữ khác là
+nhánh `default` trong khối điều khiển luồng `switch-case`
+có thể xuất hiện ở bất kỳ vị trí nào.
+Ví dụ, ba khối `switch-case` sau tương đương nhau.
+@@@ .line-numbers
+''' go
+switch n := rand.Intn(3); n {
+case 0: fmt.Println("n == 0")
+case 1: fmt.Println("n == 1")
+default: fmt.Println("n == 2")
+}
+
+switch n := rand.Intn(3); n {
+default: fmt.Println("n == 2")
+case 0: fmt.Println("n == 0")
+case 1: fmt.Println("n == 1")
+}
+
+switch n := rand.Intn(3); n {
+case 0: fmt.Println("n == 0")
+default: fmt.Println("n == 2")
+case 1: fmt.Println("n == 1")
+}
+'''
+
+###========== Câu lệnh `goto` và khai báo nhãn
+
+Giống nhiều ngôn ngữ khác, Go cũng hỗ trợ câu lệnh `goto`.
+Để tạo thành câu lệnh, keyword `goto` phải được theo sau bởi một nhãn.
+Nhãn được khai báo theo dạng `LabelName:`,
+trong đó `LabelName` phải là một identifier.
+Nhãn có tên khác identifier trắng phải được sử dụng ít nhất một lần.
+
+Câu lệnh `goto` khiến luồng thực thi nhảy đến câu lệnh kế tiếp
+sau vị trí khai báo nhãn được dùng trong câu lệnh `goto`.
+Vì vậy, sau khai báo nhãn phải có một câu lệnh.
+
+Nhãn phải được khai báo bên trong thân hàm.
+Chỗ dùng nhãn có thể nằm trước hoặc sau khai báo nhãn.
+Tuy nhiên, nhãn không hiển thị (và không thể xuất hiện) bên ngoài
+khối mã trong cùng mà nhãn được khai báo.
+
+Ví dụ sau dùng câu lệnh `goto` và một nhãn để tạo vòng lặp.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	i := 0
+
+Next: // khai báo nhãn tại đây.
+	fmt.Println(i)
+	i++
+	if i < 5 {
+		goto Next // luồng thực thi nhảy đến nhãn
+	}
+}
+'''
+
+Như đã đề cập ở trên, nhãn không hiển thị (và không thể xuất hiện)
+bên ngoài khối mã trong cùng mà nhãn được khai báo.
+Vì vậy, ví dụ sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+goto Label1 // lỗi
+	{
+		Label1:
+		goto Label2 // lỗi
+	}
+	{
+		Label2:
+	}
+}
+'''
+
+Lưu ý, nếu nhãn được khai báo trong phạm vi của một biến,
+thì chỗ dùng nhãn không được nằm trước khai báo biến đó.
+Phạm vi của identifier sẽ được giải thích sau trong bài viết
+__khối và phạm vi trong Go__.
+
+    === blocks and scopes in Go :: blocks-and-scopes.tmd
+
+Ví dụ sau cũng không biên dịch được.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	i := 0
+Next:
+	if i >= 5 {
+		// lỗi: nhảy qua khai báo k
+		goto Exit
+	}
+
+	k := i + i
+	fmt.Println(k)
+	i++
+	goto Next
+
+// Nhãn này được khai báo trong phạm vi của k,
+// nhưng được dùng bên ngoài phạm vi của k.
+Exit:
+}
+'''
+
+Quy tắc vừa nêu __có thể thay đổi sau này__.
+Hiện tại, để đoạn mã trên biên dịch được,
+ta cần điều chỉnh phạm vi của biến `k`.
+Có hai cách sửa vấn đề trong ví dụ trước.
+
+    === may change later :: https://github.com/golang/go/issues/26058
+
+Một cách là thu hẹp phạm vi của biến `k`.
+@@@ .line-numbers
+''' go
+func main() {
+	i := 0
+Next:
+	if i >= 5 {
+		goto Exit
+	}
+	// Tạo một khối mã tường minh để
+	// thu hẹp phạm vi của k.
+	{
+		k := i + i
+		fmt.Println(k)
+	}
+	i++
+	goto Next
+Exit:
+}
+'''
+
+Cách còn lại là mở rộng phạm vi của biến `k`.
+@@@ .line-numbers
+''' go
+func main() {
+	var k int // chuyển khai báo k đến đây.
+	i := 0
+Next:
+	if i >= 5 {
+		goto Exit
+	}
+
+	k = i + i
+	fmt.Println(k)
+	i++
+	goto Next
+Exit:
+}
+'''
+
+###========== Câu lệnh `break` và `continue` có nhãn
+
+Câu lệnh `goto` phải có nhãn.
+Câu lệnh `break` hoặc `continue` cũng có thể
+có nhãn, nhưng nhãn là tùy chọn.
+Thông thường, `break` có nhãn được dùng trong các khối điều khiển luồng lồng nhau có thể thoát bằng `break`,
+còn `continue` có nhãn được dùng trong các khối vòng lặp lồng nhau.
+
+Nếu câu lệnh `break` có nhãn,
+nhãn đó phải được khai báo ngay trước khối điều khiển luồng có thể thoát bằng `break`
+chứa câu lệnh `break`.
+Có thể xem tên nhãn là tên của khối điều khiển luồng đó.
+Câu lệnh `break` sẽ khiến luồng thực thi thoát khỏi
+khối điều khiển luồng được gắn nhãn, kể cả khi khối đó
+không phải là khối điều khiển luồng gần nhất chứa câu lệnh `break`.
+
+Nếu câu lệnh `continue` có nhãn,
+nhãn đó phải được khai báo ngay trước khối điều khiển vòng lặp
+chứa câu lệnh `continue`.
+Có thể xem tên nhãn là tên của khối điều khiển vòng lặp đó.
+Câu lệnh `continue` sẽ kết thúc sớm lượt lặp hiện tại của
+khối vòng lặp được gắn nhãn, kể cả khi khối đó
+không phải là khối điều khiển vòng lặp gần nhất chứa câu lệnh `continue`.
+
+Ví dụ sau dùng các câu lệnh `break`
+và `continue` có nhãn.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func FindSmallestPrimeLargerThan(n int) int {
+Outer:
+	for n++; ; n++{
+		for i := 2; ; i++ {
+			switch {
+			case i * i > n:
+				break Outer
+			case n % i == 0:
+				continue Outer
+			}
+		}
+	}
+	return n
+}
+
+func main() {
+	for i := 90; i < 100; i++ {
+		n := FindSmallestPrimeLargerThan(i)
+		fmt.Print("The smallest prime number larger than ")
+		fmt.Println(i, "is", n)
+	}
+}
+'''

@@ -1,0 +1,348 @@
+### `nil` trong Go
+
+`nil` là một predeclared identifier được dùng thường xuyên và rất quan trọng trong Go.
+Đây là cách biểu diễn bằng literal cho zero value của nhiều kiểu dữ liệu.
+Nhiều lập trình viên Go mới, vốn có kinh nghiệm với một số ngôn ngữ phổ biến khác,
+có thể xem `nil` là tương đương với
+`null` (hoặc `NULL`) trong các ngôn ngữ đó.
+Điều này đúng một phần, nhưng giữa `nil` trong Go
+và `null` (hoặc `NULL`) trong các ngôn ngữ khác có nhiều điểm khác biệt.
+
+Phần còn lại của bài viết liệt kê các thông tin và chi tiết liên quan đến `nil`.
+
+###========== `nil` Là Một Predeclared Identifier Trong Go
+
+Ta có thể dùng `nil` mà không cần khai báo.
+
+###========== `nil` Có Thể Biểu Diễn Zero Value Của Nhiều Kiểu
+
+Trong Go, `nil` có thể biểu diễn zero value của các kiểu sau:
+*  các kiểu pointer (bao gồm cả kiểu không an toàn về kiểu dữ liệu).
+*  các kiểu map.
+*  các kiểu slice.
+*  các kiểu function.
+*  các kiểu channel.
+*  các kiểu interface.
+
+###========== Predeclared `nil` Không Có Kiểu Mặc Định
+
+Mỗi predeclared identifier khác trong Go đều có một kiểu mặc định.
+Ví dụ:
+*
+   kiểu mặc định của cả `true` và `false`
+   đều là kiểu `bool`.
+*
+   kiểu mặc định của `iota` là `int`.
+
+Tuy nhiên, predeclared `nil` không có kiểu mặc định, dù nó có nhiều kiểu khả dĩ.
+Thực tế, predeclared `nil` là giá trị untyped duy nhất trong Go không có kiểu mặc định.
+Compiler cần có đủ thông tin từ ngữ cảnh để suy ra kiểu của một giá trị `nil`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	// Phải có đủ thông tin để compiler
+	// suy ra kiểu của một giá trị nil.
+	_ = (*struct{})(nil)
+	_ = []int(nil)
+	_ = map[int]bool(nil)
+	_ = chan string(nil)
+	_ = (func())(nil)
+	_ = interface{}(nil)
+
+	// Các dòng sau tương đương với những dòng trên.
+	var _ *struct{} = nil
+	var _ []int = nil
+	var _ map[int]bool = nil
+	var _ chan string = nil
+	var _ func() = nil
+	var _ interface{} = nil
+
+	// Dòng sau không biên dịch được.
+	var _ = nil
+}
+'''
+
+###========== Predeclared `nil` Không Phải Là Từ Khóa Trong Go
+
+Có thể shadow predeclared `nil`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	nil := 123
+	fmt.Println(nil) // 123
+
+	// Dòng sau không biên dịch được,
+	// vì trong scope này nil biểu diễn một giá trị int.
+	var _ map[string]int = nil
+}
+'''
+
+//
+(Nhân tiện, `null` và `NULL` trong nhiều ngôn ngữ khác
+cũng không phải là từ khóa.)
+
+@@@ #sizes
+###========== Kích Thước Của Giá Trị Nil Thuộc Các Kiểu Khác Nhau Có Thể Khác Nhau
+
+Bố cục bộ nhớ của mọi giá trị thuộc cùng một kiểu luôn giống nhau.
+Các giá trị nil của kiểu đó cũng vậy
+(giả sử zero value của kiểu đó có thể được biểu diễn bằng `nil`).
+Kích thước của một giá trị nil luôn bằng
+kích thước của các giá trị không nil có cùng kiểu với nó.
+Tuy nhiên, giá trị nil thuộc các kiểu khác nhau có thể có kích thước khác nhau.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+)
+
+func main() {
+	var p *struct{} = nil
+	fmt.Println( unsafe.Sizeof( p ) ) // 8
+
+	var s []int = nil
+	fmt.Println( unsafe.Sizeof( s ) ) // 24
+
+	var m map[int]bool = nil
+	fmt.Println( unsafe.Sizeof( m ) ) // 8
+
+	var c chan string = nil
+	fmt.Println( unsafe.Sizeof( c ) ) // 8
+
+	var f func() = nil
+	fmt.Println( unsafe.Sizeof( f ) ) // 8
+
+	var i interface{} = nil
+	fmt.Println( unsafe.Sizeof( i ) ) // 16
+}
+'''
+
+Kích thước phụ thuộc vào compiler và kiến trúc.
+Các kết quả in ở trên áp dụng cho kiến trúc 64 bit và Go compiler tiêu chuẩn.
+Trên kiến trúc 32 bit, các kích thước được in ra sẽ bằng một nửa.
+
+Với Go compiler tiêu chuẩn, kích thước của hai giá trị thuộc hai kiểu khác nhau
+nhưng cùng loại, mà zero value của chúng có thể được biểu diễn bằng predeclared `nil`,
+luôn giống nhau. Ví dụ, kích thước của mọi giá trị thuộc các kiểu slice khác nhau đều giống nhau.
+
+###========== Hai Giá Trị Nil Thuộc Hai Kiểu Khác Nhau Có Thể Không So Sánh Được
+
+Ví dụ, cả hai phép so sánh trong ví dụ sau đều không biên dịch được.
+Lý do là trong mỗi phép so sánh,
+không toán hạng nào có thể được chuyển đổi ngầm định sang kiểu của toán hạng còn lại.
+@@@ .line-numbers
+''' go
+// Lý do biên dịch thất bại: các kiểu không khớp.
+var _ = (*int)(nil) == (*bool)(nil)         // error
+var _ = (chan int)(nil) == (chan bool)(nil) // error
+'''
+
+Hãy đọc __quy tắc so sánh trong Go__
+để biết hai giá trị nào có thể so sánh với nhau.
+Các giá trị `nil` có kiểu cụ thể cũng tuân theo quy tắc so sánh.
+
+    === quy tắc so sánh trong Go :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
+
+Các dòng code trong ví dụ sau đều biên dịch được.
+@@@ .line-numbers
+''' go
+type IntPtr *int
+// Kiểu nền tảng của IntPtr là *int.
+var _ = IntPtr(nil) == (*int)(nil)
+
+// Mọi kiểu trong Go đều triển khai kiểu interface{}.
+var _ = (interface{})(nil) == (*int)(nil)
+
+// Giá trị thuộc kiểu channel một chiều có thể được
+// chuyển đổi sang kiểu channel hai chiều có cùng kiểu phần tử.
+var _ = (chan int)(nil) == (chan<- int)(nil)
+var _ = (chan int)(nil) == (<-chan int)(nil)
+'''
+
+###========== Hai Giá Trị Nil Cùng Kiểu Có Thể Không So Sánh Được
+
+Trong Go, các kiểu map, slice và function không hỗ trợ phép so sánh.
+So sánh hai giá trị, kể cả giá trị nil, thuộc các kiểu không thể so sánh là không hợp lệ.
+Các phép so sánh sau không biên dịch được.
+@@@ .line-numbers
+''' go
+var _ = ([]int)(nil) == ([]int)(nil)
+var _ = (map[string]int)(nil) == (map[string]int)(nil)
+var _ = (func())(nil) == (func())(nil)
+'''
+
+Tuy nhiên, có thể so sánh mọi giá trị thuộc các kiểu không thể so sánh kể trên
+với identifier `nil` đứng riêng.
+@@@ .line-numbers
+''' go
+// Các dòng sau biên dịch được.
+var _ = ([]int)(nil) == nil
+var _ = (map[string]int)(nil) == nil
+var _ = (func())(nil) == nil
+'''
+
+###========== Hai Giá Trị Nil Có Thể Không Bằng Nhau
+
+Nếu một trong hai giá trị nil được so sánh là giá trị interface
+còn giá trị kia không phải, giả sử chúng có thể so sánh,
+kết quả so sánh luôn là `false`.
+Lý do là giá trị không phải interface sẽ được
+__chuyển đổi sang kiểu của giá trị interface__
+trước khi thực hiện phép so sánh.
+Giá trị interface sau khi chuyển đổi có dynamic type,
+còn giá trị interface kia thì không.
+Vì vậy, kết quả so sánh luôn là `false`.
+
+    === chuyển đổi sang kiểu của giá trị interface :: interface.tmd#boxing
+
+Ví dụ:
+@@@ .disable-line-numbers111
+''' go
+fmt.Println( (interface{})(nil) == (*int)(nil) ) // false
+'''
+
+###========== Lấy Phần Tử Từ Nil Map Không Gây Panic
+
+Lấy phần tử từ một giá trị nil map luôn trả về giá trị zero element.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+fmt.Println( (map[string]int)(nil)["key"] ) // 0
+fmt.Println( (map[int]bool)(nil)[123] )     // false
+fmt.Println( (map[int]*int64)(nil)[123] )   // <nil>
+'''
+
+###========== Có Thể Dùng Range Với Nil Channel, Map, Slice Và Array Pointer
+
+Số vòng lặp khi duyệt nil map và slice bằng không.
+
+Số vòng lặp khi duyệt một nil array pointer
+bằng độ dài của kiểu array tương ứng.
+(Tuy nhiên, nếu độ dài của kiểu array tương ứng khác không,
+và lần lặp thứ hai không bị bỏ qua hoặc lược bỏ,
+thì khi chạy, phép lặp sẽ gây panic.)
+
+Range qua một nil channel sẽ khiến goroutine hiện tại bị block mãi mãi.
+
+Ví dụ, đoạn code sau sẽ in `0`, `1`,
+`2`, `3` và `4`, rồi block mãi mãi.
+`Hello`, `world` và `Bye` sẽ không bao giờ được in ra.
+@@@ .line-numbers
+''' go
+for range []int(nil) {
+	fmt.Println("Hello")
+}
+
+for range map[string]string(nil) {
+	fmt.Println("world")
+}
+
+for i := range (*[5]int)(nil) {
+	fmt.Println(i)
+}
+
+for range chan bool(nil) { // block tại đây
+	fmt.Println("Bye")
+}
+'''
+
+###========== Gọi Method Với Receiver Nil Không Phải Interface Không Gây Panic
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+type Slice []bool
+
+func (s Slice) Length() int {
+	return len(s)
+}
+
+func (s Slice) Modify(i int, x bool) {
+	s[i] = x // panic nếu s là nil
+}
+
+func (p *Slice) DoNothing() {
+}
+
+func (p *Slice) Append(x bool) {
+	*p = append(*p, x) // panic nếu p là nil
+}
+
+func main() {
+	// Các selector sau không gây panic.
+	_ = ((Slice)(nil)).Length
+	_ = ((Slice)(nil)).Modify
+	_ = ((*Slice)(nil)).DoNothing
+	_ = ((*Slice)(nil)).Append
+
+	// Hai dòng sau cũng không gây panic.
+	_ = ((Slice)(nil)).Length()
+	((*Slice)(nil)).DoNothing()
+
+	// Hai dòng sau sẽ gây panic. Tuy nhiên, panic
+	// không xảy ra tại thời điểm gọi method.
+	// Chúng chỉ xảy ra khi dereference con trỏ nil
+	// bên trong phần thân method.
+	/*
+	((Slice)(nil)).Modify(0, true)
+	((*Slice)(nil)).Append(true)
+	*/
+}
+'''
+
+Thực tế, cách triển khai method `Append` ở trên chưa hoàn chỉnh;
+nên sửa thành như sau.
+
+@@@ .line-numbers
+''' go
+func (p *Slice) Append(x bool) {
+	if p == nil {
+		*p = []bool{x}
+		return
+	}
+	*p = append(*p, x)
+}
+'''
+
+###========== `*new(T)` Trả Về Giá Trị Nil Kiểu `T` Nếu Zero Value Của Kiểu `T` Được Biểu Diễn Bằng Predeclared Identifier `nil`
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println(*new(*int) == nil)         // true
+	fmt.Println(*new([]int) == nil)        // true
+	fmt.Println(*new(map[int]bool) == nil) // true
+	fmt.Println(*new(chan string) == nil)  // true
+	fmt.Println(*new(func()) == nil)       // true
+	fmt.Println(*new(interface{}) == nil)  // true
+}
+'''
+
+###========== Tóm Tắt
+
+Trong Go, để đơn giản và thuận tiện,
+`nil` được thiết kế như một identifier có thể dùng để biểu diễn zero value của một số kiểu.
+`nil` không phải là một giá trị đơn lẻ. Nó có thể biểu diễn nhiều giá trị với bố cục bộ nhớ khác nhau.

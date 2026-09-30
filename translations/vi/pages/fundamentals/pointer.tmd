@@ -1,0 +1,397 @@
+### Con trỏ trong Go
+
+Mặc dù Go tiếp thu nhiều tính năng từ đủ loại ngôn ngữ khác,
+Go chủ yếu được xem là một ngôn ngữ thuộc họ C.
+Một minh chứng là Go cũng hỗ trợ con trỏ.
+Con trỏ trong Go và C tương tự nhau ở nhiều khía cạnh,
+nhưng giữa chúng cũng có một số điểm khác biệt.
+Bài viết này liệt kê các khái niệm và chi tiết liên quan đến con trỏ trong Go.
+
+###=========== Địa chỉ bộ nhớ
+
+Địa chỉ bộ nhớ là vị trí cụ thể trong bộ nhớ khi lập trình.
+
+Thông thường, địa chỉ bộ nhớ được lưu dưới dạng một từ nguyên không dấu có kích thước bản địa.
+Kích thước của một từ bản địa là 4 byte trên kiến trúc 32-bit và 8 byte
+trên kiến trúc 64-bit.
+Vì vậy, dung lượng bộ nhớ tối đa về lý thuyết là 2^$$32$$ byte,
+còn gọi là 4GB (1GB == 2^$$30$$ byte), trên kiến trúc 32-bit,
+và là 2^$$64$$ byte, còn gọi là 16EB (1EB == 1024PB, 1PB == 1024TB, 1TB == 1024GB), trên kiến trúc 64-bit.
+
+Địa chỉ bộ nhớ thường được biểu diễn bằng literal số nguyên hệ thập lục phân,
+chẳng hạn `0x1234CDEF`.
+
+###=========== Địa chỉ của giá trị
+
+Địa chỉ của một giá trị là địa chỉ bắt đầu của vùng bộ nhớ
+được __phần trực tiếp__ của giá trị đó chiếm dụng.
+
+    === direct part :: value-part.tmd
+
+###=========== Con trỏ là gì?
+
+Con trỏ là một loại kiểu trong Go.
+Giá trị con trỏ được dùng để lưu địa chỉ bộ nhớ,
+thường là địa chỉ của một giá trị khác.
+
+Khác với ngôn ngữ C, để bảo đảm an toàn, Go đặt ra một số hạn chế đối với con trỏ.
+Hãy đọc các phần sau để biết chi tiết.
+
+###=========== Các kiểu và giá trị con trỏ trong Go
+
+Trong Go, một kiểu con trỏ không định danh có thể được biểu diễn bằng `*T`,
+trong đó `T` có thể là bất kỳ kiểu nào.
+Kiểu `T` được gọi là kiểu cơ sở của kiểu con trỏ `*T`.
+
+Ta có thể khai báo kiểu con trỏ có tên, nhưng nhìn chung,
+không nên dùng kiểu con trỏ có tên,
+vì kiểu con trỏ không định danh dễ đọc hơn.
+
+Nếu __kiểu nền tảng__ của một kiểu con trỏ có tên là `*T`,
+thì kiểu cơ sở của kiểu con trỏ có tên đó là `T`.
+
+    === underlying type :: type-system-overview.tmd#underlying-type
+
+Hai kiểu con trỏ không định danh có cùng kiểu cơ sở là cùng một kiểu.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+*int  // Kiểu con trỏ không định danh có kiểu cơ sở là int.
+**int // Kiểu con trỏ không định danh có kiểu cơ sở là *int.
+
+// Ptr là kiểu con trỏ có tên với kiểu cơ sở là int.
+type Ptr *int
+// PP là kiểu con trỏ có tên với kiểu cơ sở là Ptr.
+type PP *Ptr
+'''
+
+Zero value của mọi kiểu con trỏ được biểu diễn bằng `nil` có sẵn.
+Các giá trị con trỏ nil không lưu địa chỉ nào.
+
+Giá trị thuộc kiểu con trỏ có kiểu cơ sở là `T` chỉ có thể lưu địa chỉ của các giá trị kiểu `T`.
+
+@@@ #references
+###=========== Về từ "reference"
+
+Trong Go 101, từ "reference" chỉ một mối quan hệ.
+Ví dụ, nếu một giá trị con trỏ lưu địa chỉ của một giá trị khác,
+ta có thể nói giá trị con trỏ tham chiếu trực tiếp đến giá trị kia,
+và giá trị kia có ít nhất một tham chiếu.
+Cách dùng từ "reference" trong Go 101 nhất quán với đặc tả Go.
+
+Khi một giá trị con trỏ tham chiếu đến một giá trị khác, ta cũng thường nói giá trị con trỏ trỏ đến giá trị kia.
+
+###=========== Làm thế nào để lấy giá trị con trỏ và giá trị có thể lấy địa chỉ là gì?
+
+Có hai cách để lấy một giá trị con trỏ khác nil.
+*.
+   Có thể dùng hàm dựng sẵn `new` để cấp phát bộ nhớ cho một giá trị
+   thuộc bất kỳ kiểu nào. `new(T)` cấp phát bộ nhớ cho một giá trị `T`
+   (một biến ẩn danh) và trả về địa chỉ của giá trị `T` đó.
+   Giá trị được cấp phát là zero value của kiểu `T`.
+   Địa chỉ trả về được xem là giá trị con trỏ kiểu `*T`.
+*.
+   Ta cũng có thể lấy địa chỉ của những giá trị có thể lấy địa chỉ trong Go.
+   Với giá trị `t` kiểu `T` có thể lấy địa chỉ,
+   ta dùng biểu thức `&t` để lấy địa chỉ của `t`,
+   trong đó `&` là toán tử lấy địa chỉ giá trị.
+   Kiểu của `&t` được xem là `*T`.
+
+Nói chung, giá trị có thể lấy địa chỉ là giá trị được lưu ở đâu đó trong bộ nhớ.
+Hiện tại, ta chỉ cần biết mọi biến đều có thể lấy địa chỉ,
+còn hằng số, lời gọi hàm và kết quả chuyển đổi tường minh đều không thể lấy địa chỉ.
+Khi một biến được khai báo, Go runtime sẽ cấp phát một vùng nhớ cho biến đó.
+Địa chỉ bắt đầu của vùng nhớ ấy chính là địa chỉ của biến.
+
+Ta sẽ tìm hiểu thêm về các giá trị có thể và không thể lấy địa chỉ trong những bài viết sau.
+Nếu bạn đã quen thuộc với Go, có thể đọc __bản tổng hợp này__
+để xem danh sách các giá trị có thể và không thể lấy địa chỉ trong Go.
+
+    === this summary :: summaries.tmd#not-addressable
+
+Phần tiếp theo sẽ đưa ra ví dụ về cách lấy giá trị con trỏ.
+
+###=========== Giải tham chiếu con trỏ
+
+Cho giá trị con trỏ `p` thuộc kiểu con trỏ có kiểu cơ sở là `T`,
+làm thế nào để lấy giá trị tại địa chỉ được lưu trong con trỏ (tức giá trị
+mà con trỏ tham chiếu đến)? Chỉ cần dùng biểu thức `*p`,
+trong đó `*` được gọi là toán tử giải tham chiếu.
+`*p` được gọi là kết quả giải tham chiếu con trỏ `p`.
+Giải tham chiếu con trỏ là quá trình ngược với việc lấy địa chỉ.
+Kết quả của `*p` là giá trị kiểu `T` (kiểu cơ sở của kiểu `p`).
+
+Giải tham chiếu một con trỏ nil sẽ gây runtime panic.
+
+Chương trình sau minh họa một số ví dụ về lấy địa chỉ
+và giải tham chiếu con trỏ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	p0 := new(int)   // p0 trỏ đến một giá trị int zero.
+	fmt.Println(p0)  // (chuỗi địa chỉ hệ thập lục phân)
+	fmt.Println(*p0) // 0
+
+	// x là bản sao của giá trị tại
+	// địa chỉ được lưu trong p0.
+	x := *p0
+	// Cả hai đều lấy địa chỉ của x.
+	// x, *p1 và *p2 biểu diễn cùng một giá trị.
+	p1, p2 := &x, &x
+	fmt.Println(p1 == p2) // true
+	fmt.Println(p0 == p1) // false
+	p3 := &*p0 // <=> p3 := &(*p0) <=> p3 := p0
+	// Lúc này, p3 và p0 lưu cùng một địa chỉ.
+	fmt.Println(p0 == p3) // true
+	*p0, *p1 = 123, 789
+	fmt.Println(*p2, x, *p3) // 789 789 123
+
+	fmt.Printf("%T, %T \n", *p0, x) // int, int
+	fmt.Printf("%T, %T \n", p0, p1) // *int, *int
+}
+'''
+
+
+Hình sau mô tả mối quan hệ giữa các giá trị
+được dùng trong chương trình trên.
+
+{ ><
+&& res/pointer.png
+}
+
+###=========== Vì sao cần con trỏ?
+
+Trước tiên, hãy xem một ví dụ.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func double(x int) {
+	x += x
+}
+
+func main() {
+	var a = 3
+	double(a)
+	fmt.Println(a) // 3
+}
+'''
+
+Hàm `double` trong ví dụ trên được kỳ vọng sẽ sửa đối số đầu vào bằng cách nhân đôi nó.
+Tuy nhiên, hàm không làm được điều đó. Vì sao?
+Vì trong Go, mọi phép gán giá trị, bao gồm cả việc truyền đối số cho hàm, đều là sao chép giá trị.
+Hàm `double` đã sửa bản sao (`x`) của biến `a`, chứ không phải biến `a`.
+
+Một cách sửa hàm `double` ở trên là cho hàm trả về kết quả đã thay đổi.
+Cách này không phải lúc nào cũng phù hợp với mọi tình huống.
+Ví dụ sau cho thấy một cách khác: dùng tham số con trỏ.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func double(x *int) {
+	*x += *x
+	x = nil // dòng này chỉ nhằm mục đích giải thích
+}
+
+func main() {
+	var a = 3
+	double(&a)
+	fmt.Println(a) // 6
+	p := &a
+	double(p)
+	fmt.Println(a, p == nil) // 12 false
+}
+'''
+
+Ta có thể thấy rằng khi đổi tham số thành kiểu con trỏ, đối số con trỏ `&a` được truyền vào
+và bản sao `x` được dùng trong thân hàm đều tham chiếu đến cùng một giá trị,
+nên việc sửa `*x` cũng tương đương với việc sửa `*p`, tức là biến `a`.
+Nói cách khác, thay đổi trong thân hàm `double` giờ đây có thể được phản ánh ra bên ngoài hàm.
+
+Dĩ nhiên, việc sửa bản sao của chính đối số con trỏ được truyền vào
+vẫn không thể được phản ánh lên đối số con trỏ ban đầu.
+Sau lần gọi hàm `double` thứ hai, con trỏ cục bộ
+`p` không bị đổi thành `nil`.
+
+Tóm lại, con trỏ cung cấp cách truy cập gián tiếp đến một số giá trị.
+Nhiều ngôn ngữ không có khái niệm con trỏ.
+Tuy nhiên, trong những ngôn ngữ đó, con trỏ chỉ được ẩn dưới các khái niệm khác.
+
+###=========== Trả về con trỏ đến biến cục bộ là an toàn trong Go
+
+Khác với ngôn ngữ C, Go hỗ trợ garbage collection,
+nên việc trả về địa chỉ của một biến cục bộ hoàn toàn an toàn trong Go.
+@@@ .line-numbers
+''' go
+func newInt() *int {
+	a := 3
+	return &a
+}
+'''
+
+@@@ #restrictions
+###=========== Các hạn chế đối với con trỏ trong Go
+
+Vì lý do an toàn, Go đặt ra một số hạn chế đối với con trỏ (so với con trỏ trong ngôn ngữ C).
+Nhờ những hạn chế này, Go vừa giữ được lợi ích của con trỏ,
+vừa tránh được các nguy hiểm do con trỏ gây ra.
+
+###----------- Giá trị con trỏ trong Go không hỗ trợ phép toán số học
+
+Trong Go, con trỏ không thể thực hiện phép toán số học.
+Với con trỏ `p`, cả `p++` và `p-2` đều không hợp lệ.
+
+Nếu `p` là con trỏ đến một giá trị số, compiler sẽ xem
+`*p++` là một câu lệnh hợp lệ và xử lý nó như `(*p)++`.
+Nói cách khác, toán tử giải tham chiếu con trỏ `*`
+có độ ưu tiên cao hơn toán tử tăng `++` và giảm `--`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := int64(5)
+	p := &a
+
+	// Hai dòng sau không biên dịch được.
+	/*
+	p++
+	p = (&a) + 8
+	*/
+
+	*p++
+	fmt.Println(*p, a)   // 6 6
+	fmt.Println(p == &a) // true
+
+	*&a++
+	*&*&a++
+	**&p++
+	*&*p++
+	fmt.Println(*p, a) // 10 10
+}
+'''
+
+###----------- Không thể chuyển đổi một giá trị con trỏ sang một kiểu con trỏ bất kỳ
+
+Trong Go, giá trị thuộc kiểu con trỏ `T1` chỉ có thể được chuyển đổi trực tiếp,
+tường minh sang kiểu con trỏ khác `T2` nếu thỏa mãn một trong hai điều kiện sau.
+*.
+   Kiểu nền tảng của `T1` và `T2` giống nhau (bỏ qua struct tag); đặc biệt,
+   nếu `T1` hoặc `T2` là kiểu 	__không định danh__
+   và kiểu nền tảng của chúng giống nhau (xét cả struct tag),
+   thì phép chuyển đổi có thể được thực hiện ngầm định.
+   Các kiểu và giá trị struct sẽ được giải thích trong __bài viết tiếp theo__.
+*.
+   Cả `T1` và `T2` đều là kiểu con trỏ không định danh,
+   đồng thời kiểu nền tảng của các kiểu cơ sở của chúng giống nhau (bỏ qua struct tag).
+
+    === unnamed :: type-system-overview.tmd#named-type
+    === the next article :: struct.tmd
+
+Ví dụ, xét các kiểu con trỏ sau:
+@@@ .line-numbers
+''' go
+type MyInt int64
+type Ta    *int64
+type Tb    *MyInt
+'''
+
+Ta có các nhận định sau:
+*.
+   Giá trị kiểu `*int64` có thể được chuyển đổi ngầm định sang kiểu `Ta`,
+   và ngược lại, vì kiểu nền tảng của cả hai đều là `*int64`.
+*.
+   Giá trị kiểu `*MyInt` có thể được chuyển đổi ngầm định sang kiểu `Tb`,
+   và ngược lại, vì kiểu nền tảng của cả hai đều là `*MyInt`.
+*.
+   Giá trị kiểu `*MyInt` có thể được chuyển đổi tường minh sang kiểu `*int64`,
+   và ngược lại, vì cả hai đều không định danh và kiểu nền tảng của các kiểu cơ sở đều là `int64`.
+*.
+   Giá trị kiểu `Ta` không thể được chuyển đổi trực tiếp sang kiểu `Tb`, kể cả bằng cách tường minh.
+   Tuy nhiên, dựa trên ba nhận định đầu, một giá trị `pa` kiểu
+   `Ta` có thể được chuyển đổi gián tiếp sang kiểu `Tb`
+   bằng cách lồng ba phép chuyển đổi tường minh: `Tb((*MyInt)((*int64)(pa)))`.
+
+Không kiểu con trỏ nào trong số này có thể được chuyển đổi sang kiểu `*uint64` theo cách an toàn.
+
+###----------- Không thể so sánh một giá trị con trỏ với giá trị thuộc kiểu con trỏ bất kỳ
+
+Trong Go, có thể so sánh con trỏ bằng toán tử `==` và `!=`.
+Chỉ có thể so sánh hai giá trị con trỏ trong Go nếu thỏa mãn một trong ba điều kiện sau.
+*.
+   Kiểu của hai con trỏ Go giống nhau.
+*.
+   Một giá trị con trỏ có thể được chuyển đổi ngầm định sang kiểu con trỏ của giá trị còn lại.
+   Nói cách khác, kiểu nền tảng của hai kiểu phải giống nhau
+   và ít nhất một trong hai kiểu con trỏ Go phải là kiểu không định danh.
+*.
+   Chỉ một trong hai con trỏ được biểu diễn bằng định danh `nil` thuần (không định kiểu).
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type MyInt int64
+	type Ta    *int64
+	type Tb    *MyInt
+
+	// 4 con trỏ nil thuộc các kiểu khác nhau.
+	var pa0 Ta
+	var pa1 *int64
+	var pb0 Tb
+	var pb1 *MyInt
+
+	// Cả 6 dòng sau đều biên dịch được.
+	// Kết quả so sánh đều là true.
+	_ = pa0 == pa1
+	_ = pb0 == pb1
+	_ = pa0 == nil
+	_ = pa1 == nil
+	_ = pb0 == nil
+	_ = pb1 == nil
+
+	// Cả 3 dòng sau đều không biên dịch được.
+	/*
+	_ = pa0 == pb0
+	_ = pa1 == pb1
+	_ = pa0 == Tb(nil)
+	*/
+}
+'''
+
+###----------- Không thể gán giá trị con trỏ cho giá trị thuộc kiểu con trỏ khác
+
+Điều kiện để gán một giá trị con trỏ cho một giá trị con trỏ khác
+giống với điều kiện để so sánh hai giá trị con trỏ,
+đã nêu ở trên.
+
+###=========== Có thể phá vỡ các hạn chế về con trỏ trong Go
+
+Như đã đề cập ở đầu bài viết,
+các cơ chế (cụ thể là kiểu `unsafe.Pointer`)
+do __package chuẩn `unsafe`__ cung cấp
+có thể được dùng để phá vỡ các hạn chế mà Go đặt ra cho con trỏ.
+Kiểu `unsafe.Pointer` tương tự `void*` trong C.
+Nói chung, không nên dùng các cách không an toàn.
+
+    === the `unsafe` standard package :: unsafe.tmd
+
+

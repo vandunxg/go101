@@ -1,0 +1,459 @@
+### Struct trong Go
+
+Tương tự C, Go cũng hỗ trợ các kiểu struct.
+Bài viết này giới thiệu kiến thức cơ bản về kiểu và giá trị struct trong Go.
+
+###========== Kiểu Struct và Literal Kiểu Struct
+
+Mỗi literal kiểu struct không định danh bắt đầu bằng từ khóa `struct`,
+theo sau là một chuỗi khai báo trường được đặt trong `{}`.
+Thông thường, mỗi khai báo trường gồm một tên và một kiểu.
+Kiểu struct có thể không có trường nào.
+
+Sau đây là một literal kiểu struct không định danh:
+@@@ .line-numbers
+''' go
+struct {
+	title  string
+	author string
+	pages  int
+}
+'''
+
+Kiểu struct trên có ba trường. Hai trường `title` và `author`
+đều có kiểu `string`.
+Trường `pages` có kiểu `int`.
+
+Một số bài viết cũng gọi các trường là biến thành viên.
+
+Có thể khai báo liền nhau các trường có cùng kiểu.
+@@@ .line-numbers
+''' go
+struct {
+	title, author string
+	pages         int
+}
+'''
+
+Kích thước của một kiểu struct bằng tổng kích thước của các kiểu trường cộng với số byte đệm.
+Các byte đệm được dùng để căn chỉnh địa chỉ bộ nhớ của một số trường.
+Ta sẽ tìm hiểu về byte đệm và căn chỉnh địa chỉ bộ nhớ trong __một bài viết sau__.
+
+    === bài viết sau :: memory-layout.tmd
+
+Kiểu struct không có trường có kích thước bằng không.
+
+Khi khai báo một trường struct, có thể gắn tag cho trường đó.
+Tag trường là tùy chọn; giá trị mặc định của mỗi tag là chuỗi rỗng.
+Cú pháp cho phép dùng một trong hai dạng string literal làm tag trường.
+Tuy nhiên, trong thực tế, tag của trường struct nên được viết dưới dạng cặp key-value,
+và mỗi tag nên là raw string literal (``...``),
+còn mỗi value trong tag nên là interpreted string literal (`"..."`).
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+struct {
+	Title  string `json:"title" myfmt:"s1"`
+	Author string `json:"author,omitempty" myfmt:"s2"`
+	Pages  int    `json:"pages,omitempty" myfmt:"n1"`
+	X, Y   bool   `myfmt:"b1"`
+}
+'''
+
+Lưu ý, tag của hai trường `X` và `Y` trong ví dụ trên giống hệt nhau
+(dù dùng tag trường theo cách này là một thực hành không tốt).
+
+Ta có thể dùng cách __reflection__ để kiểm tra thông tin tag của trường.
+
+    === reflection :: reflection.tmd#struct-field-tag
+
+Mục đích của mỗi tag trường phụ thuộc vào ứng dụng.
+Trong ví dụ trên, tag trường có thể giúp các hàm trong package chuẩn
+`encoding/json` xác định tên trường trong văn bản JSON,
+khi mã hóa giá trị struct thành văn bản JSON hoặc giải mã văn bản JSON thành giá trị struct.
+Các hàm trong package chuẩn `encoding/json` chỉ mã hóa và giải mã những trường struct được export,
+đó là lý do chữ cái đầu tiên trong tên các trường ở ví dụ trên đều viết hoa.
+
+Không nên dùng tag trường làm chú thích.
+
+Khác với ngôn ngữ C, struct trong Go không hỗ trợ union.
+
+Tất cả kiểu struct đã nêu ở trên đều không định danh.
+Trong thực tế, kiểu struct có định danh được dùng phổ biến hơn.
+
+Chỉ các trường được export của kiểu struct xuất hiện trong một package
+mới có thể được sử dụng trong package khác thông qua việc import package đó.
+Ta có thể xem các trường struct không được export như biến thành viên private/protected.
+
+Tag trường và thứ tự khai báo trường trong một kiểu struct ảnh hưởng đến định danh của kiểu struct.
+Hai kiểu struct không định danh chỉ giống hệt nhau nếu chúng có cùng chuỗi khai báo trường.
+Hai khai báo trường chỉ giống hệt nhau nếu tên tương ứng,
+kiểu tương ứng và tag tương ứng của chúng đều giống nhau,
+đồng thời cả hai đều là __trường nhúng__ hoặc đều không phải trường nhúng.
+Lưu ý, **hai tên trường struct không được export thuộc các package khác nhau
+luôn được xem là hai tên khác nhau.**
+
+    === trường nhúng :: type-embedding.tmd
+
+Kiểu struct không thể có trường mang chính kiểu struct đó, dù là trực tiếp hay đệ quy.
+
+{ %%
+https://github.com/golang/go/issues/18640
+}
+
+###========== Literal Giá Trị Struct và Thao Tác với Giá Trị Struct
+
+Trong Go, dạng `T{...}`,
+trong đó `T` phải là một literal kiểu hoặc tên kiểu,
+được gọi là **composite literal** và
+được dùng làm literal giá trị cho một số loại kiểu,
+bao gồm kiểu struct và các kiểu container sẽ được giới thiệu sau.
+
+Lưu ý, literal kiểu `T{...}` là một giá trị có kiểu `T`.
+
+    === kiểu cơ sở :: type-system-overview.tmd#underlying-type
+
+Cho kiểu struct `S` có __kiểu cơ sở__ là `struct{x int; y bool}`,
+giá trị zero của `S` có thể được biểu diễn bằng hai dạng composite literal struct sau:
+*.
+   `S{0, false}`.
+   Ở dạng này không có tên trường, nhưng phải cung cấp tất cả giá trị trường
+   theo đúng thứ tự khai báo trường.
+*.
+   `S{x: 0, y: false}`, `S{y: false, x: 0}`,
+   `S{x: 0}`, `S{y: false}` và `S{}`.
+   Ở dạng này, mỗi phần tử trường đều không bắt buộc và thứ tự các phần tử không quan trọng.
+   Các trường bị bỏ qua sẽ nhận zero value của kiểu tương ứng.
+   Tuy nhiên, nếu có phần tử trường thì phải viết theo dạng `FieldName: FieldValue`.
+   Thứ tự các phần tử trường ở dạng này không quan trọng.
+   Dạng `S{}` là cách biểu diễn giá trị zero của kiểu `S` được dùng nhiều nhất.
+
+Nếu `S` là kiểu struct được import từ package khác,
+bạn nên dùng dạng thứ hai để duy trì tính tương thích.
+Hãy xét trường hợp người duy trì package thêm một trường mới cho kiểu `S`;
+khi đó, cách dùng dạng thứ nhất sẽ không còn hợp lệ.
+
+Ta cũng có thể dùng composite literal struct để biểu diễn giá trị struct khác zero.
+
+Với một giá trị `v` có kiểu `S`, ta có thể dùng
+`v.x` và `v.y` để biểu diễn giá trị các trường của `v`; chúng được gọi là selector (hay selector expression).
+`v` được gọi là receiver của các selector.
+
+Sau này, ta gọi dấu chấm `.` trong selector là toán tử chọn thuộc tính.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+)
+
+type Book struct {
+	title, author string
+	pages         int
+}
+
+func main() {
+	book := Book{"Go 101", "Tapir", 256}
+	fmt.Println(book) // {Go 101 Tapir 256}
+
+	// Tạo một giá trị book theo dạng khác.
+	// Cả ba trường đều được chỉ định.
+	book = Book{author: "Tapir", pages: 256, title: "Go 101"}
+
+	// Không trường nào được chỉ định. Trường title và
+	// author đều là "", trường pages là 0.
+	book = Book{}
+
+	// Chỉ chỉ định trường author. Trường title
+	// là "" và trường pages là 0.
+	book = Book{author: "Tapir"}
+
+	// Khởi tạo một giá trị struct bằng các selector.
+	var book2 Book // <=> book2 := Book{}
+	book2.author = "Tapir Liu"
+	book2.pages = 300
+	fmt.Println(book2.pages) // 300
+}
+'''
+
+Dấu phẩy `,` cuối cùng trong một composite literal là tùy chọn
+nếu phần tử cuối và dấu `}` đóng literal nằm trên cùng một dòng.
+Nếu không, dấu `,` cuối cùng là bắt buộc.
+Để biết thêm chi tiết, hãy đọc __quy tắc xuống dòng trong Go__.
+
+    === quy tắc xuống dòng trong Go :: line-break-rules.tmd
+
+@@@ .line-numbers
+''' go
+var _ = Book {
+	author: "Tapir",
+	pages: 256,
+	title: "Go 101", // ở đây phải có dấu ","
+}
+
+// Dấu "," cuối dòng sau là tùy chọn.
+var _ = Book{author: "Tapir", pages: 256, title: "Go 101",}
+'''
+
+###========== Phép Gán Giá Trị Struct
+
+Khi một giá trị struct được gán cho một giá trị struct khác,
+kết quả tương đương với việc lần lượt gán từng trường.
+@@@ .line-numbers
+''' go
+func f() {
+	book1 := Book{pages: 300}
+	book2 := Book{"Go 101", "Tapir", 256}
+
+	book2 = book1
+	// Dòng trên tương đương với
+	// các dòng sau.
+	book2.title = book1.title
+	book2.author = book1.author
+	book2.pages = book1.pages
+}
+'''
+
+Hai giá trị struct chỉ có thể được gán cho nhau nếu
+kiểu của chúng giống hệt nhau hoặc kiểu của hai giá trị struct
+có kiểu cơ sở giống hệt nhau (có xét đến tag trường)
+và ít nhất một trong hai kiểu là __kiểu không định danh__.
+
+    === kiểu không định danh :: type-system-overview.tmd#named-type
+
+@@@ #field-addressability
+###========== Tính Khả Địa Chỉ của Trường Struct
+
+Các trường của một struct khả địa chỉ cũng khả địa chỉ.
+Các trường của một struct không khả địa chỉ cũng không khả địa chỉ.
+Không thể sửa đổi các trường của struct không khả địa chỉ.
+Mọi composite literal, bao gồm composite literal struct, đều không khả địa chỉ.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type Book struct {
+		Pages int
+	}
+	var book = Book{} // book khả địa chỉ
+	p := &book.Pages
+	*p = 123
+	fmt.Println(book) // {123}
+
+	// Hai dòng sau không biên dịch được vì
+	// Book{} không khả địa chỉ, nên Book{}.Pages cũng vậy.
+	/*
+	Book{}.Pages = 123
+	p = &(Book{}.Pages) // <=> p = &Book{}.Pages
+	*/
+}
+'''
+
+Lưu ý, độ ưu tiên của toán tử chọn thuộc tính `.`
+trong selector cao hơn toán tử lấy địa chỉ `&`.
+
+
+@@@ #take-composite-literal-address
+###========== Composite Literal Không Khả Địa Chỉ Nhưng Có Thể Lấy Địa Chỉ
+
+Thông thường, chỉ các giá trị khả địa chỉ mới có thể lấy địa chỉ.
+Tuy nhiên, Go có một cú pháp rút gọn cho phép ta
+lấy địa chỉ của composite literal.
+Cú pháp rút gọn là một ngoại lệ trong cú pháp nhằm giúp việc lập trình thuận tiện hơn.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type Book struct {
+		Pages int
+	}
+	// Book{100} không khả địa chỉ nhưng
+	// vẫn có thể lấy địa chỉ.
+	p := &Book{100} // <=> tmp := Book{100}; p := &tmp
+	p.Pages = 200
+}
+'''
+
+@@@ #use-pointer-as-struct
+###========== Trong Field Selector, Receiver Được Dereference Ngầm
+
+Trong ví dụ sau, để đơn giản, có thể viết `(*bookN).pages`
+thành `bookN.pages`. Nói cách khác, `bookN`
+được dereference trong selector dạng rút gọn.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type Book struct {
+		pages int
+	}
+	book1 := &Book{100} // book1 là một con trỏ struct
+	book2 := new(Book)  // book2 là một con trỏ struct khác
+	// Dùng con trỏ struct như struct.
+	book2.pages = book1.pages
+	// Dòng cuối này tương đương với dòng trên.
+	// Nói cách khác, nếu receiver là con trỏ,
+	// nó sẽ được dereference ngầm.
+	(*book2).pages = (*book1).pages
+}
+'''
+
+@@@ #comparison
+###========== So Sánh Giá Trị Struct
+
+Một kiểu struct có thể so sánh được chỉ khi không kiểu nào trong các kiểu trường của nó
+(kể cả các trường có tên là blank identifier `_`) thuộc loại __không thể so sánh__.
+
+    === không thể so sánh :: type-system-overview.tmd#types-not-support-comparison
+
+Hai giá trị struct có thể so sánh với nhau chỉ khi chúng có thể được gán cho nhau và kiểu của cả hai đều có thể so sánh.
+Nói cách khác, hai giá trị struct chỉ có thể được so sánh với nhau nếu
+các kiểu (có thể so sánh) của chúng giống hệt nhau hoặc
+kiểu cơ sở của chúng giống hệt nhau (có xét đến tag trường)
+và ít nhất một trong hai kiểu là không định danh.
+
+Khi so sánh hai giá trị struct cùng kiểu,
+từng cặp trường tương ứng sẽ được so sánh (theo thứ tự trong mã nguồn).
+Hai giá trị struct bằng nhau chỉ khi tất cả các cặp trường tương ứng đều bằng nhau.
+Việc so sánh dừng sớm khi phát hiện một cặp trường không bằng nhau hoặc __xảy ra panic__.
+Khi so sánh, các trường có tên là blank identifier `_` sẽ bị bỏ qua.
+
+    === xảy ra panic :: interface.tmd#comparison
+
+###========== Chuyển Đổi Giá Trị Struct
+
+Giá trị của hai kiểu struct `S1` và `S2` có thể được chuyển đổi
+sang kiểu của nhau nếu `S1` và `S2` có
+kiểu cơ sở giống hệt nhau (bỏ qua tag trường).
+Đặc biệt, nếu một trong `S1` hoặc `S2` là __kiểu không định danh__
+và kiểu cơ sở của chúng giống hệt nhau (có xét đến tag trường),
+thì có thể chuyển đổi ngầm giữa các giá trị của chúng.
+
+Cho các kiểu struct `S0`, `S1`, `S2`,
+`S3` và `S4` trong đoạn mã sau,
+*
+   không thể chuyển đổi giá trị kiểu `S0` sang
+   bốn kiểu còn lại, và ngược lại,
+   vì tên các trường tương ứng khác nhau.
+*
+   hai giá trị thuộc hai kiểu khác nhau trong số `S1`,
+   `S2`, `S3` và `S4`
+   có thể chuyển đổi sang kiểu của nhau.
+
+
+Đặc biệt,
+*
+   có thể chuyển đổi ngầm giá trị kiểu được ký hiệu bởi `S2`
+   sang kiểu `S3`, và ngược lại.
+*
+   có thể chuyển đổi ngầm giá trị kiểu được ký hiệu bởi `S2`
+   sang kiểu `S4`, và ngược lại.
+
+
+Tuy nhiên,
+*
+   phải chuyển đổi tường minh giá trị kiểu được ký hiệu bởi `S2`
+   sang kiểu `S1`, và ngược lại.
+*
+   phải chuyển đổi tường minh giá trị kiểu `S3`
+   sang kiểu `S4`, và ngược lại.
+
+@@@ .line-numbers
+''' go
+package main
+
+type S0 struct {
+	y int "foo"
+	x bool
+}
+
+// S1 là alias của một kiểu không định danh.
+type S1 = struct {
+	x int "foo"
+	y bool
+}
+
+// S2 cũng là alias của một kiểu không định danh.
+type S2 = struct {
+	x int "bar"
+	y bool
+}
+
+// Nếu bỏ qua tag trường, các kiểu cơ sở
+// của S3(S4) và S1 giống nhau. Nếu xét tag trường,
+// kiểu cơ sở của S3(S4) và S1 khác nhau.
+type S3 S2 // S3 là kiểu được định nghĩa (do đó có định danh)
+type S4 S3 // S4 là kiểu được định nghĩa (do đó có định danh)
+
+var v0, v1, v2, v3, v4 = S0{}, S1{}, S2{}, S3{}, S4{}
+func f() {
+	v1 = S1(v2); v2 = S2(v1)
+	v1 = S1(v3); v3 = S3(v1)
+	v1 = S1(v4); v4 = S4(v1)
+	v2 = v3; v3 = v2 // có thể chuyển đổi ngầm
+	v2 = v4; v4 = v2 // có thể chuyển đổi ngầm
+	v3 = S3(v4); v4 = S4(v3)
+}
+'''
+
+Thực tế, hai giá trị struct chỉ có thể được gán (hoặc so sánh) cho nhau
+nếu một trong hai có thể được chuyển đổi ngầm sang kiểu của giá trị kia.
+
+###========== Có Thể Dùng Kiểu Struct Ẩn Danh trong Khai Báo Trường
+
+Cho phép dùng kiểu struct ẩn danh làm kiểu của các trường
+trong một kiểu struct khác.
+Cũng cho phép dùng literal kiểu struct ẩn danh
+trong composite literal.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+var aBook = struct {
+	// Kiểu của trường author là
+	// một kiểu struct ẩn danh.
+	author struct {
+		firstName, lastName string
+		gender              bool
+	}
+	title string
+	pages int
+}{
+	author: struct { // một kiểu struct ẩn danh
+		firstName, lastName string
+		gender              bool
+	}{
+		firstName: "Mark",
+		lastName: "Twain",
+	},
+	title: "The Million Pound Note",
+	pages: 96,
+}
+'''
+
+Thông thường, để mã dễ đọc hơn, không nên
+dùng literal kiểu struct ẩn danh trong composite literal.
+
+###========== Tìm Hiểu Thêm về Kiểu Struct
+
+Có một số chủ đề nâng cao liên quan đến kiểu struct.
+Các chủ đề đó sẽ được giải thích sau trong __type embedding__ và __bố cục bộ nhớ__.
+
+    === type embedding :: type-embedding.tmd
+    === bố cục bộ nhớ :: memory-layout.tmd#size-and-padding
+
+

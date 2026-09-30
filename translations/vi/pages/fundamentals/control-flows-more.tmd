@@ -1,0 +1,698 @@
+### Goroutine, lời gọi hàm trì hoãn và panic/recover
+
+Bài viết này giới thiệu goroutine và lời gọi hàm trì hoãn.
+Goroutine và lời gọi hàm trì hoãn là hai tính năng độc đáo của Go.
+Bài viết cũng giải thích cơ chế panic và recover.
+Bài viết không đề cập đến toàn bộ kiến thức liên quan đến các tính năng này;
+những nội dung khác sẽ được giới thiệu trong các bài viết sau.
+
+@@@ #goroutine
+###========== Goroutine
+
+CPU hiện đại thường có nhiều lõi, một số lõi còn hỗ trợ hyper-threading.
+Nói cách khác, CPU hiện đại có thể xử lý đồng thời nhiều luồng lệnh.
+Để tận dụng tối đa sức mạnh của CPU hiện đại,
+chúng ta cần lập trình đồng thời khi viết chương trình.
+
+Tính toán đồng thời là hình thức tính toán trong đó
+nhiều phép tính được thực hiện trong những khoảng thời gian chồng lấp lên nhau.
+Hình dưới đây mô tả hai trường hợp tính toán đồng thời.
+Trong hình, A và B đại diện cho hai phép tính riêng biệt.
+Trường hợp thứ hai còn được gọi là tính toán song song,
+một dạng tính toán đồng thời đặc biệt.
+Ở trường hợp thứ nhất, A và B chỉ chạy song song trong một khoảng thời gian ngắn.
+
+{ ><
+&& res/concurrent-vs-parallel.png
+}
+
+Tính toán đồng thời có thể diễn ra trong một chương trình, một máy tính hoặc một mạng.
+Trong Go 101, chúng ta chỉ đề cập đến tính toán đồng thời ở phạm vi chương trình.
+Goroutine là cách Go tạo ra các phép tính đồng thời trong lập trình Go.
+
+Goroutine cũng thường được gọi là green thread.
+Green thread được runtime của ngôn ngữ duy trì và lập lịch,
+thay vì do hệ điều hành quản lý.
+Chi phí bộ nhớ và chuyển đổi ngữ cảnh
+của goroutine thấp hơn nhiều so với thread của hệ điều hành.
+Vì vậy, một chương trình Go có thể duy trì hàng chục nghìn goroutine cùng lúc,
+miễn là bộ nhớ hệ thống đủ.
+
+Go không hỗ trợ tạo system thread trong mã người dùng.
+Vì thế, dùng goroutine là cách duy nhất để lập trình đồng thời (ở phạm vi chương trình) trong Go.
+
+Mỗi chương trình Go khởi chạy với một goroutine duy nhất, gọi là main goroutine.
+Một goroutine có thể tạo goroutine mới.
+Tạo goroutine mới trong Go rất đơn giản:
+chỉ cần dùng từ khóa `go` trước một lời gọi hàm.
+Khi đó, lời gọi hàm sẽ được thực thi trong goroutine mới.
+Goroutine mới sẽ kết thúc cùng lúc với hàm được gọi.
+
+Mọi giá trị kết quả của lời gọi hàm trong goroutine
+(nếu hàm được gọi có trả về giá trị)
+đều phải được bỏ đi ngay trong câu lệnh gọi hàm.
+Ví dụ sau tạo hai goroutine mới
+trong main goroutine.
+Trong ví dụ, `time.Duration` là một kiểu tùy chỉnh được định nghĩa
+trong package chuẩn `time`.
+Kiểu nền của nó là kiểu dựng sẵn `int64`.
+Kiểu nền sẽ được giải thích trong __bài viết tiếp theo__.
+
+    === bài viết tiếp theo :: type-system-overview.tmd#underlying-type
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"time"
+)
+
+func SayGreetings(greeting string, times int) {
+	for i := 0; i < times; i++ {
+		log.Println(greeting)
+		d := time.Second * time.Duration(rand.Intn(5)) / 2
+		time.Sleep(d) // ngủ từ 0 đến 2,5 giây
+	}
+}
+
+func main() {
+	log.SetFlags(0)
+	go SayGreetings("hi!", 10)
+	go SayGreetings("hello!", 10)
+	time.Sleep(2 * time.Second)
+}
+'''
+
+Khá đơn giản, phải không? Vậy là chúng ta đã lập trình đồng thời!
+Trong thời gian chạy, ở thời điểm cao nhất chương trình trên có thể có ba goroutine
+do người dùng tạo đang chạy đồng thời.
+Hãy chạy chương trình. Một kết quả đầu ra có thể là:
+
+@@@ .output
+'''
+hi!
+hello!
+hello!
+hello!
+hello!
+hi!
+'''
+
+Khi main goroutine kết thúc, toàn bộ chương trình cũng kết thúc,
+kể cả khi các goroutine khác chưa kết thúc.
+
+Khác với các bài viết trước, chương trình này dùng hàm `Println`
+trong package chuẩn `log` thay cho hàm tương ứng trong package chuẩn `fmt`.
+Lý do là các hàm in trong package chuẩn `log` được đồng bộ
+(phần tiếp theo sẽ giải thích đồng bộ là gì),
+nên văn bản do hai goroutine in ra sẽ không bị trộn vào cùng một dòng
+(dù khả năng văn bản bị trộn khi dùng các hàm in trong package chuẩn `fmt`
+ở chương trình cụ thể này là rất thấp).
+
+@@@ #synchronization
+###========== Đồng bộ hóa tính toán đồng thời
+
+Các phép tính đồng thời có thể dùng chung tài nguyên, thường là tài nguyên bộ nhớ.
+Trong quá trình tính toán đồng thời, có thể xảy ra những tình huống sau:
+*
+   Trong cùng một khoảng thời gian, một phép tính đang ghi dữ liệu vào một vùng nhớ,
+   còn phép tính khác đang đọc dữ liệu từ chính vùng nhớ đó.
+   Khi đó, tính toàn vẹn của dữ liệu mà phép tính kia đọc có thể không được bảo đảm.
+*
+   Trong cùng một khoảng thời gian, một phép tính đang ghi dữ liệu vào một vùng nhớ,
+   còn phép tính khác cũng đang ghi vào chính vùng nhớ đó.
+   Khi đó, tính toàn vẹn của dữ liệu được lưu tại vùng nhớ đó có thể không được bảo đảm.
+
+Những tình huống này được gọi là data race. Một trong những nhiệm vụ của lập trình
+đồng thời là kiểm soát việc chia sẻ tài nguyên giữa các phép tính đồng thời,
+để data race không bao giờ xảy ra.
+Các cách thực hiện nhiệm vụ này được gọi là kỹ thuật đồng bộ hóa tính toán đồng thời,
+hay đồng bộ hóa dữ liệu; từng kỹ thuật sẽ được giới thiệu trong các bài Go 101 sau.
+
+Những nhiệm vụ khác trong lập trình đồng thời gồm:
+*
+   xác định cần bao nhiêu phép tính.
+*
+   xác định thời điểm bắt đầu, chặn, bỏ chặn và kết thúc một phép tính.
+*
+   xác định cách phân chia khối lượng công việc giữa các phép tính đồng thời.
+
+Chương trình ở phần trước chưa hoàn hảo.
+Hai goroutine mới được tạo ra dự định in mỗi lời chào mười lần.
+Tuy nhiên, main goroutine sẽ kết thúc sau hai giây,
+nên nhiều lời chào không có cơ hội được in ra.
+Làm thế nào để main goroutine biết khi nào cả hai goroutine mới
+đã hoàn thành công việc? Chúng ta phải dùng các kỹ thuật đồng bộ hóa tính toán đồng thời.
+
+Go hỗ trợ một số __kỹ thuật đồng bộ hóa tính toán đồng thời__.
+Trong số đó, __kỹ thuật channel__ là kỹ thuật độc đáo và được sử dụng phổ biến nhất.
+Tuy nhiên, để đơn giản, ở đây chúng ta sẽ dùng một kỹ thuật khác:
+kiểu `WaitGroup` trong package chuẩn `sync`,
+để đồng bộ việc thực thi giữa hai goroutine mới và main goroutine.
+
+    === kỹ thuật đồng bộ hóa tính toán đồng thời :: concurrent-synchronization-overview.tmd
+    === kỹ thuật channel :: channel.tmd
+
+Kiểu `WaitGroup` có ba method (hàm đặc biệt, sẽ được giải thích sau):
+`Add`, `Done` và `Wait`.
+Kiểu này sẽ được giải thích chi tiết trong một bài viết khác sau này.
+Ở đây, có thể hiểu đơn giản rằng:
+*
+   method `Add` dùng để đăng ký số lượng tác vụ mới.
+*
+   method `Done` dùng để thông báo một tác vụ đã hoàn thành.
+*
+   method `Wait` khiến goroutine gọi nó bị chặn cho đến khi tất cả tác vụ đã đăng ký hoàn thành.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"time"
+	"sync"
+)
+
+var wg sync.WaitGroup
+
+func SayGreetings(greeting string, times int) {
+	for i := 0; i < times; i++ {
+		log.Println(greeting)
+		d := time.Second * time.Duration(rand.Intn(5)) / 2
+		time.Sleep(d)
+	}
+	// Thông báo tác vụ đã hoàn thành.
+	wg.Done() // <=> wg.Add(-1)
+}
+
+func main() {
+	log.SetFlags(0)
+	wg.Add(2) // đăng ký hai tác vụ.
+	go SayGreetings("hi!", 10)
+	go SayGreetings("hello!", 10)
+	wg.Wait() // chặn cho đến khi mọi tác vụ hoàn thành.
+}
+'''
+
+Khi chạy chương trình, ta có thể thấy trước khi chương trình kết thúc,
+mỗi goroutine trong hai goroutine mới đều in mười lời chào.
+
+@@@ #states-of-goroutine
+###========== Các trạng thái của goroutine
+
+Ví dụ cuối cho thấy một goroutine còn hoạt động có thể ở (và chuyển đổi giữa)
+hai trạng thái: **running** và **blocking**.
+Trong ví dụ đó, main goroutine chuyển sang trạng thái blocking khi gọi
+method `wg.Wait`, rồi trở lại trạng thái running
+khi hai goroutine còn lại đều hoàn thành tác vụ tương ứng.
+
+Hình sau mô tả một vòng đời có thể có của goroutine.
+
+{ ><
+&& res/goroutine-states.png
+}
+
+Lưu ý: goroutine vẫn được xem là đang 'running' nếu nó đang ngủ (sau khi gọi hàm `time.Sleep`)
+hoặc đang chờ phản hồi từ system call hay kết nối mạng.
+
+Khi được tạo, goroutine tự động chuyển sang trạng thái 'running'.
+Goroutine chỉ có thể kết thúc từ trạng thái running, không thể kết thúc từ trạng thái blocking.
+Nếu vì lý do nào đó goroutine ở trạng thái blocking mãi mãi,
+thì nó sẽ không bao giờ kết thúc.
+Trong lập trình đồng thời, cần tránh những trường hợp như vậy,
+ngoại trừ một vài trường hợp hiếm gặp.
+
+Goroutine đang bị chặn chỉ có thể được bỏ chặn bởi
+một thao tác được thực hiện trong goroutine khác.
+Nếu tất cả goroutine trong chương trình Go đều ở trạng thái blocking,
+thì tất cả sẽ bị chặn mãi mãi.
+Đây có thể xem là deadlock toàn cục.
+Khi tình trạng này xảy ra trong chương trình, Go runtime tiêu chuẩn
+sẽ cố gắng làm chương trình gặp lỗi nghiêm trọng.
+
+Chương trình sau sẽ gặp lỗi sau hai giây:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"sync"
+	"time"
+)
+
+var wg sync.WaitGroup
+
+func main() {
+	wg.Add(1)
+	go func() {
+		time.Sleep(time.Second * 2)
+		wg.Wait()
+	}()
+	wg.Wait()
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+fatal error: all goroutines are asleep - deadlock!
+
+...
+'''
+
+Sau này, chúng ta sẽ tìm hiểu thêm những thao tác khiến goroutine chuyển sang trạng thái blocking.
+
+###========== Lập lịch goroutine
+
+Không phải mọi goroutine ở trạng thái running đều đang được thực thi tại một thời điểm.
+Ở bất kỳ thời điểm nào, số goroutine được thực thi tối đa
+không vượt quá số CPU logic khả dụng cho chương trình hiện tại.
+Ta có thể gọi hàm __`runtime.NumCPU`__
+để lấy số CPU logic khả dụng cho chương trình hiện tại.
+Mỗi CPU logic chỉ có thể thực thi một goroutine tại một thời điểm.
+Go runtime phải thường xuyên chuyển đổi ngữ cảnh thực thi giữa các goroutine
+để mỗi goroutine đang chạy có cơ hội được thực thi.
+Điều này tương tự cách hệ điều hành chuyển đổi ngữ cảnh thực thi giữa các OS thread.
+
+    === runtime.NumCPU :: https://golang.org/pkg/runtime/#NumCPU
+
+Hình sau mô tả chi tiết hơn một vòng đời có thể có của goroutine.
+Trong hình, trạng thái running được chia thành một số trạng thái phụ.
+Goroutine ở trạng thái phụ chờ trong hàng đợi đang chờ được thực thi.
+Goroutine ở trạng thái phụ đang thực thi có thể quay lại trạng thái phụ chờ trong hàng đợi
+sau khi đã được thực thi một thời gian (một khoảng thời gian rất ngắn).
+
+{ ><
+&& res/goroutine-schedule.png
+}
+
+Để đơn giản, các trạng thái phụ trong hình trên sẽ không được nhắc đến
+trong những bài viết khác của Go 101.
+Và cũng như đã nói, trong Go 101, trạng thái ngủ và trạng thái gọi system call
+không được xem là trạng thái phụ của trạng thái blocking.
+
+Go runtime tiêu chuẩn sử dụng __mô hình M-P-G__
+để lập lịch goroutine,
+trong đó **M** đại diện cho OS thread,
+**P** đại diện cho bộ xử lý logic/ảo (không phải CPU logic)
+và **G** đại diện cho goroutine.
+Phần lớn công việc lập lịch do bộ xử lý logic (**P**) thực hiện;
+chúng đóng vai trò trung gian, gắn goroutine (**G**) vào OS thread (**M**).
+Mỗi OS thread tại một thời điểm chỉ có thể được gắn với tối đa một goroutine,
+và mỗi goroutine tại một thời điểm chỉ có thể được gắn với tối đa một OS thread.
+Goroutine chỉ được thực thi khi đã được gắn với một OS thread.
+Sau khi được thực thi một lúc, goroutine sẽ cố tách khỏi OS thread tương ứng,
+để các goroutine đang chạy khác có cơ hội được gắn vào thread và thực thi.
+
+    === mô hình M-P-G :: https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw
+
+Trong thời gian chạy, ta có thể gọi hàm __`runtime.GOMAXPROCS`__
+để lấy và đặt số bộ xử lý logic (**P**).
+
+    === runtime.GOMAXPROCS :: https://golang.org/pkg/runtime/#GOMAXPROCS
+
+Giá trị khởi tạo mặc định của `runtime.GOMAXPROCS` cũng có thể được đặt
+thông qua biến môi trường `GOMAXPROCS`.
+
+Ở mọi thời điểm, số goroutine trong trạng thái phụ đang thực thi không lớn hơn
+giá trị nhỏ hơn giữa `runtime.NumCPU` và `runtime.GOMAXPROCS`.
+
+@@@ #defer
+###========== Lời gọi hàm trì hoãn
+
+Lời gọi hàm trì hoãn là lời gọi hàm đứng sau từ khóa `defer`.
+Từ khóa `defer` cùng lời gọi hàm trì hoãn tạo thành một câu lệnh defer.
+Tương tự lời gọi hàm trong goroutine,
+mọi giá trị kết quả của lời gọi hàm (nếu hàm được gọi có trả về giá trị)
+đều phải được bỏ đi ngay trong câu lệnh gọi hàm.
+
+Khi một câu lệnh defer được thực thi, lời gọi hàm trì hoãn chưa chạy ngay.
+Thay vào đó, lời gọi được đẩy vào stack lời gọi defer do lời gọi hàm lồng nhau gần nhất quản lý.
+Sau khi một lời gọi hàm `fc(...)` trả về (nhưng chưa kết thúc hoàn toàn)
+và bước vào __giai đoạn thoát__,
+tất cả lời gọi hàm trì hoãn được đẩy vào stack lời gọi defer của nó
+sẽ được lấy khỏi stack và thực thi theo thứ tự vào trước, ra sau,
+tức theo thứ tự ngược với thứ tự chúng được đẩy vào stack.
+Khi mọi lời gọi trì hoãn đã chạy xong, lời gọi hàm `fc(...)` mới kết thúc hoàn toàn.
+
+    === giai đoạn thoát :: function-declarations-and-calls.tmd#exiting-phase
+
+Ví dụ đơn giản sau minh họa cách dùng lời gọi hàm trì hoãn.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	defer fmt.Println("The third line.")
+	defer fmt.Println("The second line.")
+	fmt.Println("The first line.")
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+The first line.
+The second line.
+The third line.
+'''
+
+
+Đây là một ví dụ khác phức tạp hơn một chút.
+Ví dụ sẽ in các số từ `0` đến `9`,
+mỗi số trên một dòng, theo thứ tự tự nhiên.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	defer fmt.Println("9")
+	fmt.Println("0")
+	defer fmt.Println("8")
+	fmt.Println("1")
+	if false {
+		defer fmt.Println("not reachable")
+	}
+	defer func() {
+		defer fmt.Println("7")
+		fmt.Println("3")
+		defer func() {
+			fmt.Println("5")
+			fmt.Println("6")
+		}()
+		fmt.Println("4")
+	}()
+	fmt.Println("2")
+	return
+	defer fmt.Println("not reachable")
+}
+'''
+
+@@@ #defer-modify-results
+###========== Lời gọi hàm trì hoãn có thể thay đổi kết quả trả về có tên của hàm bao quanh
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func Triple(n int) (r int) {
+	defer func() {
+		r += n // thay đổi giá trị trả về
+	}()
+
+	return n + n // <=> r = n + n; return
+}
+
+func main() {
+	fmt.Println(Triple(5)) // 15
+}
+'''
+
+@@@ #argument-evaluation-moment
+###========== Thời điểm đánh giá các đối số của lời gọi hàm trì hoãn
+
+Mọi đối số của lời gọi hàm trì hoãn
+đều được đánh giá tại thời điểm câu lệnh defer tương ứng được thực thi
+(còn gọi là thời điểm lời gọi trì hoãn được đẩy vào stack lời gọi defer).
+Kết quả đánh giá được dùng khi lời gọi trì hoãn được thực thi sau đó,
+trong giai đoạn thoát của lời gọi bao quanh (lời gọi chứa lời gọi trì hoãn).
+
+Các biểu thức bên trong thân của một lời gọi hàm ẩn danh,
+dù đó là lời gọi thông thường hay lời gọi defer/goroutine,
+đều được đánh giá khi lời gọi hàm ẩn danh được thực thi.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+// eval-moment.go
+package main
+
+import "fmt"
+
+func main() {
+	func() {
+		var x = 0
+		for i := 0; i < 3; i++ {
+			defer fmt.Println("a:", i + x)
+		}
+		x = 10
+	}()
+	fmt.Println()
+	func() {
+		var x = 0
+		for i := 0; i < 3; i++ {
+			defer func() {
+				fmt.Println("b:", i + x)
+			}()
+		}
+		x = 10
+	}()
+}
+'''
+
+    === gotv :: https://go101.org/apps-and-libs/gotv.html
+
+Dùng các phiên bản Go Toolchain khác nhau để chạy mã (__gotv__ là công cụ dùng để
+quản lý và sử dụng nhiều bản cài đặt Go toolchain chính thức cùng tồn tại).
+Kết quả:
+@@@ .output
+'''
+$ gotv 1.21. run eval-moment.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.8/bin/go run eval-moment.go
+a: 2
+a: 1
+a: 0
+
+b: 13
+b: 13
+b: 13
+$ gotv 1.22. run eval-moment.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.1/bin/go run eval-moment.go
+a: 2
+a: 1
+a: 0
+
+b: 12
+b: 11
+b: 10
+'''
+
+Lưu ý sự thay đổi hành vi do __thay đổi ngữ nghĩa (của khối lệnh `for`) trong Go 1.22__.
+
+    === thay đổi ngữ nghĩa ... :: control-flows.tmd#for-semantic-change
+
+Các quy tắc về thời điểm đánh giá đối số tương tự cũng áp dụng cho lời gọi hàm trong goroutine.
+Chương trình sau sẽ in `123 789`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+
+func main() {
+	var a = 123
+	go func(x int) {
+		time.Sleep(time.Second)
+		fmt.Println(x, a) // 123 789
+	}(a)
+
+	a = 789
+
+	time.Sleep(2 * time.Second)
+}
+'''
+
+Nhân tiện, trong dự án thực tế, không nên đồng bộ bằng các lời gọi `time.Sleep`.
+Nếu chương trình chạy trên máy tính có CPU đang phải phục vụ nhiều
+chương trình khác, goroutine mới được tạo có thể không bao giờ
+có cơ hội chạy trước khi chương trình kết thúc.
+Trong dự án thực tế, chúng ta nên dùng các kỹ thuật đồng bộ hóa tính toán đồng thời
+được giới thiệu trong bài viết
+__tổng quan về đồng bộ hóa tính toán đồng thời__
+để đồng bộ.
+
+    === tổng quan về đồng bộ hóa tính toán đồng thời :: concurrent-synchronization-overview.tmd
+
+###========== Vì sao cần tính năng hàm trì hoãn
+
+Trong các ví dụ trên, lời gọi hàm trì hoãn không thực sự bắt buộc.
+Tuy nhiên, tính năng lời gọi hàm trì hoãn là cần thiết cho cơ chế
+panic và recover sẽ được giới thiệu dưới đây.
+
+Lời gọi hàm trì hoãn cũng giúp chúng ta viết mã rõ ràng và vững chắc hơn.
+Sau này, chúng ta có thể đọc thêm các ví dụ mã sử dụng lời gọi hàm trì hoãn
+và tìm hiểu thêm chi tiết trong bài viết
+__tìm hiểu thêm về hàm trì hoãn__. Còn bây giờ,
+chúng ta sẽ tìm hiểu vai trò của hàm trì hoãn đối với panic và recover.
+
+    === tìm hiểu thêm về hàm trì hoãn :: defer-more.tmd
+
+@@@ #panic-recover
+###========== Panic và recover
+
+Go không hỗ trợ ném và bắt exception;
+thay vào đó, lập trình Go ưu tiên xử lý lỗi tường minh.
+Trên thực tế, Go có một cơ chế tương tự ném/bắt exception.
+Cơ chế đó được gọi là panic/recover.
+
+Ta có thể gọi hàm dựng sẵn `panic` để tạo panic,
+khiến goroutine hiện tại chuyển sang trạng thái panicking.
+
+Panicking là một cách khác để khiến hàm trả về.
+Ngay khi panic xảy ra trong một lời gọi hàm, lời gọi đó lập tức trả về
+và bước vào giai đoạn thoát.
+
+Khi gọi hàm dựng sẵn `recover` trong một lời gọi trì hoãn,
+có thể loại bỏ panic đang hoạt động trong goroutine hiện tại,
+để goroutine đó trở lại trạng thái bình thường.
+
+Nếu goroutine đang panicking kết thúc mà không được recover, toàn bộ chương trình sẽ gặp lỗi nghiêm trọng.
+
+Các hàm dựng sẵn `panic` và `recover` được khai báo như sau:
+@@@ .line-numbers
+''' go
+func panic(v interface{})
+func recover() interface{}
+'''
+
+Kiểu và giá trị interface sẽ được giải thích sau trong bài viết
+__interface trong Go__.
+Ở đây, chỉ cần biết kiểu interface rỗng
+`interface{}` có thể xem như kiểu `any`
+hoặc kiểu `Object` trong nhiều ngôn ngữ khác. Nói cách khác,
+ta có thể truyền giá trị thuộc bất kỳ kiểu nào vào lời gọi hàm `panic`.
+
+    === interface trong Go :: interface.tmd
+
+Giá trị hàm `recover` trả về là giá trị
+mà lời gọi hàm `panic` đã nhận.
+
+Ví dụ dưới đây cho thấy cách tạo panic và cách recover nó.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	defer func() {
+		fmt.Println("exit normally.")
+	}()
+	fmt.Println("hi!")
+	defer func() {
+		v := recover()
+		fmt.Println("recovered:", v)
+	}()
+	panic("bye!")
+	fmt.Println("unreachable")
+}
+'''
+
+Kết quả:
+
+@@@ .output
+'''
+hi!
+recovered: bye!
+exit normally.
+'''
+
+Đây là ví dụ khác cho thấy một goroutine đang panicking kết thúc mà không được recover.
+Vì vậy, toàn bộ chương trình gặp lỗi nghiêm trọng.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	fmt.Println("hi!")
+
+	go func() {
+		time.Sleep(time.Second)
+		panic(123)
+	}()
+
+	for {
+		time.Sleep(time.Second)
+	}
+}
+'''
+
+Kết quả:
+
+@@@ .output
+'''
+hi!
+panic: 123
+
+goroutine 5 [running]:
+...
+'''
+
+Go runtime sẽ tạo panic trong một số tình huống,
+chẳng hạn chia số nguyên cho không. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	a, b := 1, 0
+	_ = a/b
+}
+'''
+
+Kết quả:
+
+@@@ .output
+'''
+panic: runtime error: integer divide by zero
+
+goroutine 1 [running]:
+...
+'''
+
+Các tình huống panic khác do runtime sẽ được đề cập
+trong những bài Go 101 sau.
+
+Nhìn chung, panic được dùng cho lỗi logic, chẳng hạn lỗi do con người bất cẩn.
+Lỗi logic không bao giờ nên xảy ra trong lúc chạy.
+Nếu xảy ra, mã nguồn hẳn có lỗi.
+Mặt khác, rất khó tránh hoàn toàn lỗi không phải lỗi logic trong lúc chạy.
+Nói cách khác, lỗi không phải lỗi logic là những lỗi xảy ra trong thực tế.
+Những lỗi đó không nên gây panic; thay vào đó, chúng cần được trả về tường minh
+và xử lý đúng cách.
+
+Sau này, chúng ta có thể tìm hiểu __một số trường hợp sử dụng panic/recover__
+và __cơ chế panic/recover chi tiết hơn__.
+
+    === một số trường hợp sử dụng panic/recover :: panic-and-recover-use-cases.tmd
+    === cơ chế panic/recover chi tiết hơn :: panic-and-recover-more.tmd
+
+###========== Một số lỗi nghiêm trọng không phải panic và không thể recover
+
+Với trình biên dịch Go tiêu chuẩn, một số lỗi nghiêm trọng,
+chẳng hạn tràn stack và hết bộ nhớ, không thể recover.
+Khi xảy ra, chương trình sẽ gặp lỗi nghiêm trọng.
