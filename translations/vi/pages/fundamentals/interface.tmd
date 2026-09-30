@@ -1,0 +1,1122 @@
+### Interface trong Go
+
+Interface là một dạng kiểu đặc biệt trong Go.
+Interface đảm nhiệm một số vai trò quan trọng trong Go.
+Về cơ bản, interface giúp Go hỗ trợ việc đóng gói giá trị (value boxing).
+Nhờ đó, thông qua việc đóng gói giá trị, Go hỗ trợ reflection và tính đa hình (polymorphism).
+
+Kể từ phiên bản 1.18, Go đã hỗ trợ generics do người dùng định nghĩa.
+Trong generics, interface cũng có thể được dùng làm type constraint.
+Thực tế, mọi type constraint đều là interface.
+Trước Go 1.18, mọi interface đều có thể được dùng làm kiểu giá trị.
+Nhưng kể từ Go 1.18, một số interface chỉ có thể dùng làm type constraint.
+Các interface có thể dùng làm kiểu giá trị được gọi là basic interface.
+
+Bài viết này chủ yếu được viết trước khi Go hỗ trợ generics,
+nên nội dung chủ yếu nói về basic interface.
+Để tìm hiểu về interface chỉ dùng làm constraint, hãy đọc
+sách __Go generics 101__.
+
+    === Go generics 101 :: https://go101.org/generics/101.html
+
+###=========== Interface và tập hợp kiểu
+
+Interface xác định một số yêu cầu về kiểu.
+Mọi kiểu không phải interface thỏa mãn các yêu cầu này tạo thành một tập hợp kiểu,
+được gọi là tập hợp kiểu của interface đó.
+
+Các yêu cầu do interface xác định được biểu đạt
+bằng cách nhúng một số phần tử vào interface.
+Hiện tại (Go 1.25), có hai loại phần tử interface: phần tử method và phần tử kiểu.
+
+*
+   Phần tử method có dạng một __method specification__.
+   Method specification được nhúng trong interface không được
+   dùng blank identifier `_` làm tên.
+*
+   Phần tử kiểu có thể là tên kiểu, literal kiểu, kiểu xấp xỉ hoặc hợp kiểu (type union).
+   Bài viết này không bàn nhiều về hai dạng sau, mà chỉ đề cập đến
+   tên kiểu và literal biểu thị interface.
+
+    === method specification :: method.tmd#method-set
+
+Ví dụ, __interface `error` được khai báo sẵn__,
+có định nghĩa như bên dưới,
+nhúng method specification `Error() string`.
+Trong định nghĩa này, `interface{...}` được gọi là literal kiểu interface,
+còn từ `interface` là keyword trong Go.
+
+    === `error` interface type :: https://golang.org/pkg/builtin/#error
+
+@@@ .line-numbers
+''' go
+type error interface {
+        Error() string
+}
+'''
+
+Ta cũng có thể nói interface `error` trực tiếp chỉ định method `Error() string`.
+Tập hợp kiểu của nó gồm mọi kiểu không phải interface
+có __method__ với đặc tả `Error() string`.
+Về lý thuyết, tập hợp kiểu này là vô hạn.
+Trong một dự án Go cụ thể, tập hợp đó là hữu hạn.
+
+    === method :: method.tmd
+
+Sau đây là một số định nghĩa interface khác và khai báo alias.
+
+@@@ .line-numbers
+''' go
+// Interface này chỉ định trực tiếp hai method và
+// nhúng thêm hai interface, trong đó một interface
+// là tên kiểu, interface còn lại là literal kiểu.
+type ReadWriteCloser = interface {
+	Read(buf []byte) (n int, err error)
+	Write(buf []byte) (n int, err error)
+	error                      // a type name
+	interface{ Close() error } // a type literal
+}
+
+// Interface này nhúng một kiểu xấp xỉ. Tập hợp kiểu
+// của nó gồm mọi kiểu có kiểu nền là []byte.
+type AnyByteSlice = interface {
+	~[]byte
+}
+
+// Interface này nhúng một hợp kiểu. Tập hợp kiểu gồm
+// 6 kiểu: uint, uint8, uint16, uint32, uint64 và uintptr.
+type Unsigned interface {
+	uint | uint8 | uint16 | uint32 | uint64 | uintptr
+}
+'''
+
+Nhúng một interface (được biểu thị bằng tên kiểu hoặc literal kiểu)
+vào interface khác tương đương với việc (đệ quy) mở rộng các phần tử của interface trước vào interface sau.
+Ví dụ, interface được biểu thị bởi alias kiểu `ReadWriteCloser`
+tương đương với interface được biểu thị bởi literal sau,
+trong đó chỉ định trực tiếp bốn method.
+
+@@@ .line-numbers
+''' go
+interface {
+	Read(buf []byte) (n int, err error)
+	Write(buf []byte) (n int, err error)
+	Error() string
+	Close() error
+}
+'''
+
+Tập hợp kiểu của interface trên gồm mọi kiểu không phải interface
+có ít nhất bốn method mà interface chỉ định.
+Tập hợp kiểu này cũng là vô hạn.
+Nó chắc chắn là tập con của tập hợp kiểu thuộc interface `error`.
+
+Lưu ý: trước Go 1.18, chỉ tên kiểu interface mới có thể được nhúng vào interface.
+
+Các interface trong đoạn mã sau đều được gọi là blank interface,
+vì chúng không nhúng gì và không chỉ định method nào.
+
+@@@ .line-numbers
+''' go
+// Kiểu blank interface không định danh.
+interface{}
+	
+// Nothing là một blank interface được định nghĩa.
+type Nothing interface{}
+'''
+
+Go 1.18 đã bổ sung alias khai báo sẵn `any`,
+biểu thị kiểu blank interface `interface{}`.
+
+Tập hợp kiểu của blank interface gồm mọi kiểu không phải interface.
+
+###=========== Method set của các kiểu
+
+Mỗi kiểu có một __method set__ tương ứng.
+*
+   Với kiểu không phải interface, method set gồm đặc tả của
+   toàn bộ __method được khai báo (tường minh hoặc ngầm định)__
+   cho kiểu đó.
+*
+   Với interface, method set gồm mọi method specification
+   được chỉ định trực tiếp hoặc gián tiếp thông qua việc nhúng kiểu khác.
+
+    === method set ... :: method.tmd#method-set
+    === the methods ... :: method.tmd
+
+Trong các ví dụ ở phần trước,
+
+*
+   method set của interface `ReadWriteCloser` có bốn method.
+*
+   method set của interface khai báo sẵn `error` chỉ có một method.
+*
+   method set của blank interface là rỗng.
+
+Để tiện gọi, method set của một kiểu cũng thường được gọi là
+method set của mọi giá trị thuộc kiểu đó.
+
+###=========== Basic interface
+
+Basic interface là các interface có thể dùng làm kiểu giá trị.
+Interface không phải basic interface còn được gọi là interface chỉ dùng làm constraint.
+
+Hiện tại (Go 1.25), mọi basic interface đều có thể được định nghĩa hoàn toàn
+bằng một method set (có thể rỗng).
+Nói cách khác, basic interface không cần phần tử kiểu để được định nghĩa.
+
+Trong các ví dụ ở phần trước nữa, interface được biểu thị
+bởi alias `ReadWriteCloser` là basic interface,
+còn interface `Unsigned` và kiểu được biểu thị bởi alias
+`AnyByteSlice` thì không.
+Cả hai kiểu sau đều chỉ dùng làm constraint.
+
+Blank interface và interface khai báo sẵn `error`
+cũng đều là basic interface.
+
+Hai basic interface không định danh giống nhau nếu method set của chúng giống nhau.
+Lưu ý, các method không export (có tên là identifier không export)
+thuộc các package khác nhau luôn được xem là hai method khác nhau,
+kể cả khi tên của chúng giống hệt nhau.
+
+@@@ #implementation
+###=========== Việc triển khai interface
+
+Nếu kiểu không phải interface nằm trong tập hợp kiểu của một interface,
+ta nói kiểu đó triển khai interface.
+Nếu tập hợp kiểu của một interface là tập con của interface khác,
+ta nói interface trước triển khai interface sau.
+
+Một interface luôn triển khai chính nó, vì tập hợp kiểu luôn là tập con (hoặc tập cha) của chính nó.
+Tương tự, hai interface có cùng method set triển khai lẫn nhau.
+Thực tế, hai interface không định danh giống nhau nếu tập hợp kiểu của chúng giống nhau.
+
+Nếu kiểu `T` triển khai interface `X`,
+method set của `T` phải là tập cha của method set `X`,
+bất kể `T` là interface hay kiểu khác.
+Ví dụ, trong các ví dụ ở phần trước,
+interface được biểu thị bởi `ReadWriteCloser`
+triển khai interface `error`.
+
+Trong Go, việc triển khai interface luôn là ngầm định.
+Compiler không yêu cầu khai báo tường minh quan hệ triển khai trong mã.
+Go không có keyword `implements`.
+Compiler Go sẽ tự kiểm tra quan hệ triển khai khi cần.
+
+Ví dụ, trong đoạn mã sau, method set của
+kiểu con trỏ struct `*Book`, kiểu số nguyên `MyInt` và
+kiểu con trỏ `*MyInt` đều chứa method specification
+`About() string`, vì thế chúng đều triển khai
+interface `Aboutable` đã nêu ở trên.
+@@@ .line-numbers
+''' go
+type Aboutable interface {
+	About() string
+}
+
+type Book struct {
+	name string
+	// các field khác ...
+}
+
+func (book *Book) About() string {
+	return "Book: " + book.name
+}
+
+type MyInt int
+
+func (MyInt) About() string {
+	return "I'm a custom integer value"
+}
+'''
+
+Cơ chế triển khai ngầm định cho phép các kiểu
+được định nghĩa trong package thư viện khác, chẳng hạn package chuẩn,
+tự động triển khai interface được khai báo trong package của người dùng.
+Ví dụ, nếu khai báo interface như sau,
+thì kiểu `DB` và `Tx` được khai báo trong __package chuẩn
+`database/sql`__ sẽ tự động triển khai interface này,
+vì cả hai đều có ba method tương ứng được interface chỉ định.
+
+    === the `database/sql` standard package :: https://golang.org/pkg/database/sql/
+
+@@@ .line-numbers
+''' go
+import "database/sql"
+
+...
+
+type DatabaseStorer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+}
+'''
+
+Lưu ý, vì tập hợp kiểu của blank interface gồm mọi kiểu không phải interface,
+nên mọi kiểu đều triển khai mọi blank interface.
+Đây là một đặc điểm quan trọng của Go.
+
+@@@ #boxing
+###=========== Đóng gói giá trị
+
+Nhắc lại, hiện tại (Go 1.25), kiểu của giá trị interface phải là basic interface.
+Trong phần còn lại của bài viết này,
+khi nhắc đến kiểu giá trị, kiểu đó có thể là
+kiểu không phải interface hoặc basic interface.
+Nó không bao giờ là interface chỉ dùng làm constraint.
+
+Có thể xem mỗi giá trị interface như một chiếc hộp chứa giá trị không phải interface.
+Để đóng gói giá trị không phải interface vào giá trị interface,
+kiểu của giá trị đó phải triển khai kiểu interface đích.
+
+Nếu kiểu `T` triển khai interface (basic) `I`,
+mọi giá trị kiểu `T` đều có thể được chuyển đổi ngầm định sang kiểu `I`.
+Nói cách khác, mọi giá trị kiểu `T` đều
+__có thể gán__
+cho giá trị kiểu `I` (và có thể thay đổi giá trị đó).
+Khi giá trị `T` được chuyển đổi (gán) sang giá trị `I`,
+*
+   nếu `T` không phải interface,
+   một bản sao giá trị `T` được đóng gói
+   vào giá trị `I` kết quả (hoặc đích).
+   Độ phức tạp thời gian của thao tác sao chép là // `O(n)` //,
+   với `n` là kích thước giá trị `T` được sao chép.
+   //(Compiler Go chuẩn thực hiện một số tối ưu hóa
+   để giảm chi phí đóng gói các giá trị thỏa mãn một số điều kiện.
+   Hãy đọc chương "Interfaces" trong sách
+   __Go Optimizations 101__ để tìm hiểu các tối ưu hóa này.)
+*
+   nếu `T` cũng là interface,
+   một bản sao giá trị được đóng gói trong `T` sẽ được đóng gói
+   vào giá trị `I` kết quả (hoặc đích).
+   Compiler Go chuẩn tối ưu hóa trường hợp này,
+   nên độ phức tạp thời gian sao chép là // `O(1)` //,
+   thay vì // `O(n)` //.
+   { %%
+   https://commaok.xyz/post/interface-allocs
+   kể từ Go1.5, trong triển khai compiler chính thức (), nếu dynamic value
+   không phải con trỏ, runtime sẽ cấp phát bộ nhớ cho bản sao dynamic value rồi
+   lưu con trỏ tới bản sao đó trong giá trị interface.
+   }
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+    === assignable :: constants-and-variables.tmd#assignment
+
+Thông tin kiểu của giá trị được đóng gói cũng được lưu trong giá trị interface kết quả (hoặc đích).
+(Phần dưới sẽ giải thích thêm.)
+
+Giá trị được đóng gói trong giá trị interface được gọi là
+**// dynamic value //** của giá trị interface đó.
+Kiểu của dynamic value được gọi là
+**// dynamic type //** của giá trị interface đó.
+
+Phần trực tiếp của dynamic value trong giá trị interface là bất biến,
+dù ta có thể thay dynamic value của nó bằng dynamic value khác.
+
+Trong Go, zero value của mọi kiểu interface được biểu thị
+bằng identifier khai báo sẵn `nil`.
+Không có gì được đóng gói trong giá trị interface nil.
+Gán `nil` không định kiểu cho giá trị interface sẽ
+xóa dynamic value đang được đóng gói trong giá trị interface đó.
+
+//
+(Lưu ý, zero value của nhiều kiểu không phải interface trong Go
+cũng được biểu thị bằng `nil`.
+Giá trị nil không phải interface cũng có thể được đóng gói vào giá trị interface.
+Giá trị interface chứa giá trị nil không phải interface vẫn đang chứa một thứ gì đó,
+nên nó không phải giá trị interface nil.)
+
+Vì mọi kiểu đều triển khai tất cả blank interface,
+nên mọi giá trị không phải interface đều có thể được đóng gói (hoặc gán) vào blank interface.
+Vì vậy, blank interface có thể được xem như kiểu
+`any` trong nhiều ngôn ngữ khác.
+
+Khi giá trị không định kiểu (trừ `nil` không định kiểu)
+được gán cho blank interface,
+giá trị đó trước tiên được chuyển sang kiểu mặc định.
+(Nói cách khác, có thể xem giá trị đó được suy ra thành giá trị có kiểu mặc định.)
+
+Hãy xem ví dụ minh họa một số phép gán
+có giá trị interface làm đích.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Aboutable interface {
+	About() string
+}
+
+// Kiểu *Book triển khai Aboutable.
+type Book struct {
+	name string
+}
+func (book *Book) About() string {
+	return "Book: " + book.name
+}
+
+func main() {
+	// Một giá trị *Book được đóng gói vào
+	// giá trị interface kiểu Aboutable.
+	var a Aboutable = &Book{"Go 101"}
+	fmt.Println(a) // &{Go 101}
+
+	// i là một giá trị blank interface.
+	var i interface{} = &Book{"Rust 101"}
+	fmt.Println(i) // &{Rust 101}
+
+	// Aboutable triển khai interface{}.
+	i = a
+	fmt.Println(i) // &{Go 101}
+}
+'''
+
+Lưu ý, prototype hàm `fmt.Println` được dùng nhiều lần trong các bài trước là
+
+@@@ .disable-line-numbers111
+''' go
+func Println(a ...interface{}) (n int, err error)
+'''
+
+Vì vậy, lời gọi hàm `fmt.Println` có thể nhận đối số thuộc
+mọi kiểu.
+
+Ví dụ tiếp theo cho thấy cách dùng blank interface
+để đóng gói giá trị thuộc mọi kiểu không phải interface.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var i interface{}
+	i = []int{1, 2, 3}
+	fmt.Println(i) // [1 2 3]
+	i = map[string]int{"Go": 2012}
+	fmt.Println(i) // map[Go:2012]
+	i = true
+	fmt.Println(i) // true
+	i = 1
+	fmt.Println(i) // 1
+	i = "abc"
+	fmt.Println(i) // abc
+
+	// Xóa giá trị được đóng gói trong giá trị interface i.
+	i = nil
+	fmt.Println(i) // <nil>
+}
+'''
+
+Compiler Go xây dựng một bảng toàn cục chứa
+thông tin về từng kiểu trong quá trình biên dịch.
+Thông tin này gồm __kind__ của kiểu,
+các method và field của kiểu,
+kiểu phần tử của kiểu chứa, kích thước các kiểu, v.v.
+Bảng toàn cục được nạp vào bộ nhớ khi chương trình khởi chạy.
+
+    === kind :: type-system-overview.tmd#type-kinds
+
+Khi chạy, lúc giá trị không phải interface được đóng gói vào giá trị interface,
+Go runtime (ít nhất là runtime chuẩn) sẽ phân tích và xây dựng
+thông tin triển khai cho cặp kiểu của hai giá trị,
+rồi lưu thông tin triển khai trong giá trị interface.
+Thông tin triển khai của mỗi cặp kiểu không phải interface và kiểu interface chỉ được
+xây dựng một lần rồi lưu đệm trong map toàn cục để tăng hiệu quả thực thi.
+Số phần tử trong map toàn cục này không bao giờ giảm.
+Thực tế, giá trị interface khác nil chỉ dùng __một trường con trỏ nội bộ
+trỏ tới mục thông tin triển khai đã lưu đệm__.
+
+    === an internal ... :: value-part.tmd#interface-structure
+
+Thông tin triển khai cho mỗi cặp (kiểu interface, dynamic type)
+gồm hai phần:
+*.
+   thông tin về dynamic type (một kiểu không phải interface)
+*.
+   và method table (slice) lưu mọi method tương ứng được
+   interface chỉ định và kiểu không phải interface (dynamic type) khai báo.
+
+Hai phần thông tin này cần thiết để triển khai hai tính năng quan trọng trong Go:
+*.
+   Thông tin dynamic type là chìa khóa để triển khai __reflection__ trong Go.
+*.
+   Thông tin method table là chìa khóa để triển khai tính đa hình (sẽ được giải thích ở phần tiếp theo).
+
+    === reflection :: #reflection
+
+@@@ #polymorphism
+###=========== Tính đa hình
+
+Tính đa hình là một chức năng quan trọng do interface cung cấp,
+đồng thời cũng là tính năng quan trọng của Go.
+
+Khi giá trị không phải interface `t` thuộc kiểu `T`
+được đóng gói trong giá trị interface `i` kiểu `I`,
+việc gọi method do interface `I` chỉ định
+trên giá trị interface `i`
+thực tế sẽ gọi method tương ứng được khai báo cho kiểu không phải interface `T`
+trên giá trị không phải interface `t`.
+Nói cách khác, **gọi method của giá trị interface thực chất sẽ
+gọi method tương ứng của dynamic value được chứa trong giá trị interface đó**.
+Ví dụ, gọi method `i.m` thực chất sẽ gọi method `t.m`.
+Khi dynamic value có dynamic type khác nhau được đóng gói vào giá trị interface,
+giá trị interface hoạt động khác nhau. Đây gọi là tính đa hình.
+
+Khi gọi method `i.m`, method table trong thông tin triển khai
+lưu trong `i` được tra cứu để tìm và gọi method `t.m` tương ứng.
+Method table là slice, thao tác tra cứu chỉ là truy cập phần tử slice nên diễn ra nhanh.
+
+//
+(Lưu ý, gọi method trên giá trị interface nil sẽ gây panic khi chạy,
+vì không có method nào khả dụng để gọi.)
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Filter interface {
+	About() string
+	Process([]int) []int
+}
+
+// UniqueFilter dùng để loại bỏ các số trùng lặp.
+type UniqueFilter struct{}
+func (UniqueFilter) About() string {
+	return "remove duplicate numbers"
+}
+func (UniqueFilter) Process(inputs []int) []int {
+	outs := make([]int, 0, len(inputs))
+	pusheds := make(map[int]bool)
+	for _, n := range inputs {
+		if !pusheds[n] {
+			pusheds[n] = true
+			outs = append(outs, n)
+		}
+	}
+	return outs
+}
+
+// MultipleFilter chỉ giữ lại
+// các số là bội số của
+// MultipleFilter (có kiểu giá trị int).
+type MultipleFilter int
+func (mf MultipleFilter) About() string {
+	return fmt.Sprintf("keep multiples of %v", mf)
+}
+func (mf MultipleFilter) Process(inputs []int) []int {
+	var outs = make([]int, 0, len(inputs))
+	for _, n := range inputs {
+		if n % int(mf) == 0 {
+			outs = append(outs, n)
+		}
+	}
+	return outs
+}
+
+// Nhờ tính đa hình, chỉ cần một hàm
+// filterAndPrint.
+func filterAndPrint(fltr Filter, unfiltered []int) []int {
+	// Gọi các method của fltr sẽ gọi các method
+	// thuộc giá trị thực sự được đóng gói trong fltr.
+	filtered := fltr.Process(unfiltered)
+	fmt.Println(fltr.About() + ":\n\t", filtered)
+	return filtered
+}
+
+func main() {
+	numbers := []int{12, 7, 21, 12, 12, 26, 25, 21, 30}
+	fmt.Println("before filtering:\n\t", numbers)
+
+	// Ba giá trị không phải interface được đóng gói vào
+	// ba phần tử slice interface Filter.
+	filters := []Filter{
+		UniqueFilter{},
+		MultipleFilter(2),
+		MultipleFilter(3),
+	}
+
+	// Lần lượt gán từng phần tử slice cho
+	// biến cục bộ fltr (kiểu interface
+	// Filter). Giá trị được đóng gói trong mỗi
+	// phần tử cũng được sao chép vào fltr.
+	for _, fltr := range filters {
+		numbers = filterAndPrint(fltr, numbers)
+	}
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+before filtering:
+	 [12 7 21 12 12 26 25 21 30]
+remove duplicate numbers:
+	 [12 7 21 26 25 30]
+keep multiples of 2:
+	 [12 26 30]
+keep multiples of 3:
+	 [12 30]
+'''
+
+Trong ví dụ trên, tính đa hình giúp không cần
+viết riêng một hàm `filterAndPrint` cho từng kiểu filter.
+
+Ngoài lợi ích trên, tính đa hình còn cho phép nhà phát triển
+package thư viện khai báo interface được export và hàm (hoặc method)
+nhận tham số kiểu interface đó, để người dùng package
+có thể khai báo kiểu triển khai interface trong mã của mình rồi
+truyền đối số kiểu đó vào lời gọi hàm (hoặc method).
+Nhà phát triển package không cần quan tâm kiểu của người dùng được khai báo ra sao,
+miễn là kiểu đó đáp ứng các hành vi được
+interface khai báo trong package thư viện yêu cầu.
+
+Thực ra, tính đa hình không phải tính năng thiết yếu của một ngôn ngữ.
+Có thể đạt mục tiêu tương tự bằng cách khác, chẳng hạn dùng callback function.
+Tuy nhiên, cách dùng tính đa hình gọn gàng và thanh nhã hơn.
+
+@@@ #reflection
+###=========== Reflection
+
+Thông tin dynamic type lưu trong giá trị interface
+có thể dùng để kiểm tra dynamic value của giá trị interface
+và thao tác với các giá trị mà dynamic value tham chiếu đến.
+Trong lập trình, cách này được gọi là reflection.
+
+Bài viết này không giải thích các chức năng do
+__package chuẩn `reflect`__ cung cấp.
+Hãy đọc __reflections in Go__
+để tìm hiểu cách sử dụng package đó.
+Phần dưới chỉ giới thiệu chức năng reflection tích hợp sẵn trong Go.
+Trong Go, reflection tích hợp sẵn được thực hiện bằng type assertion và khối điều khiển luồng `type-switch`.
+
+    === the `reflect` standard package :: https://golang.org/pkg/reflect/
+    === reflections in Go :: reflection.tmd
+
+@@@ #type-assertion
+###----------- Type assertion
+
+Trong Go có bốn trường hợp chuyển đổi giá trị liên quan đến interface:
+*.
+   chuyển giá trị không phải interface thành giá trị interface,
+   trong đó kiểu của giá trị không phải interface
+   phải triển khai kiểu của giá trị interface.
+*.
+   chuyển giá trị interface thành giá trị interface,
+   trong đó kiểu của giá trị interface nguồn
+   phải triển khai kiểu của giá trị interface đích.
+*.
+   chuyển giá trị interface thành giá trị không phải interface,
+   trong đó kiểu của giá trị không phải interface
+   phải triển khai kiểu của giá trị interface.
+*.
+   chuyển giá trị interface thành giá trị interface,
+   trong đó kiểu của giá trị interface nguồn
+   không triển khai kiểu interface đích,
+   nhưng dynamic type của giá trị interface nguồn có thể
+   triển khai kiểu interface đích.
+
+Hai trường hợp đầu đã được giải thích.
+Cả hai đều yêu cầu kiểu giá trị nguồn triển khai kiểu interface đích.
+Compiler kiểm tra khả năng chuyển đổi của hai trường hợp đầu khi biên dịch.
+
+Phần này giải thích hai trường hợp còn lại.
+Khả năng chuyển đổi của hai trường hợp còn lại được kiểm tra khi chạy,
+bằng cú pháp gọi là **// type assertion //**.
+Thực ra, cú pháp này cũng áp dụng cho trường hợp thứ hai trong danh sách trên.
+
+Biểu thức type assertion có dạng `i.(T)`,
+trong đó `i` là giá trị interface còn `T`
+là tên kiểu hoặc literal kiểu.
+Kiểu `T` phải là
+*
+   một kiểu bất kỳ không phải interface,
+*
+   hoặc một interface bất kỳ.
+
+
+Trong type assertion `i.(T)`,
+`i` được gọi là giá trị được assertion
+còn `T` được gọi là kiểu được assertion.
+Type assertion có thể thành công hoặc thất bại.
+*
+   Nếu `T` không phải interface,
+   assertion thành công nếu dynamic type của `i` tồn tại và đồng nhất với `T`,
+   ngược lại, assertion thất bại.
+   Khi thành công, kết quả đánh giá assertion là bản sao dynamic value của `i`.
+   Có thể xem dạng assertion này là thao tác thử lấy giá trị ra khỏi hộp.
+*
+   Nếu `T` là interface,
+   assertion thành công nếu dynamic type của `i` tồn tại và triển khai `T`,
+   ngược lại thì thất bại.
+   Khi thành công, bản sao dynamic value của `i` được đóng gói vào giá trị `T`
+   và giá trị `T` trở thành kết quả đánh giá assertion.
+
+Khi type assertion thất bại, kết quả đánh giá là zero value của kiểu được assertion.
+
+Theo các quy tắc trên, nếu giá trị được assertion trong type assertion
+là interface nil, assertion luôn thất bại.
+
+Trong hầu hết trường hợp, type assertion được dùng như biểu thức một giá trị.
+Tuy nhiên, khi type assertion là biểu thức giá trị nguồn duy nhất
+trong phép gán, nó có thể trả về thêm giá trị boolean không định kiểu (tùy chọn)
+và được xem là biểu thức nhiều giá trị.
+Giá trị boolean không định kiểu thứ hai cho biết type assertion thành công hay không.
+
+Lưu ý, nếu type assertion thất bại và được dùng như
+biểu thức một giá trị (không có kết quả bool thứ hai),
+thì sẽ xảy ra panic.
+
+Ví dụ sau minh họa cách dùng type assertion (kiểu được assertion không phải interface):
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	// Compiler sẽ suy ra kiểu của 123 là int.
+	var x interface{} = 123
+
+	// Trường hợp 1:
+	n, ok := x.(int)
+	fmt.Println(n, ok) // 123 true
+	n = x.(int)
+	fmt.Println(n) // 123
+
+	// Trường hợp 2:
+	a, ok := x.(float64)
+	fmt.Println(a, ok) // 0 false
+
+	// Trường hợp 3:
+	a = x.(float64) // will panic
+}
+'''
+
+Ví dụ tiếp theo minh họa cách dùng type assertion (kiểu được assertion là interface):
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Writer interface {
+	Write(buf []byte) (int, error)
+}
+
+type DummyWriter struct{}
+func (DummyWriter) Write(buf []byte) (int, error) {
+	return len(buf), nil
+}
+
+func main() {
+	var x interface{} = DummyWriter{}
+	var y interface{} = "abc"
+	// Lúc này dynamic type của y là string.
+	var w Writer
+	var ok bool
+
+	// Kiểu DummyWriter triển khai cả
+	// Writer lẫn interface{}.
+	w, ok = x.(Writer)
+	fmt.Println(w, ok) // {} true
+	x, ok = w.(interface{})
+	fmt.Println(x, ok) // {} true
+
+	// Dynamic type của y là string,
+	// kiểu này không triển khai Writer.
+	w, ok = y.(Writer)
+	fmt.Println(w, ok) // <nil> false
+	w = y.(Writer)     // will panic
+}
+'''
+
+Thực tế, với giá trị interface `i` có dynamic type `T`,
+lời gọi method `i.m(...)` tương đương lời gọi `i.(T).m(...)`.
+
+@@@ #type-switch
+###----------- Khối điều khiển luồng `type-switch`
+
+Cú pháp khối `type-switch` có lẽ là cú pháp kỳ lạ nhất trong Go.
+Có thể xem đây là phiên bản mở rộng của type assertion.
+Khối `type-switch` có một số điểm tương tự khối điều khiển luồng `switch-case`.
+Cú pháp như sau:
+@@@ .line-numbers
+''' go
+switch aSimpleStatement; v := x.(type) {
+case TypeA:
+	...
+case TypeB, TypeC:
+	...
+case nil:
+	...
+default:
+	...
+}
+'''
+
+Phần `aSimpleStatement;` trong khối `type-switch` là tùy chọn.
+`aSimpleStatement` phải là __simple statement__.
+`x` phải là giá trị interface và được gọi là giá trị được assertion.
+`v` được gọi là kết quả assertion và phải xuất hiện dưới dạng khai báo biến ngắn.
+
+    === simple statement :: expressions-and-statements.tmd#simple-statements
+
+Sau keyword `case` trong khối `type-switch` có thể là
+identifier khai báo sẵn `nil` hoặc danh sách phân tách bằng dấu phẩy gồm ít nhất một tên kiểu hay literal kiểu.
+Các mục này (`nil`, tên kiểu và literal kiểu) không được lặp trong cùng khối `type-switch`.
+
+Nếu kiểu được biểu thị bởi tên kiểu hoặc literal kiểu sau keyword `case`
+trong khối `type-switch` không phải interface, thì kiểu đó
+phải triển khai kiểu interface của giá trị được assertion.
+
+Ví dụ sau sử dụng khối điều khiển luồng `type-switch`.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	values := []interface{}{
+		456, "abc", true, 0.33, int32(789),
+		[]int{1, 2, 3}, map[int]bool{}, nil,
+	}
+	for _, x := range values {
+		// Ở đây, v được khai báo một lần nhưng biểu thị
+		// các biến khác nhau ở từng nhánh.
+		switch v := x.(type) {
+		case []int: // a type literal
+			// Trong nhánh này, kiểu của v là []int.
+			fmt.Println("int slice:", v)
+		case string: // one type name
+			// Trong nhánh này, kiểu của v là string.
+			fmt.Println("string:", v)
+		case int, float64, int32: // multiple type names
+			// Trong nhánh này, kiểu của v là interface{},
+			// giống x trong nhánh này.
+			fmt.Println("number:", v)
+		case nil:
+			// Trong nhánh này, kiểu của v là interface{},
+			// giống x trong nhánh này.
+			fmt.Println(v)
+		default:
+			// Trong nhánh này, kiểu của v là interface{},
+			// giống x trong nhánh này.
+			fmt.Println("others:", v)
+		}
+		// Lưu ý, mỗi biến được biểu thị bởi v trong
+		// ba nhánh cuối là bản sao của x.
+	}
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+number: 456
+string: abc
+others: true
+number: 0.33
+number: 789
+int slice: [1 2 3]
+others: map[]
+<nil>
+'''
+
+Về mặt logic, ví dụ trên tương đương với đoạn sau:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	values := []interface{}{
+		456, "abc", true, 0.33, int32(789),
+		[]int{1, 2, 3}, map[int]bool{}, nil,
+	}
+	for _, x := range values {
+		if v, ok := x.([]int); ok {
+			fmt.Println("int slice:", v)
+		} else if v, ok := x.(string); ok {
+			fmt.Println("string:", v)
+		} else if x == nil {
+			v := x
+			fmt.Println(v)
+		} else {
+			_, isInt := x.(int)
+			_, isFloat64 := x.(float64)
+			_, isInt32 := x.(int32)
+			if isInt || isFloat64 || isInt32 {
+				v := x
+				fmt.Println("number:", v)
+			} else {
+				v := x
+				fmt.Println("others:", v)
+			}
+		}
+	}
+}
+'''
+
+Khối `type-switch` có một số điểm tương tự khối `switch-case`.
+*
+   Giống khối `switch-case`, trong khối `type-switch`,
+   có nhiều nhất một nhánh `default`.
+*
+   Giống khối `switch-case`, trong khối `type-switch`,
+   nếu có nhánh `default`,
+   nhánh này có thể đứng cuối, đầu hoặc ở giữa.
+*
+   Giống khối `switch-case`, khối `type-switch` có thể không chứa nhánh nào,
+   khi đó được xem là no-op.
+
+Tuy nhiên, khác với khối `switch-case`, câu lệnh `fallthrough`
+không thể dùng bên trong các nhánh của khối `type-switch`.
+
+###=========== Tìm hiểu thêm về interface trong Go
+
+{ %%
+@@@ #embedding
+###----------- Nhúng interface
+
+Một interface có thể nhúng tên kiểu biểu thị một interface khác.
+Kết quả cuối cùng giống như trải các method specification
+do interface được nhúng chỉ định vào phần thân định nghĩa
+của interface đang nhúng.
+Ví dụ, trong đoạn mã sau, các method set tương ứng
+do các interface `Ic`, `Id` và `Ie` chỉ định
+đều giống nhau.
+
+@@@ .line-numbers
+''' go
+type Ia interface {
+	fa()
+}
+
+type Ib = interface {
+	fb()
+}
+
+type Ic interface {
+	fa()
+	fb()
+}
+
+type Id = interface {
+	Ia // embed Ia
+	Ib // embed Ib
+}
+
+type Ie interface {
+	Ia // embed Ia
+	fb()
+}
+'''
+
+
+Trước Go 1.14, một interface không thể nhúng interface khác
+nếu cả hai cùng chỉ định method specification có tên giống nhau,
+đồng thời chúng cũng không thể cùng được nhúng vào một interface thứ ba
+kể cả khi các method specification trùng nhau giống hệt.
+Ví dụ, các khai báo interface sau đều không hợp lệ (trước Go 1.14).
+
+@@@ .line-numbers
+''' go
+type Ix interface {
+	Ia
+	Ic
+}
+
+type Iy = interface {
+	Ib
+	Ic
+}
+
+type Iz interface {
+	Ic
+	fa()
+}
+'''
+
+__href="https://github.com/golang/go/issues/6977">Kể từ Go 1.14__, giới hạn minh họa trong ví dụ trên __href="https://github.com/golang/proposal/blob/master/design/6977-overlapping-interfaces.md">đã được gỡ bỏ__.
+Method set do mỗi interface trong ví dụ trên chỉ định đều giống `Ic`.
+
+Interface không thể nhúng chính nó hoặc interface khác có đệ quy nhúng interface đó.
+}
+
+@@@ #comparison
+###----------- So sánh các giá trị interface
+
+Có hai trường hợp so sánh liên quan đến giá trị interface:
+*.
+   so sánh giá trị không phải interface với giá trị interface.
+*.
+   so sánh hai giá trị interface.
+
+Với trường hợp thứ nhất,
+kiểu của giá trị không phải interface phải triển khai kiểu
+(giả sử là `I`) của giá trị interface,
+để giá trị không phải interface có thể được chuyển đổi (đóng gói)
+thành giá trị interface kiểu `I`.
+Điều đó có nghĩa phép so sánh giữa giá trị không phải interface và giá trị interface
+có thể chuyển thành phép so sánh giữa hai giá trị interface.
+Vì vậy, phần dưới chỉ giải thích phép so sánh giữa hai giá trị interface.
+
+So sánh hai giá trị interface thực chất là so sánh dynamic type
+và dynamic value tương ứng.
+
+Các bước so sánh hai giá trị interface (bằng toán tử `==`):
+*.
+   nếu một trong hai giá trị là interface nil,
+   thì kết quả cho biết
+   giá trị interface còn lại có phải cũng là interface nil hay không.
+*.
+   nếu dynamic type của hai giá trị interface khác nhau,
+   thì kết quả là `false`.
+*.
+   nếu dynamic type của hai giá trị interface giống nhau,
+   -
+      nếu dynamic type đó là __kiểu không thể so sánh__, sẽ xảy ra panic.
+   -
+      ngược lại, kết quả là kết quả so sánh dynamic value của hai giá trị interface.
+
+    === incomparable type :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
+
+Tóm lại, hai giá trị interface bằng nhau chỉ khi thỏa mãn một trong các điều kiện sau:
+*.
+   Cả hai đều là giá trị interface nil.
+*.
+   Dynamic type của chúng giống nhau và có thể so sánh, đồng thời dynamic value bằng nhau.
+
+Theo quy tắc trên, hai giá trị interface có dynamic value đều là `nil`
+có thể không bằng nhau. Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a, b, c interface{} = "abc", 123, "a"+"b"+"c"
+	// Trường hợp thuộc bước 2.
+	fmt.Println(a == b) // false
+	// Trường hợp thuộc bước 3.
+	fmt.Println(a == c) // true
+
+	var x *int = nil
+	var y *bool = nil
+	var ix, iy interface{} = x, y
+	var i interface{} = nil
+	// Trường hợp thuộc bước 2.
+	fmt.Println(ix == iy) // false
+	// Trường hợp thuộc bước 1.
+	fmt.Println(ix == i) // false
+	// Trường hợp thuộc bước 1.
+	fmt.Println(iy == i) // false
+
+	// []int là kiểu không thể so sánh
+	var s []int = nil
+	i = s
+	// Trường hợp thuộc bước 1.
+	fmt.Println(i == nil) // false
+	// Trường hợp thuộc bước 3.
+	fmt.Println(i == i) // will panic
+}
+'''
+
+###----------- Cấu trúc nội bộ của giá trị interface
+
+Trong compiler/runtime Go chính thức, blank interface và interface không rỗng
+được biểu diễn bằng hai cấu trúc nội bộ khác nhau.
+Hãy đọc __value parts__ để biết thêm chi tiết.
+
+    === value parts :: value-part.tmd#interface-structure
+
+{ %%
+todo: cần hình minh họa. Ba phần:
+*  bố cục giá trị interface
+*  bố cục thông tin triển khai
+*  bố cục thông tin kiểu
+}
+
+###----------- Không thể chuyển trực tiếp giá trị `[]T` thành `[]I`,
+    kể cả khi kiểu `T` triển khai interface `I`.
+
+Ví dụ, đôi khi ta cần chuyển giá trị `[]string`
+sang kiểu `[]interface{}`. Không giống một số ngôn ngữ khác, không có
+cách trực tiếp để chuyển đổi. Ta phải tự chuyển từng phần tử trong vòng lặp:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	words := []string{
+		"Go", "is", "a", "high",
+		"efficient", "language.",
+	}
+
+	// Prototype của hàm fmt.Println là
+	// func Println(a ...interface{}) (n int, err error).
+	// Vì thế không thể truyền words... làm đối số.
+
+	// fmt.Println(words...) // không biên dịch được
+
+	// Chuyển giá trị []string thành []interface{}.
+	iw := make([]interface{}, 0, len(words))
+	for _, w := range words {
+		iw = append(iw, w)
+	}
+	fmt.Println(iw...) // compiles okay
+}
+'''
+
+###----------- Mỗi method của interface tương ứng với một hàm ngầm định
+
+Với mỗi method tên `m`
+trong method set do interface `I` xác định,
+compiler sẽ ngầm định khai báo một hàm tên `I.m`,
+có thêm một tham số đầu vào kiểu `I` so với method `m`.
+Tham số bổ sung này là tham số đầu vào đầu tiên của hàm `I.m`.
+Giả sử `i` là giá trị interface kiểu `I`,
+thì lời gọi method `i.m(...)` tương đương lời gọi hàm `I.m(i, ...)`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type I interface {
+	m(int)bool
+}
+
+type T string
+func (t T) m(n int) bool {
+	return len(t) > n
+}
+
+func main() {
+	var i I = T("gopher")
+	fmt.Println(i.m(5))                        // true
+	fmt.Println(I.m(i, 5))                     // true
+	fmt.Println(interface{m(int)bool}.m(i, 5)) // true
+
+	// Các dòng sau biên dịch được,
+	// nhưng sẽ gây panic khi chạy.
+	I(nil).m(5)
+	I.m(nil, 5)
+	interface {m(int) bool}.m(nil, 5)
+}
+'''

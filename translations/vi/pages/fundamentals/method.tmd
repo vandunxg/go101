@@ -1,0 +1,723 @@
+### Phương thức trong Go
+
+Go hỗ trợ một số tính năng lập trình hướng đối tượng.
+Phương thức là một trong những tính năng đó.
+Bài viết này giới thiệu các khái niệm liên quan đến phương thức trong Go.
+
+###========== Khai báo phương thức
+
+Trong Go, ta có thể khai báo tường minh một phương thức cho kiểu `T` và `*T`,
+trong đó `T` phải thỏa mãn 4 điều kiện:
+*.
+   `T` phải là một __kiểu được định nghĩa__;
+*.
+   `T` phải được định nghĩa trong cùng package với khai báo phương thức;
+*.
+   `T` không được là kiểu con trỏ;
+*.
+   `T` không được là kiểu interface.
+   Các kiểu interface sẽ được giải thích trong __bài tiếp theo__.
+
+    === kiểu được định nghĩa :: type-system-overview.tmd#type-definition
+    === bài tiếp theo :: interface.tmd
+
+Kiểu `T` và `*T` lần lượt được gọi là kiểu receiver của các phương thức được khai báo cho chúng.
+Kiểu `T` được gọi là kiểu cơ sở receiver của tất cả phương thức khai báo cho cả kiểu `T` và `*T`.
+
+Lưu ý rằng ta cũng có thể khai báo phương thức cho __type alias__
+của các kiểu `T` và `*T` đã nêu ở trên.
+Hiệu quả giống như khai báo phương thức trực tiếp cho chính các kiểu `T`
+và `*T` đó.
+
+    === type alias :: type-system-overview.tmd#type-alias
+
+Nếu một phương thức được khai báo cho một kiểu, ta có thể nói kiểu đó có (hoặc sở hữu) phương thức ấy.
+
+Từ các điều kiện đã liệt kê ở trên, ta có thể kết luận rằng
+không thể khai báo tường minh phương thức cho:
+*
+   các kiểu dựng sẵn, chẳng hạn `int` và `string`,
+   vì ta không thể khai báo phương thức trong package chuẩn `builtin`.
+*
+   các kiểu interface. Tuy nhiên, một kiểu interface có thể sở hữu các phương thức.
+   Hãy đọc __bài tiếp theo__ để biết chi tiết.
+*
+   __các kiểu không có tên__,
+   ngoại trừ các kiểu con trỏ có dạng `*T` được mô tả ở trên.
+
+    === kiểu không có tên :: type-system-overview.tmd#named-type
+
+Khai báo phương thức tương tự khai báo hàm,
+nhưng có thêm một phần khai báo tham số.
+Phần tham số bổ sung này chỉ có thể chứa đúng một tham số có kiểu receiver của phương thức.
+Tham số duy nhất đó được gọi là tham số receiver trong khai báo phương thức.
+Tham số receiver phải được đặt trong `()`
+và khai báo giữa từ khóa `func` với tên phương thức.
+
+Sau đây là một số ví dụ khai báo phương thức:
+@@@ .line-numbers
+''' go
+// Age và int là hai kiểu riêng biệt. Ta
+// không thể khai báo phương thức cho int và *int,
+// nhưng có thể khai báo cho Age và *Age.
+type Age int
+func (age Age) LargerThan(a Age) bool {
+	return age > a
+}
+func (age *Age) Increase() {
+	*age++
+}
+
+// Receiver của kiểu hàm tự định nghĩa.
+type FilterFunc func(in int) bool
+func (ff FilterFunc) Filter(in int) bool {
+	return ff(in)
+}
+
+// Receiver của kiểu map tự định nghĩa.
+type StringSet map[string]struct{}
+func (ss StringSet) Has(key string) bool {
+	_, present := ss[key]
+	return present
+}
+func (ss StringSet) Add(key string) {
+	ss[key] = struct{}{}
+}
+func (ss StringSet) Remove(key string) {
+	delete(ss, key)
+}
+
+// Receiver của kiểu struct tự định nghĩa.
+type Book struct {
+	pages int
+}
+
+func (b Book) Pages() int {
+	return b.pages
+}
+
+func (b *Book) SetPages(pages int) {
+	b.pages = pages
+}
+'''
+
+Từ các ví dụ trên, ta biết kiểu cơ sở receiver
+không chỉ có thể là kiểu struct mà còn có thể là
+các kiểu khác, chẳng hạn kiểu cơ bản và kiểu container,
+miễn là kiểu cơ sở receiver thỏa mãn 4 điều kiện đã liệt kê ở trên.
+
+Trong một số ngôn ngữ lập trình khác,
+tên tham số receiver luôn là `this` ngầm định.
+Trong Go, đây không phải identifier được khuyến nghị để đặt tên cho tham số receiver.
+
+Receiver có kiểu `*T` được gọi là **// pointer receiver //**,
+còn receiver không phải con trỏ được gọi là **// value receiver //**.
+Cá nhân tôi không khuyến nghị xem thuật ngữ **// pointer //**
+là khái niệm đối lập với thuật ngữ **// value //**,
+vì giá trị con trỏ cũng chỉ là những giá trị đặc biệt.
+Tuy vậy, tôi không phản đối việc dùng các thuật ngữ pointer receiver và value receiver ở đây.
+Lý do sẽ được giải thích bên dưới.
+
+Tên phương thức có thể là blank identifier `_`.
+Một kiểu có thể có nhiều phương thức mang tên blank identifier.
+Nhưng không thể gọi các phương thức đó.
+Chỉ có thể gọi các phương thức được export từ package khác.
+Lời gọi phương thức sẽ được giới thiệu ở một phần sau.
+
+@@@ #method-as-function
+###========== Mỗi phương thức tương ứng với một hàm ngầm định
+
+Với mỗi khai báo phương thức, compiler sẽ khai báo một hàm ngầm định tương ứng.
+Với hai phương thức cuối cùng được khai báo cho kiểu `Book` và kiểu `*Book`
+trong ví dụ cuối của phần trước,
+compiler ngầm định khai báo hai hàm sau:
+
+@@@ .line-numbers
+''' go
+func Book.Pages(b Book) int {
+	// Phần thân giống với phương thức Pages.
+	return b.pages
+}
+
+func (*Book).SetPages(b *Book, pages int) {
+	// Phần thân giống với phương thức SetPages.
+	b.pages = pages
+}
+'''
+
+Trong mỗi khai báo hàm ngầm định này, tham số receiver
+được bỏ khỏi khai báo phương thức tương ứng rồi đưa
+vào danh sách tham số thông thường ở vị trí đầu tiên.
+Phần thân của hai hàm được khai báo ngầm định
+giống với phần thân tường minh của các phương thức tương ứng.
+
+Tên các hàm ngầm định `Book.Pages` và `(*Book).SetPages`
+đều có dạng `TypeDenotation.MethodName`.
+Vì identifier trong Go không thể chứa ký tự đặc biệt dấu chấm,
+hai tên hàm ngầm định này không phải identifier hợp lệ,
+nên không thể khai báo tường minh hai hàm đó.
+Chúng chỉ có thể được compiler khai báo ngầm định,
+nhưng vẫn có thể được gọi trong mã của người dùng:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Book struct {
+	pages int
+}
+
+func (b Book) Pages() int {
+	return b.pages
+}
+
+func (b *Book) SetPages(pages int) {
+	b.pages = pages
+}
+
+func main() {
+	var book Book
+	// Gọi hai hàm được khai báo ngầm định.
+	(*Book).SetPages(&book, 123)
+	fmt.Println(Book.Pages(book)) // 123
+}
+'''
+
+Thực tế, compiler không chỉ khai báo hai hàm ngầm định,
+mà còn viết lại hai phương thức tường minh tương ứng
+để phần thân của chúng gọi hai hàm ngầm định
+(ít nhất, ta có thể hình dung là như vậy), như đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+func (b Book) Pages() int {
+	return Book.Pages(b)
+}
+
+func (b *Book) SetPages(pages int) {
+	(*Book).SetPages(b, pages)
+}
+'''
+
+@@@ #implicit-pointer-methods
+###========== Các phương thức ngầm định với pointer receiver
+
+Với mỗi phương thức được khai báo cho kiểu receiver giá trị `T`,
+compiler sẽ ngầm định khai báo cho kiểu `*T` một phương thức tương ứng cùng tên.
+Theo ví dụ trên, phương thức `Pages` được khai báo cho kiểu `Book`,
+nên một phương thức cùng tên `Pages` được ngầm định khai báo
+cho kiểu `*Book`:
+
+@@@ .line-numbers
+''' go
+// Lưu ý: đây không phải cú pháp Go hợp lệ.
+// Đoạn này chỉ nhằm giải thích.
+// Nó cho biết biểu thức (&aBook).Pages
+// được tính như aBook.Pages (xem các phần bên dưới).
+func (b *Book) Pages = (*b).Pages
+'''
+
+Đây là lý do tôi không bác bỏ cách dùng thuật ngữ value receiver
+(đối lập với thuật ngữ pointer receiver).
+Sau cùng, khi ta khai báo tường minh phương thức cho một kiểu không phải con trỏ,
+thực tế có hai phương thức được khai báo: phương thức tường minh dành cho kiểu không phải con trỏ
+và phương thức ngầm định dành cho kiểu con trỏ tương ứng.
+
+Như đã đề cập ở phần trước, với mỗi phương thức được khai báo,
+compiler cũng khai báo một hàm ngầm định tương ứng.
+Vì vậy, với phương thức được khai báo ngầm định, compiler
+sẽ khai báo hàm ngầm định sau:
+
+@@@ .line-numbers
+''' go
+func (*Book).Pages(b *Book) int {
+	return Book.Pages(*b)
+}
+'''
+
+Nói cách khác, đồng thời với mỗi phương thức được khai báo tường minh
+với value receiver, compiler cũng khai báo ngầm định thêm hai hàm và một phương thức.
+
+@@@ #method-set
+###========== Đặc tả phương thức và method set
+
+
+Có thể xem đặc tả phương thức là một __function prototype__
+không có từ khóa `func`.
+Ta có thể xem mỗi khai báo phương thức gồm từ khóa `func`,
+phần khai báo tham số receiver, một đặc tả phương thức và một phần thân phương thức (hàm).
+
+    === function prototype :: function.tmd#prototype
+
+Ví dụ, đặc tả phương thức của các phương thức `Pages` và
+`SetPages` đã nêu ở trên là:
+
+@@@ .line-numbers
+''' go
+Pages() int
+SetPages(pages int)
+'''
+
+
+Mỗi kiểu có một method set.
+Method set của một kiểu không phải interface gồm tất cả đặc tả phương thức
+của các phương thức được khai báo cho kiểu đó, dù tường minh hay ngầm định,
+ngoại trừ các phương thức có tên là blank identifier `_`.
+Các kiểu interface sẽ được giải thích trong __bài tiếp theo__.
+
+Ví dụ, method set của kiểu `Book` trong các phần trước là:
+@@@ .line-numbers
+''' go
+Pages() int
+'''
+
+còn method set của kiểu `*Book` là:
+
+@@@ .line-numbers
+''' go
+Pages() int
+SetPages(pages int)
+'''
+
+Thứ tự các đặc tả phương thức trong method set không quan trọng.
+
+Với hai method set, nếu mọi đặc tả phương thức trong tập này cũng có trong tập kia,
+ta nói method set thứ nhất là tập con của method set thứ hai,
+còn tập thứ hai là tập cha của tập thứ nhất.
+Nếu hai method set là tập con (hoặc tập cha) của nhau,
+ta nói chúng giống hệt nhau.
+
+Cho kiểu `T`, giả sử nó không phải kiểu con trỏ cũng không phải
+kiểu interface; vì __lý do__
+đã nêu trong phần trước, method set của kiểu `T` luôn
+là tập con của method set của kiểu `*T`.
+Ví dụ, method set của kiểu `Book` ở trên là
+tập con của method set của kiểu `*Book`.
+
+    === lý do :: #implicit-pointer-methods
+
+Lưu ý rằng **tên phương thức không được export, tức bắt đầu bằng chữ thường,
+thuộc các package khác nhau luôn được xem là hai tên phương thức khác nhau,
+ngay cả khi cách viết của chúng giống hệt nhau.**
+
+Method set đóng vai trò quan trọng trong tính đa hình của Go.
+Để tìm hiểu về tính đa hình, hãy đọc __bài tiếp theo__
+(interfaces trong Go).
+
+Method set của các kiểu sau luôn rỗng:
+*  các kiểu cơ bản dựng sẵn.
+*  các kiểu con trỏ được định nghĩa.
+*  các kiểu con trỏ có kiểu cơ sở là interface hoặc kiểu con trỏ.
+*  các kiểu array, slice, map, function và channel không có tên.
+
+@@@ #call
+###========== Method value và lời gọi phương thức
+
+Phương thức thực chất là một dạng hàm đặc biệt.
+Phương thức thường được gọi là hàm thành viên.
+Khi một kiểu có một phương thức, mỗi giá trị của kiểu đó cũng có một thành viên bất biến thuộc kiểu hàm.
+Tên thành viên này giống tên phương thức, còn kiểu của thành viên giống kiểu
+của hàm được khai báo theo dạng khai báo phương thức nhưng bỏ phần receiver.
+
+Lời gọi phương thức chỉ là lời gọi một hàm thành viên như vậy.
+Với một giá trị `v`, phương thức `m` của nó có thể được biểu diễn
+bằng dạng selector `v.m`, đây là một giá trị hàm.
+
+Ví dụ có một số lời gọi phương thức:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Book struct {
+	pages int
+}
+
+func (b Book) Pages() int {
+	return b.pages
+}
+
+func (b *Book) SetPages(pages int) {
+	b.pages = pages
+}
+
+func main() {
+	var book Book
+
+	fmt.Printf("%T \n", book.Pages)       // func() int
+	fmt.Printf("%T \n", (&book).SetPages) // func(int)
+	// &book có một phương thức ngầm định.
+	fmt.Printf("%T \n", (&book).Pages) // func() int
+
+	// Gọi ba phương thức.
+	(&book).SetPages(123)
+	book.SetPages(123) // tương đương với dòng ngay trên
+	fmt.Println(book.Pages())    // 123
+	fmt.Println((&book).Pages()) // 123
+}
+'''
+
+{ %%
+Trong ví dụ trên, giá trị `book` được gọi là giá trị cơ sở của cả hai
+receiver argument trong lời gọi phương thức `Pages` và `SetPages`.
+}
+
+//
+(Khác với ngôn ngữ C, Go không có toán tử `->`
+để gọi phương thức với pointer receiver,
+nên `(&book)->SetPages(123)` là cú pháp Go không hợp lệ.)
+
+Khoan đã! Vì sao dòng `book.SetPages(123)` trong ví dụ trên vẫn biên dịch được?
+Sau cùng, phương thức `SetPages` không được khai báo cho kiểu `Book`.
+Một mặt, có thể xem đây là cú pháp rút gọn giúp lập trình thuận tiện hơn.
+Cú pháp này chỉ áp dụng cho receiver là giá trị có thể lấy địa chỉ.
+Khi truyền giá trị `book` có thể lấy địa chỉ làm receiver argument
+cho lời gọi phương thức `SetPages`, compiler sẽ ngầm lấy địa chỉ của nó.
+Mặt khác, ta cũng nên xem `aBookExpression.SetPages` luôn là selector hợp lệ về mặt cú pháp,
+ngay cả khi biểu thức `aBookExpression` được tính thành một giá trị `Book` không thể lấy địa chỉ;
+trong trường hợp đó, selector `aBookExpression.SetPages` không hợp lệ (nhưng vẫn hợp cú pháp).
+
+{ %%
+@@@ .line-numbers
+''' go
+ ...
+
+// Kết quả trả về của hàm không thể lấy địa chỉ trong Go.
+func MakeBook() Book {
+	return Book{}
+}
+
+func main() {
+	var book Book
+	book.SetPages(123) // <=> (&book).SetPages(123)
+	fmt.Println(book.Pages()) // 123
+
+	// lỗi: kết quả trả về của hàm không thể lấy địa chỉ.
+	MakeBook().SetPages(123)
+}
+'''
+}
+
+{ %%
+Thực tế, có thể xem method value `book.Pages`
+là một closure được trả về bởi:
+@@@ .line-numbers
+''' go
+func() func() int {
+	return func() int {
+		Book.Pages(b)
+	}
+}(book)
+'''
+
+còn method value `(&book).SetPages`
+có thể được xem như closure được trả về bởi:
+@@@ .line-numbers
+''' go
+func (b *Book) func(int) {
+	return func(pages int) {
+		(*Book).SetPages(b, pages)
+	}
+}(&book)
+'''
+}
+
+Như đã đề cập ở trên, khi một phương thức được khai báo cho một kiểu,
+mỗi giá trị của kiểu đó sẽ có một thành viên hàm.
+Zero value cũng không ngoại lệ, bất kể zero value
+của kiểu đó có được biểu diễn bằng `nil` hay không.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+type StringSet map[string]struct{}
+func (ss StringSet) Has(key string) bool {
+	// Không bao giờ panic ở đây, kể cả khi ss là nil.
+	_, present := ss[key]
+	return present
+}
+
+type Age int
+func (age *Age) IsNil() bool {
+	return age == nil
+}
+func (age *Age) Increase() {
+	*age++ // Nếu age là con trỏ nil thì
+	       // giải tham chiếu nó sẽ gây panic.
+}
+
+func main() {
+	_ = (StringSet(nil)).Has   // sẽ không panic
+	_ = ((*Age)(nil)).IsNil    // sẽ không panic
+	_ = ((*Age)(nil)).Increase // sẽ không panic
+
+	_ = (StringSet(nil)).Has("key") // sẽ không panic
+	_ = ((*Age)(nil)).IsNil()       // sẽ không panic
+
+	// Dòng sau sẽ gây panic. Nhưng panic
+	// không phải do gọi phương thức.
+	// Nguyên nhân là việc giải tham chiếu con trỏ nil
+	// bên trong phần thân phương thức.
+	((*Age)(nil)).Increase()
+}
+'''
+
+###========== Receiver argument được truyền bằng bản sao
+
+Giống như đối số của hàm thông thường,
+receiver argument cũng được truyền bằng bản sao.
+Vì vậy, các thay đổi trên __phần trực tiếp__
+của receiver argument trong lời gọi phương thức sẽ không được phản ánh
+ra bên ngoài phương thức.
+
+    === phần trực tiếp :: value-part.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Book struct {
+	pages int
+}
+
+func (b Book) SetPages(pages int) {
+	b.pages = pages
+}
+
+func main() {
+	var b Book
+	b.SetPages(123)
+	fmt.Println(b.pages) // 0
+}
+'''
+
+Một ví dụ khác:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Book struct {
+	pages int
+}
+
+type Books []Book
+
+func (books Books) Modify() {
+	// Các thay đổi trên phần nền của
+	// receiver sẽ được phản ánh ra bên ngoài
+	// phương thức.
+	books[0].pages = 500
+	// Các thay đổi trên phần trực tiếp của
+	// receiver sẽ không được phản ánh ra bên ngoài
+	// phương thức.
+	books = append(books, Book{789})
+}
+
+func main() {
+	var books = Books{{123}, {456}}
+	books.Modify()
+	fmt.Println(books) // [{500} {456}]
+}
+'''
+
+Ngoài lề một chút: nếu đổi thứ tự hai dòng bên trong
+phương thức `Modify` ở trên thì cả hai thay đổi
+đều sẽ không được phản ánh ra bên ngoài phần thân phương thức.
+@@@ .line-numbers
+''' go
+func (books Books) Modify() {
+	books = append(books, Book{789})
+	books[0].pages = 500
+}
+
+func main() {
+	var books = Books{{123}, {456}}
+	books.Modify()
+	fmt.Println(books) // [{123} {456}]
+}
+'''
+
+Nguyên nhân là lời gọi `append` sẽ cấp phát một vùng nhớ mới
+để lưu các phần tử của bản sao slice được truyền làm receiver argument.
+Việc cấp phát này không làm thay đổi chính receiver argument slice đã truyền vào.
+
+Để cả hai thay đổi đều được phản ánh ra bên ngoài phần thân phương thức,
+receiver của phương thức phải là con trỏ.
+@@@ .line-numbers
+''' go
+func (books *Books) Modify() {
+	*books = append(*books, Book{789})
+	(*books)[0].pages = 500
+}
+
+func main() {
+	var books = Books{{123}, {456}}
+	books.Modify()
+	fmt.Println(books) // [{500} {456} {789}]
+}
+'''
+
+@@@ #method-value-Normalization
+###========== Chuẩn hóa method value
+
+Khi biên dịch, compiler chuẩn hóa từng biểu thức method value
+bằng cách chuyển các thao tác ngầm định lấy địa chỉ và giải tham chiếu con trỏ
+thành thao tác tường minh trong biểu thức method value đó.
+
+Giả sử `v` là một giá trị kiểu `T`
+và `v.m` là biểu thức method value hợp lệ,
+*
+   nếu `m` là phương thức được khai báo tường minh cho kiểu `*T`,
+   compiler sẽ chuẩn hóa biểu thức thành `(&v).m`;
+*
+   nếu `m` là phương thức được khai báo tường minh cho kiểu `T`,
+   thì biểu thức method value `v.m` đã được chuẩn hóa.
+
+Giả sử `p` là một giá trị kiểu `*T`
+và `p.m` là biểu thức method value hợp lệ,
+*
+   nếu `m` là phương thức được khai báo tường minh cho kiểu `T`,
+   compiler sẽ chuẩn hóa biểu thức thành `(*p).m`;
+*
+   nếu `m` là phương thức được khai báo tường minh cho kiểu `*T`,
+   thì biểu thức method value `p.m` đã được chuẩn hóa.
+
+Việc chuẩn hóa method value được promote sẽ được giải thích trong bài __type embedding__ sau.
+
+    === type embedding :: type-embedding.tmd#method-value-evaluation
+
+@@@ #method-value-evaluation
+###========== Đánh giá method value
+
+Giả sử `v.m` là một biểu thức method value đã được chuẩn hóa.
+Khi method value `v.m` được đánh giá lúc runtime, receiver argument `v` được đánh giá,
+sau đó một bản sao của kết quả được lưu lại và dùng trong những lần gọi method value về sau.
+
+Ví dụ, trong đoạn mã sau:
+*
+   biểu thức method value `b.Pages` đã được chuẩn hóa.
+   Khi chạy, một bản sao receiver argument `b` được lưu lại.
+   Bản sao đó tương đương với `Book{pages: 123}`;
+   các thay đổi tiếp theo trên giá trị `b` không ảnh hưởng đến bản sao này.
+   Đó là lý do lời gọi `f1()` in ra `123`.
+*
+   biểu thức method value `p.Pages` được chuẩn hóa thành `(*p).Pages` khi biên dịch.
+   Khi chạy, receiver argument `*p` được đánh giá thành giá trị `b` hiện tại,
+   tức `Book{pages: 123}`.
+   Một bản sao của kết quả được lưu lại và dùng trong những lần gọi method value sau đó,
+   vì vậy lời gọi `f2()` cũng in ra `123`.
+*
+   biểu thức method value `p.Pages2` đã được chuẩn hóa.
+   Khi chạy, một bản sao receiver argument `p` được lưu lại.
+   Giá trị được lưu là địa chỉ của giá trị `b`,
+   do đó mọi thay đổi trên `b` đều được phản ánh khi giải tham chiếu giá trị đã lưu,
+   vì vậy lời gọi `g1()` in ra `789`.
+*
+   biểu thức method value `b.Pages2` được chuẩn hóa thành `(&b).Pages2` khi biên dịch.
+   Khi chạy, một bản sao của kết quả đánh giá `&b` được lưu lại.
+   Giá trị được lưu là địa chỉ của giá trị `b`,
+   do đó mọi thay đổi trên `b` đều được phản ánh khi giải tham chiếu giá trị đã lưu,
+   vì vậy lời gọi `g2()` in ra `789`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Book struct {
+	pages int
+}
+
+func (b Book) Pages() int {
+	return b.pages
+}
+
+func (b *Book) Pages2() int {
+	return (*b).Pages()
+}
+
+func main() {
+	var b = Book{pages: 123}
+	var p = &b
+	var f1 = b.Pages
+	var f2 = p.Pages
+	var g1 = p.Pages2
+	var g2 = b.Pages2
+	b.pages = 789
+	fmt.Println(f1()) // 123
+	fmt.Println(f2()) // 123
+	fmt.Println(g1()) // 789
+	fmt.Println(g2()) // 789
+}
+'''
+
+@@@ #method-obtaining
+###========== Kiểu được định nghĩa không nhận các phương thức khai báo tường minh cho kiểu nguồn dùng trong định nghĩa
+
+Ví dụ, trong đoạn mã sau, khác với kiểu được định nghĩa `MyInt`,
+kiểu được định nghĩa `Age` không có phương thức `IsOdd`.
+
+@@@ .line-numbers
+''' go
+package main
+
+type MyInt int
+func (mi MyInt) IsOdd() bool {
+	return mi%2 == 1
+}
+
+type Age MyInt
+
+func main() {
+	var x MyInt = 3
+	_ = x.IsOdd() // hợp lệ
+	
+	var y Age = 36
+	// _ = y.IsOdd() // lỗi: y.IsOdd không được định nghĩa
+	_ = y
+}
+'''
+
+###========== Nên khai báo phương thức với pointer receiver hay value receiver?
+
+Trước hết, từ phần trước,
+ta biết đôi khi phải khai báo phương thức với pointer receiver.
+
+Thực tế, ta luôn có thể khai báo phương thức với pointer receiver mà không gặp vấn đề logic.
+Trong một số trường hợp, chọn value receiver chỉ là vấn đề hiệu năng chương trình.
+
+Khi cả value receiver lẫn pointer receiver đều dùng được,
+có một số yếu tố cần cân nhắc để đưa ra quyết định:
+*
+   Quá nhiều thao tác sao chép con trỏ có thể làm tăng tải cho garbage collector.
+*
+   Nếu kích thước kiểu của value receiver lớn,
+   chi phí sao chép receiver argument có thể không đáng bỏ qua.
+   Các kiểu con trỏ đều là kiểu __kích thước nhỏ__.
+*
+   Khai báo phương thức với cả value receiver và pointer receiver
+   cho cùng một kiểu cơ sở dễ gây data race hơn
+   nếu các phương thức được gọi đồng thời từ nhiều goroutine.
+*
+   Không nên sao chép các giá trị thuộc những kiểu trong package chuẩn `sync`,
+   vì vậy sẽ có vấn đề nếu khai báo phương thức với value receiver
+   cho các kiểu struct __embedding__
+   những kiểu thuộc package chuẩn `sync`.
+
+    === kích thước nhỏ :: value-copy-cost.tmd
+    === embedding :: type-embedding.tmd
+
+Nếu khó quyết định một phương thức nên dùng pointer receiver
+hay value receiver,
+hãy chọn pointer receiver.

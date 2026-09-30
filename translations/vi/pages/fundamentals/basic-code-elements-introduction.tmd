@@ -1,0 +1,283 @@
+### Giới thiệu về các phần tử mã nguồn
+
+Go được biết đến với cú pháp đơn giản và rõ ràng.
+Bài viết này giới thiệu các phần tử mã nguồn phổ biến
+trong lập trình thông qua một ví dụ đơn giản. Qua đó, các gopher mới
+(lập trình viên Go) có thể hình dung cơ bản về cách sử dụng các phần tử của Go.
+
+###========== Lập trình và các phần tử mã nguồn
+
+Có thể xem lập trình là việc thao tác
+với các hoạt động theo nhiều cách khác nhau để đạt được những mục tiêu nhất định.
+Các hoạt động ghi dữ liệu vào và đọc dữ liệu từ
+các thiết bị phần cứng để hoàn thành nhiệm vụ.
+Ở máy tính hiện đại, các hoạt động cơ bản là những chỉ thị cấp thấp của CPU và GPU.
+Các thiết bị phần cứng phổ biến gồm bộ nhớ, ổ đĩa, card mạng, card đồ họa,
+màn hình, bàn phím, chuột, v.v.
+
+Lập trình bằng cách thao tác trực tiếp với các chỉ thị cấp thấp
+vừa tẻ nhạt vừa dễ mắc lỗi.
+Các ngôn ngữ lập trình cấp cao đóng gói một số thao tác cấp thấp,
+đồng thời trừu tượng hóa dữ liệu,
+giúp việc lập trình trực quan và thân thiện với con người hơn.
+
+Trong các ngôn ngữ lập trình cấp cao phổ biến,
+các thao tác chủ yếu được thực hiện bằng cách gọi
+**hàm** và sử dụng **toán tử**.
+Hầu hết các ngôn ngữ lập trình cấp cao phổ biến đều hỗ trợ một số loại
+**luồng điều khiển** điều kiện và vòng lặp;
+có thể xem chúng là những thao tác đặc biệt.
+Cú pháp của các luồng điều khiển này gần với ngôn ngữ tự nhiên,
+nên mã do lập trình viên viết dễ hiểu.
+
+Trong hầu hết ngôn ngữ lập trình cấp cao,
+dữ liệu được trừu tượng hóa thành **kiểu** và **giá trị**.
+Có thể xem kiểu là khuôn mẫu của giá trị,
+còn giá trị là một thể hiện của kiểu.
+Hầu hết ngôn ngữ hỗ trợ một số kiểu dựng sẵn và cả kiểu do người dùng tự định nghĩa.
+Hệ thống kiểu là bản chất của một ngôn ngữ lập trình.
+
+Trong lập trình có thể sử dụng rất nhiều giá trị.
+Một số giá trị có thể được biểu diễn trực tiếp bằng **literal**
+(biểu diễn dạng văn bản), nhưng một số khác thì không.
+Để lập trình linh hoạt và ít lỗi hơn, nhiều giá trị được đặt tên.
+Những giá trị đó gồm **biến** và **hằng số có tên**.
+
+Hàm có tên, giá trị có tên (bao gồm biến và hằng số có tên),
+kiểu được định nghĩa và bí danh kiểu được gọi là **phần tử mã**.
+Tên của các phần tử mã phải là **__định danh__**.
+Tên package và tên import package cũng phải là định danh.
+
+    === identifiers :: keywords-and-identifiers.tmd#identifier
+
+Trình biên dịch chuyển mã lập trình cấp cao thành các chỉ thị CPU cấp thấp
+để thực thi.
+Để giúp trình biên dịch phân tích mã lập trình cấp cao,
+nhiều từ được dành riêng và không thể dùng làm định danh.
+Những từ đó được gọi là **__từ khóa__**.
+
+    === keywords :: keywords-and-identifiers.tmd#keyword
+
+Nhiều ngôn ngữ lập trình cấp cao hiện đại
+dùng **package** để tổ chức mã.
+Muốn sử dụng các phần tử mã được export (công khai) của package khác,
+một package phải **import** package đó.
+Tên package và tên import package cũng phải là định danh.
+
+Mặc dù mã viết bằng ngôn ngữ lập trình cấp cao
+dễ hiểu hơn ngôn ngữ máy cấp thấp,
+đôi khi ta vẫn cần chú thích để giải thích logic của mã.
+Chương trình ví dụ ở phần tiếp theo có nhiều chú thích.
+
+###========== Một chương trình Go minh họa đơn giản
+
+Hãy xem một chương trình Go minh họa ngắn để tìm hiểu các loại phần tử mã trong Go.
+Giống một số ngôn ngữ khác, trong Go, chú thích một dòng bắt đầu bằng `//`,
+còn mỗi chú thích khối được đặt giữa cặp `/*` và `*/`.
+
+Dưới đây là chương trình Go minh họa.
+Hãy đọc các chú thích để biết giải thích.
+Các giải thích khác được trình bày sau chương trình.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main // khai báo package của tệp mã nguồn
+
+import "math/rand" // import một package chuẩn
+
+const MaxRnd = 16 // khai báo một hằng số có tên
+
+// Khai báo hàm
+/*
+ StatRandomNumbers tạo một số lượng số nguyên ngẫu nhiên
+ không âm nhỏ hơn MaxRnd, sau đó đếm và trả về số lượng
+ số nhỏ và số lớn trong các số ngẫu nhiên đã tạo.
+ n cho biết số lượng số ngẫu nhiên cần tạo.
+*/
+func StatRandomNumbers(n int) (int, int) {
+	// Khai báo hai biến (đều bằng 0).
+	var a, b int
+	// Luồng điều khiển vòng lặp for.
+	for i := 0; i < n; i++ {
+		// Luồng điều khiển if-else.
+		if rand.Intn(MaxRnd) < MaxRnd/2 {
+			a = a + 1
+		} else {
+			b++ // tương đương: b = b + 1
+		}
+	}
+	return a, b // hàm này trả về hai kết quả
+}
+
+// Hàm "main" là hàm điểm vào của chương trình.
+func main() {
+	var num = 100
+	// Gọi hàm StatRandomNumbers đã khai báo.
+	x, y := StatRandomNumbers(num)
+	// Gọi hai hàm dựng sẵn (print và println).
+	print("Result: ", x, " + ", y, " = ", num, "? ")
+	println(x+y == num)
+}
+'''
+
+Lưu mã nguồn ở trên vào tệp có tên
+`basic-code-element-demo.go` rồi chạy chương trình này.
+Ta sẽ nhận được kết quả tương tự như sau:
+@@@ .output
+'''
+$ go run basic-code-element-demo.go
+Result: 46 + 54 = 100? true
+'''
+
+Trong chương trình trên, `package`, `import`, `const`,
+`func`, `var`, `for`, `if`,
+`else` và `return` đều là từ khóa.
+Hầu hết các từ khác trong chương trình là định danh.
+Hãy đọc bài __từ khóa và định danh__
+để tìm hiểu thêm về từ khóa và định danh.
+
+    === keywords and identifiers :: keywords-and-identifiers.tmd
+
+{ %%
+LƯU Ý cho người dịch: số dòng có thể thay đổi khi bản địa hóa ngôn ngữ.
+}
+
+Bốn từ `int` ở dòng // 15 // và dòng // 17 //
+chỉ kiểu `int` dựng sẵn, một trong nhiều kiểu số nguyên của Go.
+Các giá trị `16` ở dòng // 5 //, `0` ở dòng // 19 //, `2` ở dòng // 21 //,
+`1` ở dòng // 22 // và `100` ở dòng // 32 // là một số literal số nguyên.
+`"Result: "` ở dòng // 36 // là một literal chuỗi.
+Hãy đọc bài __các kiểu cơ bản và literal giá trị của chúng__
+để tìm hiểu thêm về các kiểu cơ bản dựng sẵn nói trên và literal giá trị của chúng.
+Một số kiểu khác (kiểu tổ hợp) sẽ được giới thiệu trong các bài viết sau.
+
+    === basic types and their value literals :: basic-types-and-value-literals.tmd
+
+Dòng // 22 // là một phép gán.
+Dòng // 5 // khai báo một hằng số có tên là `MaxRnd`.
+Dòng // 17 // và dòng // 32 // khai báo ba biến
+bằng dạng khai báo biến thông thường.
+Biến `i` ở dòng // 19 //, `x` và `y` ở dòng // 34 //
+được khai báo bằng dạng khai báo biến rút gọn. Ta đã chỉ định kiểu
+`int` cho các biến `a` và `b`.
+Trình biên dịch Go suy ra rằng kiểu của `i`, `num`,
+`x` và `y` đều là `int`,
+vì chúng được khởi tạo bằng literal số nguyên.
+Hãy đọc bài __hằng số và biến__
+để tìm hiểu thêm về giá trị chưa định kiểu, suy luận kiểu,
+phép gán giá trị và cách khai báo biến cùng hằng số có tên.
+
+    === constants and variables :: constants-and-variables.tmd
+
+Chương trình sử dụng nhiều toán tử, chẳng hạn toán tử so sánh nhỏ hơn
+`<` ở dòng // 19 // và // 21 //,
+toán tử bằng `==` ở dòng // 37 //,
+và toán tử cộng `+` ở dòng // 22 // và dòng // 37 //.
+Đúng vậy, dấu `+` ở dòng // 36 // không phải là toán tử;
+nó là một ký tự trong string literal.
+Các giá trị tham gia vào phép toán của một toán tử được gọi là toán hạng.
+Hãy đọc bài __các toán tử thường dùng__ để tìm hiểu thêm.
+Các bài viết sau sẽ giới thiệu thêm nhiều toán tử khác.
+
+    === common operators :: operators.tmd
+
+Ở dòng // 36 // và dòng // 37 //, hai hàm dựng sẵn
+`print` và `println` được gọi.
+Hàm tùy chỉnh `StatRandomNumbers` được khai báo từ dòng
+// 15 // đến dòng // 28 // và được gọi ở dòng // 34 //.
+Dòng // 21 // cũng gọi một hàm là `Intn`,
+được khai báo trong package chuẩn `math/rand`.
+Lời gọi hàm là một thao tác thực hiện hàm.
+Các giá trị đầu vào được dùng trong lời gọi hàm được gọi là đối số.
+Hãy đọc bài __khai báo và lời gọi hàm__ để tìm hiểu thêm.
+
+    === function declarations and calls :: function-declarations-and-calls.tmd
+
+//
+(Lưu ý: không nên dùng các hàm dựng sẵn `print` và `println`
+trong lập trình Go chính thức.
+Trong các dự án Go chính thức, nên dùng các hàm tương ứng
+trong package chuẩn `fmt`.
+Trong Go 101, hai hàm này chỉ được dùng ở một vài bài đầu tiên.)
+
+
+Dòng // 1 // chỉ định tên package của tệp mã nguồn hiện tại.
+Hàm điểm vào `main` phải được khai báo trong một package
+cũng có tên là `main`.
+Dòng // 3 // import package mã chuẩn `math/rand`.
+Tên import của package này là `rand`.
+Hàm `Intn` được khai báo trong package chuẩn này
+được gọi ở dòng // 21 //.
+Hãy đọc bài __package mã và import package__
+để tìm hiểu thêm về cách tổ chức package mã và import package.
+
+    === code packages and package imports :: packages-and-imports.tmd
+
+Bài viết __biểu thức, câu lệnh
+và câu lệnh đơn__ sẽ giới thiệu biểu thức và câu lệnh là gì.
+Đặc biệt, bài viết liệt kê mọi loại câu lệnh đơn, vốn là những câu lệnh đặc biệt.
+Một số phần trong các loại luồng điều khiển phải là câu lệnh đơn,
+còn một số phần phải là biểu thức.
+
+    === expressions, ... :: expressions-and-statements.tmd
+
+Trong thân hàm `StatRandomNumbers`, có hai luồng điều khiển.
+Một luồng là vòng lặp `for`, bên trong có lồng
+luồng điều khiển điều kiện `if-else`.
+Hãy đọc bài __các luồng điều khiển cơ bản__
+để tìm hiểu thêm về mọi loại luồng điều khiển cơ bản.
+Các luồng điều khiển đặc biệt khác sẽ được giới thiệu trong những bài viết sau.
+
+    === basic control flows :: control-flows.tmd
+
+Chương trình trên dùng các dòng trống để tăng khả năng đọc mã.
+Vì mục đích của chương trình là giới thiệu các phần tử mã,
+nên chương trình có nhiều chú thích.
+Ngoại trừ chú thích tài liệu cho hàm `StatRandomNumbers`,
+các chú thích khác chỉ nhằm mục đích minh họa.
+Trong các dự án chính thức, ta nên cố gắng viết mã tự giải thích
+và chỉ dùng những chú thích cần thiết.
+
+@@@ #line-break
+###========== Về ngắt dòng
+
+Giống nhiều ngôn ngữ khác, Go cũng dùng một cặp dấu ngoặc nhọn (`{` và `}`)
+để tạo thành một khối mã tường minh. Tuy nhiên, trong lập trình Go,
+không thể tùy ý chọn phong cách viết mã. Chẳng hạn, nhiều dấu ngoặc nhọn mở (`{`)
+không thể được đặt ở dòng tiếp theo. Nếu sửa khai báo hàm
+`StatRandomNumbers` trong chương trình trên như sau,
+chương trình sẽ không biên dịch được.
+
+@@@ .line-numbers
+''' go
+func StatRandomNumbers(n int) (int, int)
+{ // lỗi cú pháp
+	var a, b int
+	for i := 0; i < n; i++
+	{ // lỗi cú pháp
+		if rand.Intn(MaxRnd) < MaxRnd/2
+		{ // lỗi cú pháp
+			a = a + 1
+		} else {
+			b++
+		}
+	}
+	return a, b
+}
+'''
+Một số lập trình viên có thể không thích những hạn chế về ngắt dòng này.
+Tuy nhiên, các hạn chế đó có hai lợi ích:
+*.
+   chúng giúp quá trình biên dịch mã nhanh hơn.
+*.
+   chúng khiến phong cách viết mã của các gopher khác nhau trông tương tự nhau,
+   nhờ đó gopher dễ đọc và hiểu mã do người khác viết hơn.
+
+
+Ta sẽ tìm hiểu thêm về quy tắc ngắt dòng trong __một bài viết sau__.
+Hiện tại, hãy tránh đặt dấu ngoặc nhọn mở ở dòng mới.
+Nói cách khác, nhìn chung, ký tự không phải khoảng trắng đầu tiên của một dòng mã
+không nên là dấu ngoặc nhọn mở.
+(Nhưng hãy nhớ rằng đây không phải quy tắc áp dụng cho mọi trường hợp.)
+
+    === a later article :: line-break-rules.tmd

@@ -1,0 +1,238 @@
+### Go Toolchain
+
+Hiện nay, các công cụ trong Go Toolchain chính thức (sau đây gọi là Go Toolchain)
+được dùng phổ biến nhất để phát triển các dự án Go.
+Trong loạt bài Go 101, mọi ví dụ đều được biên dịch và kiểm tra bằng
+Go compiler tiêu chuẩn do Go Toolchain cung cấp.
+
+Bài viết này giới thiệu cách thiết lập môi trường phát triển Go
+và cách sử dụng lệnh `go` do Go Toolchain cung cấp.
+Bài viết cũng giới thiệu một số công cụ khác nằm ngoài Go Toolchain.
+
+###========== Cài đặt Go Toolchain
+
+Hãy __tải xuống__ Go Toolchain
+và cài đặt theo hướng dẫn trên trang tải xuống.
+
+Bạn cũng có thể dùng công cụ __GoTV__
+để quản lý nhiều phiên bản Go toolchain đã cài đặt và sử dụng chúng một cách hài hòa, thuận tiện.
+
+    === tải xuống :: https://go.dev/doc/install
+    === GoTV :: https://go101.org/apps-and-libs/gotv.html
+
+Phiên bản của một bản phát hành Go Toolchain tương ứng với
+phiên bản ngôn ngữ Go cao nhất mà bản phát hành đó hỗ trợ.
+Ví dụ, Go Toolchain 1.25.x hỗ trợ
+tất cả phiên bản ngôn ngữ Go từ 1.0 đến Go 1.25.
+
+Để chạy các công cụ được cung cấp trong Go Toolchain (thông qua lệnh `go`)
+mà không cần nhập đường dẫn đầy đủ, cần thêm đường dẫn đến thư mục con `bin`
+trong thư mục cài đặt gốc của Go Toolchain vào biến môi trường `PATH`.
+Nếu Go Toolchain được cài bằng trình cài đặt hoặc trình quản lý gói, đường dẫn đến
+thư mục con `bin` có thể đã được tự động thêm vào biến môi trường `PATH`.
+
+Các phiên bản Go Toolchain gần đây hỗ trợ tính năng modules để quản lý dependency của dự án.
+Tính năng này được giới thiệu ở dạng thử nghiệm trong phiên bản 1.11
+và được bật mặc định kể từ phiên bản 1.16.
+
+Có một biến môi trường mà ta nên biết là `GOPATH`,
+dù không cần quá bận tâm đến nó.
+Mặc định, biến này trỏ đến thư mục `go` bên trong thư mục home của người dùng hiện tại.
+Nếu được chỉ định thủ công, biến môi trường `GOPATH` có thể liệt kê nhiều đường dẫn.
+Khi nhắc đến thư mục `GOPATH` ở phần sau, ý nói thư mục tại
+đường dẫn đầu tiên trong biến môi trường `GOPATH`.
+*
+   Thư mục con `pkg` bên trong thư mục `GOPATH` được
+   dùng để lưu các phiên bản Go module đã cache (Go module là tập hợp các Go package)
+   mà các dự án Go trên máy phụ thuộc vào.
+*
+   Biến môi trường `GOBIN` kiểm soát nơi lưu
+   các tệp chương trình Go nhị phân được tạo bởi
+   tiểu lệnh `go install`.
+   Theo mặc định, giá trị của biến môi trường `GOBIN` là
+   đường dẫn đến thư mục con `bin` bên trong thư mục `GOPATH`.
+   Cần thêm đường dẫn `GOBIN` vào biến môi trường `PATH`
+   nếu bạn muốn chạy các tệp chương trình Go nhị phân đã tạo
+   mà không cần chỉ định đường dẫn đầy đủ.
+
+{ %%
+Các phiên bản Go Toolchain cũ hơn có thể yêu cầu phải thiết lập
+các biến môi trường `GOROOT` và `GOPATH`.
+Các phiên bản Go Toolchain gần đây không còn yêu cầu như vậy.
+Giá trị mặc định của biến môi trường `GOPATH` là
+đường dẫn đến thư mục `go` bên trong thư mục home của người dùng hiện tại.
+Biến môi trường `GOPATH` có thể chứa nhiều đường dẫn.
+
+Biến môi trường `GOBIN` kiểm soát nơi lưu
+các tệp nhị phân được tạo bởi một số tiểu lệnh `go`,
+chẳng hạn tiểu lệnh `go install` (xem bên dưới).
+Nếu biến môi trường này chưa được thiết lập, lệnh `go` sẽ
+dùng đường dẫn đến thư mục con `bin` trong đường dẫn đầu tiên được chỉ định
+ở biến môi trường `GOPATH` để lưu các tệp nhị phân đã tạo.
+Cần thêm đường dẫn đến thư mục lưu tệp nhị phân vào biến môi trường `PATH`
+để chạy các tệp đó mà không cần chỉ định đường dẫn đầy đủ.
+
+Trước Go Toolchain 1.11, nên đặt tất cả Go package tùy chỉnh vào
+thư mục con `src` của một trong các đường dẫn được chỉ định trong biến môi trường `GOPATH`,
+đặc biệt khi dự án Go phụ thuộc vào package bên thứ ba.
+Các package sẽ được giới thiệu ở phần __href="packages-and-imports.html">package và import__ sau.
+Trong Go Toolchain 1.11, tính năng Go modules là
+
+Trong Go Toolchain 1.11, tính năng thử nghiệm Go modules được hỗ trợ.
+Tính năng Go modules cho phép đặt các dự án Go ở bất kỳ thư mục nào.
+Bạn có thể tìm hiểu thêm về module tại
+__href="https://go.dev/wiki/Modules">trang wiki này__.
+
+Lưu ý, kể từ Go Toolchain 1.13,
+Go modules trở thành chế độ được ưu tiên (thay cho chế độ `GOPATH` cũ).
+Sự cần thiết và ý nghĩa của biến môi trường `GOPATH`
+sẽ giảm đi đáng kể, thậm chí có thể bị loại bỏ hoàn toàn trong tương lai.
+Ngược lại, tầm quan trọng của biến môi trường `GOBIN` sẽ tăng lên,
+vì vẫn cần nơi lưu các tệp nhị phân do một số tiểu lệnh `go` tạo ra.
+
+Kể từ Go Toolchain 1.16, tính năng Go modules được bật mặc định.
+
+//
+(Trước Go Toolchain 1.9, cần cấu hình biến môi trường `GOROOT`
+thành đường dẫn gốc của bản cài đặt Go Toolchain.
+__href="https://golang.org/doc/go1.9#goroot">Kể từ Go Toolchain 1.9__,
+biến môi trường này trở thành tùy chọn; khuyến nghị không thiết lập nó.)
+
+
+Trước Go Toolchain 1.8, bắt buộc phải thiết lập biến môi trường `GOPATH`.
+__href="https://golang.org/doc/go1.8#gopath">Kể từ Go Toolchain 1.8__,
+giá trị mặc định của biến môi trường này là đường dẫn đến thư mục `go`
+bên trong thư mục home của người dùng hiện tại.
+Bạn có thể chỉ định `GOPATH` thủ công để làm việc với một hoặc nhiều vị trí khác nhau.
+Đúng vậy, biến môi trường `GOPATH` có thể liệt kê nhiều đường dẫn.
+}
+
+###========== Chương trình Go đơn giản nhất
+
+Hãy viết một ví dụ đơn giản và tìm hiểu cách chạy các chương trình Go đơn giản.
+
+Chương trình sau đây là chương trình Go đơn giản nhất.
+@@@ .line-numbers;must-line-numbers;fixed-width
+''' go
+package main
+
+func main() {
+}
+'''
+
+Các từ `package` và `func` là hai keyword.
+Hai từ `main` là hai identifier.
+Keyword và identifier sẽ được giới thiệu trong __một bài viết sắp tới__.
+
+    === bài viết sắp tới :: keywords-and-identifiers.tmd
+
+Dòng đầu tiên `package main` chỉ định tên package
+(ở đây là `main`) của tệp mã nguồn chứa dòng này.
+
+Dòng thứ hai để trống nhằm giúp mã dễ đọc hơn.
+
+Phần mã còn lại khai báo một function
+cũng có tên là `main`.
+Function `main` này trong package `main`
+xác định điểm bắt đầu của chương trình.
+(Lưu ý rằng một số mã khác của người dùng có thể được thực thi
+trước khi function `main` được gọi.)
+
+###========== Chạy chương trình Go
+
+Go Toolchain yêu cầu tệp mã nguồn Go
+có phần mở rộng `.go`.
+Ở đây, giả sử mã nguồn bên trên được lưu trong tệp
+có tên `simplest-go-program.go`.
+
+Mở terminal và chuyển thư mục hiện tại sang thư mục
+chứa tệp mã nguồn ở trên, sau đó chạy lệnh
+@@@ .output
+'''
+$ go run simplest-go-program.go
+'''
+
+Không có gì được in ra ư? Đúng vậy, chương trình này không in ra gì.
+
+Nếu mã nguồn có lỗi cú pháp,
+các lỗi này sẽ được báo cáo dưới dạng lỗi biên dịch.
+
+Nếu một chương trình có nhiều tệp mã nguồn thuộc package `main`,
+hãy chạy chương trình bằng lệnh sau
+@@@ .output
+'''
+$ go run .
+'''
+
+Lưu ý:
+*
+   Không nên dùng lệnh `go run` để biên dịch và chạy các dự án Go lớn.
+   Lệnh này chỉ là cách thuận tiện để chạy các chương trình Go đơn giản, như những chương trình trong các bài viết Go 101.
+   Với dự án Go lớn, hãy dùng lệnh `go build` hoặc `go install`
+   để build rồi chạy tệp nhị phân thực thi.
+*
+   Mỗi dự án Go chính thức hỗ trợ Go modules cần có tệp `go.mod` ở thư mục gốc
+   của dự án đó. Có thể tạo tệp `go.mod` bằng tiểu lệnh `go mod init` (xem bên dưới).
+*
+   Go Toolchain bỏ qua các tệp mã nguồn có tên bắt đầu bằng `_` hoặc `.`.
+
+###========== Các tiểu lệnh `go` khác
+
+Ba lệnh `go run`, `go build` và `go install`
+chỉ xuất ra lỗi cú pháp mã (nếu có).
+Chúng không xuất ra (và cũng không cố gắng xuất ra) cảnh báo về mã
+(hay các lỗi có thể có trong logic mã).
+Ta có thể dùng lệnh `go vet` để kiểm tra và báo cáo các cảnh báo đó.
+
+Ta có thể (và thường nên) dùng lệnh `go fmt` để định dạng mã nguồn Go
+theo một phong cách viết mã nhất quán.
+
+Ta có thể dùng lệnh `go test` để chạy test và benchmark.
+
+Ta có thể dùng lệnh `go doc` để xem tài liệu Go trong cửa sổ terminal.
+
+Bạn nên để các dự án Go hỗ trợ tính năng Go modules
+để quản lý dependency dễ dàng hơn. Với các dự án hỗ trợ Go modules,
+*
+   lệnh `go mod init example.com/myproject` được dùng để
+   tạo tệp `go.mod` trong thư mục hiện tại; thư mục này sẽ được xem
+   là thư mục gốc của module có tên `example.com/myproject`.
+   Tệp `go.mod` dùng để ghi lại các dependency của module. Ta có thể chỉnh sửa
+   tệp `go.mod` thủ công hoặc để các tiểu lệnh `go` cập nhật tệp này.
+*
+   lệnh `go mod tidy` được dùng để thêm các dependency còn thiếu vào
+   và xóa các dependency không còn được dùng khỏi tệp `go.mod`,
+   bằng cách phân tích toàn bộ mã nguồn trong dự án hiện tại.
+*
+   lệnh `go get` được dùng để thêm, nâng cấp, hạ cấp hoặc xóa một dependency.
+   Lệnh này hiện được dùng ít thường xuyên hơn lệnh `go mod tidy`.
+
+Kể từ Go Toolchain 1.16, ta có thể chạy `go install example.com/program@latest`
+để cài đặt phiên bản mới nhất của một chương trình Go bên thứ ba (vào thư mục `GOBIN`).
+Trước Go Toolchain 1.16, lệnh tương ứng là `go get -u example.com/program`;
+lệnh này hiện đã bị deprecated.
+
+Ta có thể chạy lệnh `go help aSubCommand` để xem thông báo trợ giúp
+của tiểu lệnh được chỉ định.
+
+Chạy lệnh `go` không kèm đối số sẽ hiển thị các tiểu lệnh được hỗ trợ.
+
+Loạt bài Go 101 sẽ không giải thích thêm nhiều về cách sử dụng các công cụ trong Go Toolchain.
+Hãy đọc __tài liệu chính thức__ để biết chi tiết.
+
+    === tài liệu chính thức :: https://golang.org/cmd/go/
+
+@@@ #doc
+###========== Xem tài liệu Go package trên trình duyệt
+
+Ta có thể dùng công cụ xem tài liệu và mã nguồn __**Golds**__
+(`go101.org/golds`) để xem tài liệu của một dự án Go cụ thể ngay trên máy.
+Đây không phải công cụ chính thức. Công cụ này do tôi (Tapir Liu) phát triển.
+**Golds** hỗ trợ trải nghiệm đọc mã phong phú (chẳng hạn liệt kê quan hệ triển khai type).
+Sau khi cài đặt **Golds**, ta có thể chạy `golds std ./...` để xem tài liệu của
+các package chuẩn và các package trong thư mục hiện tại.
+
+Để xem tài liệu Go chính thức, hãy truy cập __go.dev__.
+
+    === Golds :: https://github.com/go101/golds
+    === go.dev :: https://go.dev

@@ -1,0 +1,588 @@
+### Tổng quan về hệ thống kiểu của Go
+
+Bài viết này giới thiệu các loại kiểu trong Go và những khái niệm liên quan đến
+hệ thống kiểu của Go. Nếu chưa nắm các khái niệm nền tảng này, bạn sẽ khó hiểu
+Go một cách thấu đáo.
+
+###========== Khái niệm: Các kiểu cơ bản
+
+Các kiểu cơ bản dựng sẵn trong Go cũng đã được giới thiệu trong bài
+__các kiểu cơ bản dựng sẵn và literal giá trị cơ bản__.
+Để bài viết này được đầy đủ, các kiểu cơ bản dựng sẵn được liệt kê lại ở đây.
+*  Kiểu string dựng sẵn: `string`.
+*  Kiểu boolean dựng sẵn: `bool`.
+*  Các kiểu số dựng sẵn:
+   +  `int8`, `uint8` (`byte`), `int16`, `uint16`, `int32` (`rune`), `uint32`, `int64`, `uint64`, `int`, `uint`, `uintptr`.
+   +  `float32`, `float64`.
+   +  `complex64`, `complex128`.
+
+    === ... literal giá trị cơ bản :: basic-types-and-value-literals.tmd
+
+Lưu ý, `byte` là alias dựng sẵn của `uint8`,
+còn `rune` là alias dựng sẵn của `int32`.
+Ta cũng có thể khai báo các type alias tùy chỉnh (xem bên dưới).
+
+Ngoại trừ __các kiểu string__,
+loạt bài Go 101 sẽ không giải thích thêm về các kiểu cơ bản khác.
+
+    === các kiểu string :: string.tmd
+
+17 kiểu cơ bản dựng sẵn là các kiểu được khai báo trước.
+
+###========== Khái niệm: Các kiểu tổ hợp
+
+Go hỗ trợ các kiểu tổ hợp sau:
+*  __kiểu pointer__ - tương tự pointer trong C.
+*  __kiểu struct__ - tương tự struct trong C.
+*  __kiểu function__ - function là kiểu hạng nhất trong Go.
+*  __các kiểu container__:
+   +  kiểu array - kiểu container có độ dài cố định.
+   +  kiểu slice - kiểu container có độ dài và sức chứa thay đổi.
+   +  kiểu map - map là mảng kết hợp (hay dictionary). Trình biên dịch Go tiêu chuẩn cài đặt map bằng hashtable.
+
+*  __kiểu channel__ - channel được dùng để đồng bộ dữ liệu giữa các goroutine (luồng nhẹ trong Go).
+*  __kiểu interface__ - interface đóng vai trò then chốt trong reflection và tính đa hình.
+
+    === các kiểu pointer :: pointer.tmd
+    === các kiểu struct :: struct.tmd
+    === các kiểu function :: function.tmd
+    === các kiểu container :: container.tmd
+    === các kiểu channel :: channel.tmd
+    === các kiểu interface :: interface.tmd
+
+Các kiểu tổ hợp không tên có thể được biểu diễn bằng literal kiểu tương ứng.
+Dưới đây là một số ví dụ literal cho mọi loại kiểu tổ hợp không tên
+(kiểu có tên và kiểu không tên sẽ được giải thích bên dưới).
+@@@ .line-numbers
+''' go
+// Giả sử T là một kiểu bất kỳ và Tkey là
+// kiểu hỗ trợ so sánh (== và !=).
+
+*T         // kiểu pointer
+[5]T       // kiểu array
+[]T        // kiểu slice
+map[Tkey]T // kiểu map
+
+// kiểu struct
+struct {
+	name string
+	age  int
+}
+
+// kiểu function
+func(int) (bool, string)
+
+// kiểu interface
+interface {
+	Method0(string) int
+	Method1() (int, bool)
+}
+
+// một số kiểu channel
+chan T
+chan<- T
+<-chan T
+'''
+
+__Các kiểu so sánh được và không so sánh được__ sẽ được giải thích bên dưới.
+
+    === Các kiểu so sánh được và không so sánh được :: #types-not-support-comparison
+
+@@@ #type-kinds
+###========== Sự thật: Các loại kiểu
+
+Mỗi kiểu cơ bản và kiểu tổ hợp đã nêu ở trên tương ứng với một loại kiểu.
+Ngoài các loại này, kiểu unsafe pointer được giới thiệu trong __package chuẩn `unsafe`__
+cũng thuộc một loại kiểu trong Go.
+Vì vậy, tính đến hiện tại (Go 1.25), Go có 26 loại kiểu.
+
+    === package chuẩn `unsafe` :: https://golang.org/pkg/unsafe
+
+@@@ #type-definition
+###========== Cú pháp: Định nghĩa kiểu
+
+//
+(**Định nghĩa kiểu**, hay khai báo định nghĩa kiểu,
+ban đầu được gọi là **khai báo kiểu** và là cách khai báo kiểu duy nhất trước Go 1.9.
+Từ Go 1.9, định nghĩa kiểu trở thành một trong hai dạng khai báo kiểu.
+Dạng mới được gọi là **khai báo type alias**,
+sẽ được giới thiệu trong một mục bên dưới.)
+
+Trong Go, ta có thể định nghĩa kiểu mới bằng cú pháp sau.
+Trong cú pháp này, `type` là một keyword.
+@@@ .line-numbers
+''' go
+// Định nghĩa một kiểu mới.
+type NewTypeName SourceType
+
+// Định nghĩa đồng thời nhiều kiểu mới.
+type (
+	NewTypeName1 SourceType1
+	NewTypeName2 SourceType2
+)
+'''
+
+Tên kiểu mới phải là identifier.
+Tuy nhiên, lưu ý rằng tên kiểu khai báo ở cấp package không thể là __`init`__.
+
+    === `init` :: packages-and-imports.tmd#init
+
+Khai báo kiểu thứ hai trong ví dụ trên gồm hai đặc tả kiểu.
+Nếu một khai báo kiểu chứa nhiều hơn một đặc tả kiểu,
+các đặc tả kiểu phải được đặt trong một cặp `()`.
+
+Lưu ý:
+*
+   kiểu mới được định nghĩa và kiểu nguồn tương ứng trong định nghĩa kiểu
+   là hai kiểu phân biệt.
+*
+   hai kiểu được định nghĩa trong hai định nghĩa kiểu luôn là hai kiểu phân biệt.
+*
+   kiểu mới được định nghĩa và kiểu nguồn có cùng
+   kiểu nền (xem bên dưới để biết định nghĩa của kiểu nền),
+   và giá trị của chúng có thể được chuyển đổi qua lại.
+*
+   có thể định nghĩa kiểu bên trong thân function.
+
+Một số ví dụ định nghĩa kiểu:
+@@@ .line-numbers
+''' go
+// Các kiểu mới được định nghĩa và kiểu nguồn dưới đây đều
+// là kiểu cơ bản. Các kiểu nguồn đều được khai báo trước.
+type (
+	MyInt int
+	Age   int
+	Text  string
+)
+
+// Các kiểu mới được định nghĩa và kiểu nguồn dưới đây đều
+// là kiểu tổ hợp. Các kiểu nguồn đều không có tên.
+type IntPtr *int
+type Book struct{author, title string; pages int}
+type Convert func(in0 int, in1 bool)(out0 int, out1 string)
+type StringArray [5]string
+type StringSlice []string
+
+func f() {
+	// Tên của ba kiểu được định nghĩa này
+	// chỉ có thể được dùng bên trong function.
+	type PersonAge map[string]int
+	type MessageQueue chan string
+	type Reader interface{Read([]byte) int}
+}
+'''
+
+Lưu ý rằng,
+từ Go 1.9 đến Go 1.17, đặc tả Go từng xem
+các kiểu dựng sẵn được khai báo trước là kiểu được định nghĩa.
+Tuy nhiên, kể từ Go 1.18, đặc tả Go làm rõ rằng
+các kiểu dựng sẵn được khai báo trước không phải là kiểu được định nghĩa.
+
+@@@ #generic-type
+###========== Khái niệm: Kiểu generic tùy chỉnh và kiểu đã khởi tạo
+
+Kể từ Go 1.18, Go hỗ trợ kiểu generic tùy chỉnh (và function generic).
+Muốn dùng một kiểu generic làm kiểu giá trị, trước hết phải khởi tạo kiểu đó.
+
+Kiểu generic là kiểu được định nghĩa; các kiểu đã khởi tạo từ nó là kiểu có tên
+(kiểu có tên sẽ được giải thích trong mục tiếp theo).
+
+Hai khái niệm quan trọng khác trong generic tùy chỉnh là constraint và type parameter.
+
+Cuốn sách này không trình bày chi tiết về generic tùy chỉnh.
+Hãy đọc sách __Go Generics 101__
+để tìm hiểu cách khai báo và sử dụng kiểu generic cùng function generic.
+
+    === Go Generics 101 :: https://go101.org/generics/101.html
+
+@@@ #named-type
+###========== Khái niệm: Kiểu có tên và kiểu không tên
+
+Trước Go 1.9, thuật ngữ **kiểu có tên** được định nghĩa chính xác trong đặc tả Go.
+Kiểu có tên được định nghĩa là kiểu được biểu diễn bằng một identifier.
+Cùng với tính năng type alias tùy chỉnh được giới thiệu trong Go 1.9 (xem mục tiếp theo),
+thuật ngữ **kiểu có tên** từng bị loại khỏi đặc tả Go
+và được thay bằng thuật ngữ **kiểu được định nghĩa**.
+Kể từ Go 1.18, cùng với sự ra đời của generic tùy chỉnh,
+thuật ngữ **kiểu có tên** đã được đưa trở lại đặc tả Go.
+
+Một kiểu có tên có thể là:
+
+*
+   kiểu được khai báo trước (không bao gồm __type alias__);
+*
+   kiểu được định nghĩa (không phải kiểu generic tùy chỉnh);
+*
+   kiểu đã khởi tạo (từ một kiểu generic);
+*
+   kiểu type parameter (được dùng trong generic tùy chỉnh).
+
+Các kiểu giá trị khác được gọi là kiểu không tên.
+Kiểu không tên bắt buộc phải là kiểu tổ hợp (nhưng chiều ngược lại không đúng).
+
+    === type alias :: #type-alias
+
+@@@ #type-alias
+###========== Cú pháp: Khai báo type alias
+
+{ %%
+Thật đáng tiếc, theo tôi, việc cho phép alias của các literal kiểu là một sai lầm.
+Điều đó không cần thiết và chỉ khiến mọi thứ phức tạp, khó hiểu hơn.
+https://github.com/golang/go/issues/66540#issuecomment-2030476174
+}
+
+Kể từ Go 1.9, ta có thể khai báo type alias tùy chỉnh bằng cú pháp sau.
+Cú pháp khai báo alias khá giống định nghĩa kiểu,
+nhưng lưu ý dấu `=` trong mỗi đặc tả type alias.
+@@@ .line-numbers
+''' go
+type (
+	Name = string
+	Age  = int
+)
+
+type table = map[string]int
+type Table = map[Name]Age
+'''
+
+Tên type alias phải là identifier.
+Tương tự định nghĩa kiểu, cũng có thể khai báo type alias bên trong thân function.
+
+Tên kiểu (hoặc literal kiểu) và các alias của nó đều biểu thị cùng một kiểu.
+Với các khai báo ở trên, `Name` là alias của `string`,
+nên cả hai cùng biểu thị một kiểu.
+Điều tương tự cũng đúng với ba cặp ký hiệu kiểu còn lại (tên hoặc literal):
+*
+   `Age` và `int`
+*
+   `table` và `map[string]int`
+*
+   `Table` và `map[Name]Age`
+
+Thực tế, các literal `map[string]int`
+và `map[Name]Age` cũng cùng biểu thị một kiểu.
+Vì vậy, tương tự, các alias `table` và `Table` cũng cùng biểu thị một kiểu.
+
+Lưu ý, dù type alias luôn có tên, nó vẫn có thể biểu thị một kiểu không tên.
+Ví dụ, cả hai alias `table` và `Table`
+đều biểu thị cùng kiểu không tên `map[string]int`.
+
+@@@ #underlying-type
+###========== Khái niệm: Kiểu nền
+
+Trong Go, mỗi kiểu đều có một kiểu nền. Quy tắc:
+*  với kiểu dựng sẵn, kiểu nền chính là bản thân kiểu đó.
+*  với kiểu `Pointer` được định nghĩa trong package code chuẩn `unsafe`,
+   kiểu nền là chính nó (ít nhất ta có thể hiểu như vậy. Thực tế, kiểu nền
+   của kiểu `unsafe.Pointer` không được tài liệu mô tả rõ. Ta cũng có thể xem
+   kiểu nền là `*T`, trong đó `T` đại diện cho một kiểu bất kỳ).
+   `unsafe.Pointer` cũng được xem là kiểu dựng sẵn.
+*  kiểu nền của kiểu không tên, vốn bắt buộc phải là kiểu tổ hợp, là chính nó.
+*  trong một khai báo kiểu, kiểu mới được khai báo và kiểu nguồn có cùng kiểu nền.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+// Kiểu nền của cả hai kiểu sau đều là int.
+type (
+	MyInt int
+	Age   MyInt
+)
+
+// Các kiểu mới dưới đây có kiểu nền khác nhau.
+type (
+	IntSlice   []int   // kiểu nền là []int
+	MyIntSlice []MyInt // kiểu nền là []MyInt
+	AgeSlice   []Age   // kiểu nền là []Age
+)
+
+// Kiểu nền của []Age, Ages và AgeSlice
+// đều là kiểu không tên []Age.
+type Ages AgeSlice
+'''
+
+Làm thế nào lần theo kiểu nền khi đã biết một kiểu do người dùng khai báo?
+Quy tắc là dừng lần theo khi gặp một kiểu cơ bản dựng sẵn hoặc một kiểu không tên.
+Lấy các khai báo kiểu ở trên làm ví dụ, ta lần theo kiểu nền như sau:
+
+!  ^`
+   MyInt → int
+   \\ Age → MyInt → int
+   \\ IntSlice → []int
+   \\ MyIntSlice → []MyInt ^**→ ~~[]int~~**
+   \\ AgeSlice → []Age ^**→ ~~[]MyInt~~ → ~~[]int~~**
+   \\ Ages → AgeSlice → []Age ^**→ ~~[]MyInt~~ → ~~[]int~~**
+
+Trong Go:
+*  kiểu có kiểu nền là `bool` được gọi là **kiểu boolean**;
+*  kiểu có kiểu nền là một trong các kiểu integer dựng sẵn được gọi là **kiểu integer**;
+*  kiểu có kiểu nền là `float32` hoặc `float64` được gọi là **kiểu dấu phẩy động**;
+*  kiểu có kiểu nền là `complex64` hoặc `complex128` được gọi là **kiểu complex**;
+*  các kiểu integer, dấu phẩy động và complex cũng được gọi là **kiểu số**;
+*  kiểu có kiểu nền là `string` được gọi là **kiểu string**.
+
+Khái niệm kiểu nền đóng vai trò quan trọng trong
+__chuyển đổi giá trị, phép gán và phép so sánh trong Go__.
+
+    === chuyển đổi giá trị ... :: value-conversions-assignments-and-comparisons.tmd
+
+###========== Khái niệm: Giá trị
+
+Một thực thể thuộc một kiểu được gọi là một 'giá trị' của kiểu đó.
+Các giá trị cùng kiểu có một số thuộc tính chung.
+Một kiểu có thể có nhiều giá trị. Một trong số đó là zero value của kiểu.
+
+Mỗi kiểu đều có zero value, có thể xem là giá trị mặc định của kiểu đó.
+Identifier khai báo trước `nil` có thể dùng để biểu diễn
+zero value của slice, map, function, channel,
+pointer (bao gồm cả pointer không an toàn về kiểu) và interface.
+Để biết thêm về `nil`, hãy đọc __nil trong Go__.
+
+    === `nil` trong Go :: nil.tmd
+
+Trong code có một số dạng biểu diễn giá trị, bao gồm
+__literal__, __hằng số có tên__, __biến__ và __biểu thức__,
+mặc dù ba dạng đầu có thể xem là trường hợp đặc biệt của biểu thức.
+
+    === literal :: basic-types-and-value-literals.tmd
+    === hằng số có tên :: constants-and-variables.tmd#constant
+    === biến :: constants-and-variables.tmd#variable
+    === biểu thức :: expressions-and-statements.tmd
+
+Một giá trị có thể __có kiểu hoặc không có kiểu__.
+
+Bài viết __các kiểu cơ bản và literal giá trị cơ bản__ đã giới thiệu mọi loại literal giá trị cơ bản.
+Trong Go còn có hai loại literal nữa: composite literal và function literal.
+
+Đúng như tên gọi, function literal dùng để biểu diễn giá trị function.
+Một __khai báo function__ gồm một function literal và một identifier (tên function).
+
+Composite literal dùng để biểu diễn giá trị của kiểu struct
+và kiểu container (array, slice, map).
+Để biết thêm chi tiết, hãy đọc __struct trong Go__ và __container trong Go__.
+
+    === có kiểu hoặc không có kiểu :: constants-and-variables.tmd#untyped-value
+    === các kiểu cơ bản và literal giá trị cơ bản :: basic-types-and-value-literals.htm
+    === khai báo function :: function-declarations-and-calls.tmd#declaration
+    === struct trong Go :: struct.tmd
+    === container trong Go :: container.tmd
+
+Không có literal nào dùng để biểu diễn giá trị pointer, channel hay interface.
+
+@@@ #value-part
+###========== Khái niệm: Các phần của giá trị
+
+Khi chạy chương trình, nhiều giá trị được lưu ở đâu đó trong bộ nhớ.
+Trong Go, mỗi giá trị như vậy đều có một phần trực tiếp.
+Tuy nhiên, một số giá trị có thêm một hay nhiều phần gián tiếp.
+Mỗi phần giá trị chiếm một vùng bộ nhớ liên tục.
+Các phần nền gián tiếp của một giá trị được tham chiếu
+từ phần trực tiếp của nó thông qua pointer (__an toàn__ hoặc __không an toàn__).
+
+Thuật ngữ __**phần giá trị**__ không được định nghĩa trong đặc tả Go.
+Go 101 chỉ dùng thuật ngữ này để giải thích đơn giản hơn
+và giúp lập trình viên Go hiểu rõ hơn về kiểu và giá trị trong Go.
+
+    === an toàn :: pointer.tmd
+    === không an toàn :: unsafe.tmd
+    === phần giá trị :: value-part.tmd
+
+@@@ #value-size
+###========== Khái niệm: Kích thước giá trị
+
+Khi một giá trị được lưu trong bộ nhớ, số byte mà phần trực tiếp của giá trị chiếm
+được gọi là kích thước của giá trị.
+Vì mọi giá trị cùng kiểu có cùng kích thước,
+ta thường gọi ngắn gọn đó là kích thước của kiểu.
+
+Ta có thể dùng function `Sizeof` trong package chuẩn `unsafe`
+để lấy kích thước của bất kỳ giá trị nào.
+
+Đặc tả Go không quy định yêu cầu về kích thước giá trị của các kiểu không phải kiểu số.
+Yêu cầu về kích thước giá trị của mọi kiểu số cơ bản
+được liệt kê trong bài __các kiểu cơ bản và literal giá trị cơ bản__.
+
+    === các kiểu cơ bản ... :: basic-types-and-value-literals.tmd
+
+@@@ #pointer-base-type
+###========== Khái niệm: Kiểu cơ sở của kiểu pointer
+
+Với một kiểu pointer, giả sử kiểu nền của nó có thể được biểu diễn dưới dạng literal `*T`,
+thì `T` được gọi là kiểu cơ sở của kiểu pointer đó.
+
+Có thể tìm hiểu thêm về kiểu và giá trị pointer trong bài
+__pointer trong Go__.
+
+    === pointer trong Go :: pointer.tmd
+
+###========== Khái niệm: Các field của kiểu struct
+
+Kiểu struct gồm một tập hợp các khai báo biến thành viên.
+Mỗi khai báo biến thành viên được gọi là một "field" của kiểu struct.
+Ví dụ, kiểu struct `Book` sau có
+ba field: `author`, `title` và `pages`.
+@@@ .line-numbers
+''' go
+type Book struct {
+	author string
+	title  string
+	pages  int
+}
+'''
+
+Có thể tìm hiểu thêm về kiểu và giá trị struct trong bài
+__struct trong Go__.
+
+    === struct trong Go :: struct.tmd
+
+###========== Khái niệm: Signature của kiểu function
+
+Signature của kiểu function gồm
+danh sách khai báo tham số đầu vào và
+danh sách khai báo kết quả đầu ra của function.
+
+Tên và thân function không thuộc signature của function.
+Kiểu của tham số và kết quả quan trọng đối với signature,
+nhưng tên tham số và kết quả thì không.
+
+Hãy đọc __function trong Go__ để tìm hiểu thêm
+về kiểu function và giá trị function.
+
+    === function trong Go :: function.tmd
+
+###========== Khái niệm: Method và method set của một kiểu
+
+Trong Go, một số kiểu có thể có __method__.
+Method cũng có thể được gọi là hàm thành viên.
+Method set của một kiểu gồm tất cả method của kiểu đó.
+
+    === method :: method.tmd
+
+###========== Khái niệm: Dynamic type và dynamic value của giá trị interface
+
+Giá trị interface là các giá trị có kiểu interface.
+
+Mỗi giá trị interface có thể chứa một giá trị không phải interface.
+Giá trị được chứa trong giá trị interface được gọi là dynamic value của giá trị interface đó.
+Kiểu của dynamic value được gọi là dynamic type của giá trị interface.
+Giá trị interface không chứa gì được gọi là giá trị interface zero.
+Giá trị interface zero không có dynamic value cũng như dynamic type.
+
+Kiểu interface có thể chỉ định không method nào hoặc nhiều method;
+các method đó tạo thành method set của kiểu interface.
+
+Nếu method set của một kiểu, dù là kiểu interface hay kiểu không phải interface,
+bao hàm method set của một kiểu interface, ta nói kiểu đó
+__implements__ kiểu interface ấy.
+
+Để tìm hiểu thêm về kiểu và giá trị interface, hãy đọc __interface trong Go__.
+
+    === implements :: interface.tmd#implementation
+    === interface trong Go :: interface.tmd
+
+@@@ #concrete-type
+###========== Khái niệm: Giá trị concrete và kiểu concrete của một giá trị
+
+Với một giá trị không phải interface (có kiểu), giá trị concrete chính là nó và kiểu concrete là kiểu của giá trị đó.
+
+Giá trị interface zero không có kiểu concrete cũng như giá trị concrete.
+Với giá trị interface khác zero, giá trị concrete là dynamic value và kiểu concrete là dynamic type.
+
+###========== Khái niệm: Các kiểu container
+
+Array, slice và map có thể được xem là các kiểu container theo nghĩa chính thức.
+
+Đôi khi, kiểu string và channel cũng có thể được xem là kiểu container theo nghĩa không chính thức.
+
+Mỗi giá trị thuộc kiểu container chính thức hay không chính thức đều có độ dài.
+
+Có thể tìm hiểu thêm về các kiểu và giá trị container chính thức trong
+bài __container trong Go__.
+
+    === container trong Go :: container.tmd
+
+###========== Khái niệm: Kiểu key của kiểu map
+
+Nếu kiểu nền của một kiểu map có thể được biểu diễn dưới dạng `map[Tkey]T`,
+thì `Tkey` được gọi là kiểu key của kiểu map đó.
+`Tkey` phải là kiểu so sánh được (xem bên dưới).
+
+###========== Khái niệm: Kiểu phần tử của kiểu container
+
+Các phần tử được lưu trong giá trị của một kiểu container phải có cùng kiểu.
+Kiểu chung đó được gọi là kiểu phần tử của kiểu container.
+*  Với kiểu array, nếu kiểu nền là `[N]T`, thì kiểu phần tử là `T`.
+*  Với kiểu slice, nếu kiểu nền là `[]T`, thì kiểu phần tử là `T`.
+*  Với kiểu map, nếu kiểu nền là `map[Tkey]T`, thì kiểu phần tử là `T`.
+*  Với kiểu channel, nếu kiểu nền là `chan T`, `chan<- T` hoặc `<-chan T`, thì kiểu phần tử là `T`.
+*  Kiểu phần tử của mọi kiểu string luôn là `byte` (còn gọi là `uint8`).
+
+###========== Khái niệm: Hướng của kiểu channel
+
+Giá trị channel có thể được xem là hàng đợi FIFO (vào trước, ra trước) có đồng bộ.
+Kiểu channel và giá trị channel có hướng.
+*
+   Giá trị channel có thể vừa gửi vừa nhận được gọi là
+   channel hai chiều. Kiểu của nó được gọi là kiểu channel hai chiều.
+   Kiểu nền của channel hai chiều được biểu diễn bằng literal `chan T`.
+*
+   Giá trị channel chỉ có thể gửi được gọi là
+   channel chỉ gửi. Kiểu channel chỉ gửi được biểu diễn bằng literal `chan<- T`.
+*
+   Giá trị channel chỉ có thể nhận được gọi là
+   channel chỉ nhận. Kiểu channel chỉ nhận được biểu diễn bằng literal `<-chan T`.
+
+Có thể tìm hiểu thêm về kiểu và giá trị channel trong bài
+__channel trong Go__.
+
+    === channel trong Go :: channel.tmd
+
+@@@ #types-not-support-comparison
+###========== Sự thật: Các kiểu hỗ trợ hoặc không hỗ trợ phép so sánh
+
+Hiện tại (Go 1.25), Go không hỗ trợ phép so sánh
+(bằng toán tử `==` và `!=`)
+đối với giá trị thuộc các kiểu sau:
+* kiểu slice
+* kiểu map
+* kiểu function*.
+   mọi kiểu struct có field mang kiểu không so sánh được
+   và mọi kiểu array có kiểu phần tử không so sánh được.
+
+Các kiểu liệt kê ở trên được gọi là kiểu không so sánh được.
+Tất cả kiểu còn lại được gọi là kiểu so sánh được.
+Compiler cấm so sánh hai giá trị thuộc kiểu không so sánh được.
+
+Lưu ý, trong nhiều bài viết, kiểu không so sánh được còn được gọi là kiểu uncomparable.
+
+Kiểu key của mọi kiểu map phải là kiểu so sánh được.
+
+Có thể tìm hiểu thêm các quy tắc so sánh chi tiết trong bài
+__chuyển đổi giá trị, phép gán và phép so sánh trong Go__.
+
+    === ... phép so sánh trong Go :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
+
+###========== Sự thật: Lập trình hướng đối tượng trong Go
+
+Go không phải là ngôn ngữ lập trình hướng đối tượng có đầy đủ tính năng,
+nhưng Go thực sự hỗ trợ một số yếu tố của lập trình hướng đối tượng.
+Để biết chi tiết, hãy đọc các bài viết sau:
+*
+   __method trong Go`` method.tmd__.
+*
+   __implementations trong Go`` interface.tmd#implementation__.
+*
+   __type embedding trong Go`` type-embedding.tmd__.
+
+###========== Sự thật: Generic trong Go
+
+Trước Go 1.18, các chức năng generic của Go chỉ giới hạn ở kiểu và function dựng sẵn.
+Kể từ Go 1.18, Go đã hỗ trợ generic tùy chỉnh.
+Hãy đọc bài __generic trong Go__ để tìm hiểu generic dựng sẵn
+và sách __Go Generics 101__ để tìm hiểu generic tùy chỉnh.
+
+    === generic trong Go :: generic.tmd
+    === Go Generics 101 :: https://go101.org/generics/101.html
+
+
+

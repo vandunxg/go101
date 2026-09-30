@@ -1,0 +1,838 @@
+### Channel trong Go
+
+Channel là một tính năng tích hợp quan trọng của Go.
+Đây là một trong những tính năng tạo nên nét đặc trưng của Go.
+Cùng với một tính năng độc đáo khác là __goroutine__,
+channel giúp lập trình đồng thời trở nên thuận tiện, thú vị và
+ít khó khăn hơn.
+
+    === goroutine :: control-flows-more.tmd#goroutine
+
+Channel chủ yếu đóng vai trò là một kỹ thuật __đồng bộ hóa concurrency__.
+Bài viết này trình bày các khái niệm, cú pháp và quy tắc liên quan đến channel.
+Để giúp bạn hiểu rõ hơn về channel, bài viết cũng mô tả khái quát cấu trúc bên trong
+và một số chi tiết triển khai của compiler/runtime Go chuẩn.
+
+    === đồng bộ hóa concurrency :: control-flows-more.tmd#synchronization
+
+Một số nội dung trong bài có thể hơi khó với người mới học Go.
+Bạn có thể cần đọc lại vài phần nhiều lần để hiểu đầy đủ.
+
+###========== Giới thiệu về channel
+
+Một gợi ý về lập trình đồng thời (do // Rob Pike // đưa ra) là:
+**đừng để các phép tính giao tiếp bằng cách chia sẻ bộ nhớ,
+hãy để chúng chia sẻ bộ nhớ bằng cách giao tiếp (qua channel)**.
+(Trong lập trình Go, có thể xem mỗi phép tính là một goroutine.)
+
+Giao tiếp bằng cách chia sẻ bộ nhớ và chia sẻ bộ nhớ bằng cách giao tiếp
+là hai cách lập trình đồng thời.
+Khi các goroutine giao tiếp bằng cách chia sẻ bộ nhớ, ta dùng
+các kỹ thuật đồng bộ hóa concurrency truyền thống, chẳng hạn mutex,
+để bảo vệ vùng nhớ dùng chung và ngăn data race.
+Ta có thể dùng channel để triển khai cách chia sẻ bộ nhớ bằng giao tiếp.
+
+Go cung cấp channel như một kỹ thuật đồng bộ hóa concurrency độc đáo.
+Channel giúp các goroutine chia sẻ bộ nhớ bằng cách giao tiếp.
+Có thể xem channel như một hàng đợi FIFO (vào trước, ra trước) bên trong chương trình.
+Một số goroutine gửi giá trị vào hàng đợi (channel),
+còn các goroutine khác nhận giá trị từ hàng đợi.
+
+Cùng với việc truyền giá trị qua channel,
+quyền sở hữu một số giá trị cũng có thể được chuyển giao giữa các goroutine.
+Khi gửi một giá trị vào channel, có thể xem goroutine gửi đã nhường quyền sở hữu
+đối với một số giá trị có thể được truy cập thông qua giá trị đã gửi.
+Khi nhận một giá trị từ channel, có thể xem goroutine nhận đã có quyền sở hữu
+một số giá trị có thể được truy cập thông qua giá trị nhận được.
+
+Dĩ nhiên, việc giao tiếp qua channel cũng có thể không chuyển giao quyền sở hữu nào.
+
+Các giá trị được chuyển giao quyền sở hữu thường được tham chiếu
+(nhưng không nhất thiết phải được tham chiếu) bởi giá trị truyền đi.
+Lưu ý, ở đây quyền sở hữu được hiểu theo góc độ logic.
+Channel Go giúp lập trình viên dễ viết code không có data race,
+nhưng không thể ngăn họ viết code đồng thời sai ngay từ cấp độ cú pháp.
+
+Go cũng hỗ trợ các kỹ thuật đồng bộ hóa concurrency truyền thống,
+nhưng chỉ channel là công dân hạng nhất trong Go. Channel là một kiểu dữ liệu của Go,
+nên có thể sử dụng mà không cần import package nào.
+Các kỹ thuật đồng bộ hóa truyền thống được cung cấp trong
+các standard package `sync` và `sync/atomic`.
+
+Thực tế, mỗi kỹ thuật đồng bộ hóa concurrency đều có trường hợp sử dụng phù hợp nhất.
+Tuy vậy, channel có __phạm vi ứng dụng rộng hơn
+và cách sử dụng đa dạng hơn__.
+Một hạn chế của channel là trải nghiệm lập trình với nó rất thú vị,
+đến mức lập trình viên đôi khi vẫn chọn channel cho cả những trường hợp
+mà channel không phải lựa chọn phù hợp nhất.
+
+    === phạm vi ứng dụng rộng hơn ... :: channel-use-cases.tmd
+
+###========== Kiểu và giá trị channel
+
+Tương tự array, slice và map, mỗi kiểu channel đều có kiểu phần tử.
+Channel chỉ truyền được các giá trị thuộc kiểu phần tử của nó.
+
+Kiểu channel có thể hai chiều hoặc một chiều.
+Giả sử `T` là một kiểu bất kỳ:
+*.
+   `chan T` biểu thị kiểu channel hai chiều.
+   Compiler cho phép vừa nhận giá trị từ vừa gửi giá trị vào channel hai chiều.
+*.
+   `chan<- T` biểu thị kiểu channel chỉ gửi.
+   Compiler không cho phép nhận giá trị từ channel chỉ gửi.
+*.
+   `<-chan T` biểu thị kiểu channel chỉ nhận.
+   Compiler không cho phép gửi giá trị vào channel chỉ nhận.
+
+`T` được gọi là kiểu phần tử của các kiểu channel này.
+
+Giá trị thuộc kiểu channel hai chiều `chan T` có thể được chuyển đổi ngầm định
+sang cả kiểu chỉ gửi `chan<- T` lẫn kiểu chỉ nhận `<-chan T`,
+nhưng không thể chuyển đổi theo chiều ngược lại, kể cả khi ép kiểu tường minh.
+Giá trị kiểu chỉ gửi `chan<- T` không thể chuyển thành kiểu chỉ nhận `<-chan T`, và ngược lại.
+Lưu ý, dấu `<-` trong literal kiểu channel là các modifier.
+
+Mỗi giá trị channel có một capacity, sẽ được giải thích ở phần sau.
+Channel có capacity bằng 0 được gọi là channel không đệm (unbuffered),
+còn channel có capacity khác 0 được gọi là channel có đệm (buffered).
+
+Zero value của kiểu channel được biểu diễn bằng identifier dựng sẵn `nil`.
+Giá trị channel khác nil phải được tạo bằng hàm dựng sẵn `make`.
+Ví dụ, `make(chan int, 10)` tạo channel có kiểu phần tử là `int`.
+Đối số thứ hai trong lời gọi `make` chỉ định capacity của channel mới.
+Đối số này không bắt buộc và mặc định bằng 0.
+
+
+@@@ #assign-and-compare
+###========== So sánh giá trị channel
+
+Tất cả kiểu channel đều là kiểu có thể so sánh.
+
+Từ bài __các phần của giá trị__, ta biết rằng giá trị channel khác nil gồm nhiều phần.
+Khi gán một giá trị channel cho một giá trị khác,
+hai channel cùng tham chiếu đến (các) phần nền tảng.
+Nói cách khác, chúng đại diện cho cùng một đối tượng channel bên trong.
+Vì vậy, phép so sánh hai giá trị này cho kết quả `true`.
+
+    === các phần của giá trị :: value-part.tmd
+
+@@@ #operations
+###========== Các thao tác với channel
+
+Channel có năm thao tác được quy định.
+Giả sử channel là `ch`; cú pháp và lời gọi hàm của các thao tác này được liệt kê dưới đây.
+*.
+   Đóng channel bằng lời gọi hàm sau
+   @@@ .disable-line-numbers111
+   ''' go
+close(ch)
+   '''
+   trong đó `close` là hàm dựng sẵn.
+   Đối số của lời gọi `close` phải là một giá trị channel,
+   và channel `ch` không được là channel chỉ nhận.
+*.
+   Gửi giá trị `v` vào channel bằng cú pháp sau
+   @@@ .disable-line-numbers111
+   ''' go
+ch <- v
+   '''
+   trong đó `v` phải là giá trị có thể gán cho kiểu phần tử của channel `ch`,
+   và `ch` không được là channel chỉ nhận.
+   Ở đây, `<-` là toán tử gửi vào channel.
+*.
+   Nhận một giá trị từ channel bằng cú pháp sau
+   @@@ .disable-line-numbers111
+   ''' go
+<-ch
+   '''
+   Thao tác nhận từ channel luôn trả về ít nhất một kết quả,
+   là giá trị thuộc kiểu phần tử của channel; `ch` không được là channel chỉ gửi.
+   Ở đây `<-` là toán tử nhận từ channel.
+   Đúng vậy, ký hiệu của nó giống hệt toán tử gửi vào channel.
+   ;;;
+   Trong hầu hết trường hợp, thao tác nhận từ channel được xem là biểu thức một giá trị.
+   Tuy nhiên, nếu thao tác này là biểu thức nguồn duy nhất trong phép gán,
+   nó có thể trả thêm một giá trị boolean không định kiểu, không bắt buộc,
+   và trở thành biểu thức nhiều giá trị.
+   Giá trị boolean này cho biết kết quả thứ nhất có được gửi trước khi channel đóng hay không.
+   (Ở phần dưới, ta sẽ biết rằng có thể nhận số lượng giá trị không giới hạn từ channel đã đóng.)
+   ;;;
+   Hai thao tác nhận từ channel được dùng làm giá trị nguồn trong phép gán:
+   @@@ .disable-line-numbers111
+   ''' go
+v = <-ch
+v, sentBeforeClosed = <-ch
+   '''
+*.
+   Truy vấn capacity của buffer giá trị trong channel bằng lời gọi hàm sau
+   @@@ .disable-line-numbers111
+   ''' go
+cap(ch)
+   '''
+   trong đó `cap` là hàm dựng sẵn đã được giới thiệu trong bài __các container trong Go__.
+   Kết quả trả về của lời gọi `cap` có kiểu `int`.
+       === các container trong Go :: container.tmd#cap-len
+*.
+   Truy vấn số giá trị hiện có trong buffer giá trị
+   (hay length) của channel bằng lời gọi hàm sau
+   @@@ .disable-line-numbers111
+   ''' go
+len(ch)
+   '''
+   trong đó `len` là một hàm dựng sẵn cũng đã được giới thiệu trước đó.
+   Lời gọi `len` trả về giá trị kiểu `int`.
+   Length là số phần tử đã được gửi thành công vào channel đang truy vấn
+   nhưng chưa được nhận (lấy ra).
+
+Hầu hết thao tác cơ bản trong Go không được đồng bộ.
+Nói cách khác, chúng không an toàn khi chạy đồng thời.
+Các thao tác đó gồm gán giá trị, truyền đối số, thao tác với phần tử container, v.v.
+Tuy nhiên, tất cả thao tác channel vừa giới thiệu đều đã được đồng bộ,
+nên không cần đồng bộ bổ sung để thực hiện chúng một cách an toàn.
+
+{ %%
+https://github.com/golang/go/issues/30372
+https://github.com/golang/go/issues/27769
+}
+
+Giống hầu hết thao tác khác trong Go,
+phép gán giá trị channel không được đồng bộ.
+Tương tự, gán giá trị nhận được cho một biến khác cũng không được đồng bộ,
+dù bản thân thao tác nhận từ channel có đồng bộ.
+
+Nếu channel được truy vấn là nil, cả hai hàm dựng sẵn `cap` và `len` đều trả về 0.
+Hai thao tác truy vấn này rất đơn giản nên sẽ không được giải thích thêm.
+Thực tế, chúng hiếm khi được dùng.
+
+Các thao tác gửi, nhận và đóng channel sẽ được giải thích chi tiết ở phần tiếp theo.
+
+@@@ #channel-operation-explanations
+###========== Giải thích chi tiết các thao tác với channel
+
+Để giải thích các thao tác channel đơn giản và rõ ràng,
+trong phần còn lại của bài viết, channel được chia thành ba nhóm:
+*.
+   channel nil.
+*.
+   channel khác nil nhưng đã đóng.
+*.
+   channel khác nil và chưa đóng.
+
+
+Bảng sau tóm tắt hành vi của mọi thao tác trên channel nil, đã đóng và khác nil chưa đóng.
+
+@@@ .table;table-bordered;text-center style="width: auto !important;"
+#  ### Thao tác
+   ### Channel nil
+   ### Channel đã đóng
+   ### Channel khác nil chưa đóng
+   --------------------
+   ### Đóng
+   ;;; panic
+   ;;; panic
+   ;;; đóng thành công ^$$(C)$$
+   --------------------
+   ### Gửi giá trị vào
+   ;;; chặn vô thời hạn
+   ;;; panic
+   ;;; chặn hoặc gửi thành công ^$$(B)$$
+   --------------------
+   ### Nhận giá trị từ
+   ;;; chặn vô thời hạn
+   ;;; không bao giờ chặn ^$$(D)$$
+   ;;; chặn hoặc nhận thành công ^$$(A)$$
+
+Với năm trường hợp không có ký hiệu mũ, hành vi khá rõ ràng.
+*.
+   Đóng channel nil hoặc channel đã đóng sẽ gây panic trong goroutine hiện tại.
+*.
+   Gửi giá trị vào channel đã đóng cũng gây panic trong goroutine hiện tại.
+*.
+   Gửi hoặc nhận giá trị từ channel nil khiến goroutine hiện tại chuyển sang trạng thái chờ vô thời hạn.
+
+
+Phần tiếp theo giải thích thêm bốn trường hợp có ký hiệu mũ (A, B, C và D).
+
+Để hiểu rõ hơn kiểu và giá trị channel, đồng thời giúp một số giải thích dễ theo dõi,
+việc xem cấu trúc thô bên trong các đối tượng channel rất hữu ích.
+
+Có thể hình dung bên trong mỗi channel có ba hàng đợi (đều có thể xem là FIFO):
+*.
+   hàng đợi goroutine nhận (thường theo FIFO).
+   Đây là linked list không giới hạn kích thước.
+   Các goroutine trong hàng đợi đều đang chờ nhận giá trị từ channel.
+   { %% không đúng
+   Địa chỉ của các giá trị dùng để lưu giá trị nhận được cũng được lưu trong hàng đợi,
+   cùng với từng goroutine.
+   }
+*.
+   hàng đợi goroutine gửi (thường theo FIFO).
+   Hàng đợi này cũng là linked list không giới hạn kích thước.
+   Các goroutine trong đó đều đang chờ gửi giá trị vào channel.
+   Giá trị mà mỗi goroutine định gửi (hoặc địa chỉ của giá trị, tùy cách compiler triển khai)
+   cũng được lưu trong hàng đợi cùng với goroutine đó.
+*.
+   hàng đợi buffer giá trị (luôn theo FIFO), là một circular queue.
+   Kích thước của nó bằng capacity của channel.
+   Kiểu của mọi giá trị trong buffer là kiểu phần tử của channel.
+   Nếu số giá trị hiện có trong buffer đạt đến capacity, channel ở trạng thái đầy.
+   Nếu buffer hiện không chứa giá trị nào, channel ở trạng thái rỗng.
+   Với channel có capacity bằng 0 (unbuffered), nó luôn vừa đầy vừa rỗng.
+
+
+Bên trong mỗi channel có một mutex lock để tránh data race trong mọi loại thao tác.
+
+**Trường hợp thao tác channel A**:
+khi goroutine `R` nhận giá trị từ một channel khác nil chưa đóng,
+`R` trước tiên lấy lock gắn với channel,
+sau đó thực hiện các bước dưới đây cho đến khi thỏa mãn một điều kiện.
+*.
+   Nếu buffer giá trị của channel không rỗng (khi đó hàng đợi goroutine nhận phải rỗng),
+   goroutine `R` lấy một giá trị khỏi buffer (bằng cách dịch chuyển).
+   Nếu hàng đợi goroutine gửi cũng không rỗng, một goroutine gửi được lấy khỏi hàng đợi
+   và chuyển lại sang trạng thái chạy.
+   Giá trị mà goroutine gửi vừa được lấy ra định gửi sẽ được đưa vào buffer channel.
+   Goroutine nhận `R` tiếp tục chạy.
+   Trong trường hợp này, thao tác nhận từ channel được gọi là **thao tác không chặn**.
+*.
+   Nếu không (buffer giá trị đang rỗng), nhưng hàng đợi goroutine gửi không rỗng
+   (khi đó channel phải là unbuffered), goroutine nhận `R` lấy một goroutine gửi khỏi hàng đợi
+   và nhận giá trị mà goroutine vừa lấy ra định gửi.
+   Goroutine gửi vừa được lấy ra hết chờ và chuyển lại sang trạng thái chạy.
+   Goroutine nhận `R` tiếp tục chạy.
+   Trong trường hợp này, thao tác nhận từ channel được gọi là **thao tác không chặn**.
+*.
+   Nếu cả buffer giá trị lẫn hàng đợi goroutine gửi đều rỗng,
+   goroutine `R` được đưa vào hàng đợi goroutine nhận và chuyển sang trạng thái chờ.
+   Nó có thể được chuyển lại sang trạng thái chạy khi một goroutine khác gửi giá trị
+   vào channel sau đó.
+   Trong trường hợp này, thao tác nhận từ channel được gọi là **thao tác chặn**.
+
+**Trường hợp quy tắc channel B**:
+khi goroutine `S` gửi giá trị vào channel khác nil chưa đóng,
+`S` trước tiên lấy lock gắn với channel,
+sau đó thực hiện các bước dưới đây cho đến khi thỏa mãn điều kiện.
+*.
+   Nếu hàng đợi goroutine nhận không rỗng (khi đó buffer giá trị phải rỗng),
+   goroutine gửi `S` lấy một goroutine nhận khỏi hàng đợi
+   và gửi giá trị cho goroutine nhận vừa lấy ra.
+   Goroutine nhận đó hết chờ và trở lại trạng thái chạy.
+   Goroutine gửi `S` tiếp tục chạy.
+   Trong trường hợp này, thao tác gửi vào channel được gọi là **thao tác không chặn**.
+*.
+   Nếu không (hàng đợi goroutine nhận đang rỗng) và buffer giá trị chưa đầy
+   (khi đó hàng đợi goroutine gửi cũng phải rỗng),
+   giá trị mà goroutine `S` định gửi được đưa vào buffer,
+   rồi `S` tiếp tục chạy.
+   Trong trường hợp này, thao tác gửi vào channel được gọi là **thao tác không chặn**.
+*.
+   Nếu hàng đợi goroutine nhận rỗng và buffer giá trị đã đầy,
+   goroutine gửi `S` được đưa vào hàng đợi goroutine gửi và chuyển sang trạng thái chờ.
+   Nó có thể trở lại trạng thái chạy khi một goroutine khác nhận giá trị từ channel.
+   Trong trường hợp này, thao tác gửi vào channel được gọi là **thao tác chặn**.
+
+Như đã nói ở trên, khi channel khác nil đã đóng, gửi giá trị vào đó sẽ gây runtime panic
+trong goroutine hiện tại.
+Lưu ý, gửi dữ liệu vào channel đã đóng được xem là **thao tác không chặn**.
+
+**Trường hợp thao tác channel C**:
+khi một goroutine đóng channel khác nil chưa đóng,
+sau khi lấy lock của channel, nó sẽ thực hiện hai bước sau theo đúng thứ tự.
+*.
+   Nếu hàng đợi goroutine nhận không rỗng (khi đó buffer giá trị phải rỗng),
+   lần lượt lấy từng goroutine ra khỏi hàng đợi nhận.
+   Mỗi goroutine nhận zero value của kiểu phần tử channel rồi được chuyển lại sang trạng thái chạy.
+*.
+   Nếu hàng đợi goroutine gửi không rỗng,
+   lần lượt lấy từng goroutine ra khỏi hàng đợi gửi; mỗi goroutine sẽ panic
+   vì gửi vào channel đã đóng.
+   Đây là lý do cần tránh gửi và đóng đồng thời trên cùng một channel.
+   Thực tế, khi bật tùy chọn phát hiện data race của lệnh `go` (`-race`),
+   trường hợp gửi và đóng đồng thời có thể bị phát hiện lúc chạy và gây runtime panic.
+
+    === ... tùy chọn phát hiện data race :: https://golang.org/doc/articles/race_detector.html
+
+Lưu ý: sau khi channel đóng, các giá trị đã được đưa vào buffer vẫn còn đó.
+Xem phần giải thích ngay sau đây về trường hợp D để biết chi tiết.
+
+**Trường hợp thao tác channel D**:
+sau khi channel khác nil đóng, thao tác nhận từ channel sẽ không bao giờ chặn.
+Các giá trị trong buffer vẫn có thể được nhận; giá trị bool tùy chọn thứ hai trả về vẫn là `true`.
+Khi đã lấy và nhận hết các giá trị trong buffer, mọi thao tác nhận tiếp theo trên channel
+sẽ nhận vô hạn zero value của kiểu phần tử channel.
+Như đã nói ở trên, kết quả trả về thứ hai tùy chọn của thao tác nhận là boolean không định kiểu,
+cho biết kết quả thứ nhất (giá trị nhận được) có được gửi trước khi channel đóng hay không.
+Nếu kết quả thứ hai là `false`, kết quả thứ nhất phải là zero value của kiểu phần tử channel.
+
+Hiểu thế nào là thao tác gửi hoặc nhận channel chặn và không chặn
+là điều quan trọng để nắm cơ chế khối điều khiển `select` sẽ giới thiệu ở phần sau.
+
+Trong các giải thích trên, nếu một goroutine được lấy khỏi hàng đợi gửi hoặc nhận của channel,
+và goroutine đó bị chặn khi được đưa vào hàng đợi trong khối mã điều khiển __`select`__,
+thì nó sẽ được chuyển lại sang trạng thái chạy ở bước // 9 // của
+__quá trình thực thi khối mã điều khiển `select`__.
+Goroutine đó có thể được lấy khỏi hàng đợi tương ứng của nhiều channel
+tham gia vào khối mã điều khiển `select`.
+
+    === khối mã điều khiển `select` :: #select
+    === quá trình thực thi khối mã điều khiển `select` :: #select-implementation
+
+Từ các giải thích trên, có thể rút ra một số đặc điểm về các hàng đợi bên trong channel.
+*.
+   Nếu channel đã đóng, cả hàng đợi goroutine gửi lẫn nhận đều phải rỗng,
+   nhưng hàng đợi buffer giá trị có thể vẫn còn dữ liệu.
+*.
+   Tại mọi thời điểm, nếu buffer giá trị không rỗng,
+   hàng đợi goroutine nhận phải rỗng.
+*.
+   Tại mọi thời điểm, nếu buffer giá trị chưa đầy,
+   hàng đợi goroutine gửi phải rỗng.
+*.
+   Nếu channel có buffer thì tại mọi thời điểm,
+   ít nhất một trong hai hàng đợi goroutine gửi/nhận phải rỗng (có thể cả hai).
+*.
+   Nếu channel unbuffered, thông thường một trong hai hàng đợi goroutine gửi và nhận phải rỗng.
+   Có một ngoại lệ: khi thực thi khối mã điều khiển __`select`__,
+   một goroutine có thể được đưa vào cả hai hàng đợi.
+
+###========== Một số ví dụ sử dụng channel
+
+Sau khi đọc phần trên, hãy xem một số ví dụ dùng channel để hiểu rõ hơn.
+
+Ví dụ request/response đơn giản.
+Hai goroutine trong ví dụ giao tiếp với nhau
+thông qua một channel unbuffered.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	c := make(chan int) // channel unbuffered
+	go func(ch chan<- int, x int) {
+		time.Sleep(time.Second)
+		// <-ch    // không biên dịch được
+		// Gửi giá trị và chờ đến khi giá trị được nhận.
+		ch <- x*x // đã gửi giá trị 9
+	}(c, 3)
+	done := make(chan struct{})
+	go func(ch <-chan int) {
+		// Chờ đến khi nhận được 9.
+		n := <-ch
+		fmt.Println(n) // 9
+		// ch <- 123   // không biên dịch được
+		time.Sleep(time.Second)
+		done <- struct{}{}
+	}(c)
+	// Chờ tại đây đến khi có giá trị được nhận bởi
+	// channel "done".
+	<-done
+	fmt.Println("bye")
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+9
+bye
+'''
+
+Ví dụ minh họa cách dùng channel buffered.
+Chương trình này không chạy đồng thời, chỉ trình bày cách dùng channel buffered.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	c := make(chan int, 2) // channel buffered
+	c <- 3
+	c <- 5
+	close(c)
+	fmt.Println(len(c), cap(c)) // 2 2
+	x, ok := <-c
+	fmt.Println(x, ok) // 3 true
+	fmt.Println(len(c), cap(c)) // 1 2
+	x, ok = <-c
+	fmt.Println(x, ok) // 5 true
+	fmt.Println(len(c), cap(c)) // 0 2
+	x, ok = <-c
+	fmt.Println(x, ok) // 0 false
+	x, ok = <-c
+	fmt.Println(x, ok) // 0 false
+	fmt.Println(len(c), cap(c)) // 0 2
+	close(c) // panic!
+	// Thao tác gửi cũng sẽ panic nếu
+	// bỏ lời gọi close ở trên.
+	c <- 7
+}
+'''
+
+Một trận bóng đá không bao giờ kết thúc.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	var ball = make(chan string)
+	kickBall := func(playerName string) {
+		for {
+			fmt.Println(<-ball, "kicked the ball.")
+			time.Sleep(time.Second)
+			ball <- playerName
+		}
+	}
+	go kickBall("John")
+	go kickBall("Alice")
+	go kickBall("Bob")
+	go kickBall("Emily")
+	ball <- "referee" // bắt đầu trận đấu
+	var c chan bool   // nil
+	<-c               // chặn tại đây vô thời hạn
+}
+'''
+
+Đọc __các trường hợp sử dụng channel__
+để xem thêm ví dụ.
+
+    === các trường hợp sử dụng channel :: channel-use-cases.tmd
+
+###========== Giá trị phần tử channel được truyền bằng cách sao chép
+
+Khi chuyển một giá trị từ goroutine này sang goroutine khác,
+giá trị đó sẽ được sao chép ít nhất một lần.
+Nếu giá trị được chuyển từng nằm trong buffer channel,
+quá trình truyền sẽ có hai lần sao chép.
+Lần thứ nhất sao chép giá trị từ goroutine gửi vào buffer;
+lần thứ hai sao chép từ buffer sang goroutine nhận.
+Tương tự phép gán giá trị và truyền đối số hàm,
+khi truyền một giá trị, __chỉ phần trực tiếp của nó được sao chép__.
+
+    === ... được sao chép :: value-part.tmd#about-value-copy
+
+Với Go compiler chuẩn, kích thước kiểu phần tử channel phải nhỏ hơn `65536`.
+Tuy nhiên, nhìn chung không nên tạo channel có kiểu phần tử kích thước lớn,
+để tránh chi phí sao chép quá cao khi chuyển giá trị giữa các goroutine.
+Nếu giá trị truyền đi quá lớn, tốt hơn nên dùng kiểu phần tử là pointer
+để tránh chi phí sao chép giá trị lớn.
+
+###========== Về garbage collection đối với channel và goroutine
+
+Lưu ý, channel được tham chiếu bởi mọi goroutine trong hàng đợi gửi hoặc nhận của nó.
+Vì vậy, nếu một trong hai hàng đợi không rỗng thì channel không thể được garbage collection.
+Mặt khác, nếu một goroutine bị chặn và nằm trong hàng đợi gửi hoặc nhận của channel,
+thì goroutine đó cũng không thể được garbage collection,
+kể cả khi chỉ goroutine này tham chiếu đến channel.
+Thực tế, goroutine chỉ có thể được garbage collection sau khi đã kết thúc.
+
+###========== Thao tác gửi và nhận channel là câu lệnh đơn giản
+
+Thao tác gửi và nhận channel là __câu lệnh đơn giản__.
+Thao tác nhận từ channel luôn có thể dùng làm biểu thức một giá trị.
+Câu lệnh đơn giản và biểu thức có thể xuất hiện ở một số vị trí nhất định
+trong __khối điều khiển cơ bản__.
+
+    === câu lệnh đơn giản :: expressions-and-statements.tmd#simple-statements
+    === các khối điều khiển cơ bản :: control-flows.tmd
+
+Ví dụ trong đó thao tác gửi và nhận channel
+xuất hiện dưới dạng câu lệnh đơn giản trong hai khối điều khiển `for`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	fibonacci := func() chan uint64 {
+		c := make(chan uint64)
+		go func() {
+			var x, y uint64 = 0, 1
+			for ; y < (1 << 63); c <- y { // ở đây
+				x, y = y, x+y
+			}
+			close(c)
+		}()
+		return c
+	}
+	c := fibonacci()
+	for x, ok := <-c; ok; x, ok = <-c { // ở đây
+		time.Sleep(time.Second)
+		fmt.Println(x)
+	}
+}
+'''
+
+@@@ #range
+###========== `for-range` với channel
+
+Khối điều khiển `for-range` có thể áp dụng cho channel.
+Vòng lặp lần lượt nhận các giá trị được gửi vào channel
+cho đến khi channel đóng và buffer giá trị trở nên rỗng.
+Cú pháp `for-range` với array, slice và map cho phép nhiều biến lặp.
+Tuy nhiên, khi áp dụng `for-range` cho channel,
+bạn chỉ có thể dùng tối đa một biến lặp để lưu giá trị nhận được.
+
+@@@ .line-numbers
+''' go
+for v := range aChannel {
+	// sử dụng v
+}
+'''
+
+tương đương với
+
+@@@ .line-numbers
+''' go
+for {
+	v, ok = <-aChannel
+	if !ok {
+		break
+	}
+	// sử dụng v
+}
+'''
+
+Dĩ nhiên, giá trị `aChannel` ở đây không được là channel chỉ gửi.
+Nếu nó là channel nil, vòng lặp sẽ chặn vô thời hạn.
+
+Ví dụ, có thể viết gọn khối `for` thứ hai trong ví dụ
+ở phần trước như sau:
+
+@@@ .line-numbers
+''' go
+	for x := range c {
+		time.Sleep(time.Second)
+		fmt.Println(x)
+	}
+'''
+
+
+@@@ #select
+###========== Khối điều khiển `select-case`
+
+Cú pháp khối mã `select-case` được thiết kế riêng cho channel.
+Cú pháp khá giống khối `switch-case`.
+Chẳng hạn, `select-case` có thể có nhiều nhánh `case` và tối đa một nhánh `default`.
+Tuy nhiên, hai cấu trúc này cũng có một số khác biệt rõ ràng.
+*
+   Không được đặt biểu thức hay câu lệnh sau từ khóa `select`
+   (trước dấu `{`).
+*
+   Không được dùng câu lệnh `fallthrough` trong các nhánh `case`.
+*
+   Mỗi câu lệnh theo sau từ khóa `case` trong khối `select-case`
+   phải là thao tác nhận từ channel hoặc câu lệnh gửi vào channel.
+   Thao tác nhận từ channel có thể xuất hiện làm giá trị nguồn của phép gán đơn giản.
+   Từ đây, thao tác channel sau từ khóa `case` được gọi là thao tác `case`.
+*
+   Nếu có một hay nhiều thao tác `case` không chặn,
+   Go runtime sẽ **chọn ngẫu nhiên một thao tác không chặn để thực thi**,
+   rồi tiếp tục chạy nhánh `case` tương ứng.
+*
+   Nếu mọi thao tác `case` trong khối `select-case` đều chặn,
+   nhánh `default` sẽ được chọn nếu có.
+   Nếu không có nhánh `default`, goroutine hiện tại được đưa vào hàng đợi gửi hoặc nhận
+   tương ứng của mọi channel tham gia các thao tác `case`,
+   rồi chuyển sang trạng thái chờ.
+
+Theo quy tắc, khối `select-case` không có nhánh nào, tức `select{}`,
+sẽ khiến goroutine hiện tại chờ vô thời hạn.
+
+Chương trình sau chắc chắn đi vào nhánh `default`.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var c chan struct{} // nil
+	select {
+	case <-c:             // thao tác chặn
+	case c <- struct{}{}: // thao tác chặn
+	default:
+		fmt.Println("Go here.")
+	}
+}
+'''
+
+Ví dụ minh họa cách dùng try-send và try-receive:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	c := make(chan string, 2)
+	trySend := func(v string) {
+		select {
+		case c <- v:
+		default: // chạy vào đây nếu c đầy.
+		}
+	}
+	tryReceive := func() string {
+		select {
+		case v := <-c: return v
+		default: return "-" // chạy vào đây nếu c rỗng
+		}
+	}
+	trySend("Hello!") // gửi thành công
+	trySend("Hi!")    // gửi thành công
+	// Gửi thất bại nhưng không bị chặn.
+	trySend("Bye!")
+	// Hai dòng tiếp theo sẽ
+	// đều nhận thành công.
+	fmt.Println(tryReceive()) // Hello!
+	fmt.Println(tryReceive()) // Hi!
+	// Dòng tiếp theo nhận thất bại.
+	fmt.Println(tryReceive()) // -
+}
+'''
+
+Ví dụ sau có 50% khả năng gây panic.
+Trong ví dụ này, cả hai thao tác `case` đều không chặn.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	c := make(chan struct{})
+	close(c)
+	select {
+	case c <- struct{}{}:
+		// Panic nếu nhánh case đầu tiên được chọn.
+	case <-c:
+	}
+}
+'''
+
+@@@ #select-implementation
+###========== Cách triển khai cơ chế select
+
+Cơ chế select là một tính năng quan trọng và độc đáo của Go.
+Dưới đây là các bước __triển khai cơ chế select
+bởi Go runtime chính thức__.
+
+    === cách triển khai cơ chế select ... :: https://github.com/golang/go/blob/master/src/runtime/select.go
+
+{ %%
+Nếu ID bước thay đổi, hãy cập nhật cả các tham chiếu ở trên.
+}
+
+Để thực thi khối `select-case`, có các bước sau:
+*.
+   đánh giá tất cả biểu thức channel liên quan và biểu thức giá trị có thể được gửi trong các thao tác `case`,
+   theo thứ tự từ trên xuống dưới, từ trái sang phải.
+   Chưa cần đánh giá các giá trị đích của thao tác nhận (dùng làm giá trị nguồn) trong phép gán.
+*.
+   xáo trộn ngẫu nhiên thứ tự các nhánh sẽ được thăm dò ở bước // 5 //.
+   Nhánh `default` luôn được đặt cuối thứ tự kết quả.
+   Các thao tác `case` có thể dùng trùng channel.
+*.
+   sắp xếp tất cả channel liên quan trong các thao tác `case` để tránh deadlock (với goroutine khác) ở bước tiếp theo.
+   Trong `N` channel đầu tiên của kết quả sắp xếp sẽ không có channel trùng,
+   với `N` là số channel liên quan trong các thao tác `case`.
+   Dưới đây, **// thứ tự lock channel //** là khái niệm chỉ `N` channel đầu tiên này.
+*.
+   lấy lock của tất cả channel liên quan theo thứ tự lock channel tạo ra ở bước trước.
+*.
+   thăm dò từng nhánh trong khối select theo thứ tự ngẫu nhiên tạo ra ở bước // 2 //:
+   {
+   *.
+      nếu đây là nhánh `case` và thao tác channel tương ứng gửi giá trị vào channel đã đóng,
+      nhả lock tất cả channel theo thứ tự ngược với thứ tự lock channel và khiến goroutine hiện tại panic.
+      Chuyển đến bước // 12 //.
+   *.
+      nếu đây là nhánh `case` và thao tác channel tương ứng không chặn,
+      thực hiện thao tác đó, nhả lock tất cả channel theo thứ tự ngược với thứ tự lock,
+      rồi chạy phần thân của nhánh `case` tương ứng.
+      Thao tác channel có thể đánh thức goroutine khác đang chờ.
+      Chuyển đến bước // 12 //.
+   *.
+      nếu đây là nhánh `default`, nhả lock tất cả channel theo thứ tự ngược với thứ tự lock,
+      rồi chạy phần thân nhánh `default`.
+      Chuyển đến bước // 12 //.
+
+   }
+   (Đến đây, không có nhánh `default` và mọi thao tác `case` đều chặn.)
+*.
+   đưa (enqueue) goroutine hiện tại (kèm thông tin về nhánh `case` tương ứng)
+   vào hàng đợi nhận hoặc gửi của channel liên quan ở mỗi thao tác `case`.
+   Có thể đưa goroutine hiện tại vào hàng đợi của cùng một channel nhiều lần,
+   vì các thao tác `case` có thể cùng dùng một channel.
+*.
+   đưa goroutine hiện tại vào trạng thái chờ và nhả lock các channel theo thứ tự ngược với thứ tự lock.
+*.
+   chờ cho đến khi thao tác channel khác đánh thức goroutine hiện tại, ...
+*.
+   goroutine hiện tại được đánh thức bởi một thao tác channel trong goroutine khác.
+   Thao tác kia có thể là đóng channel hoặc gửi/nhận channel.
+   Nếu đó là thao tác gửi/nhận channel, phải có thao tác nhận/gửi channel trong nhánh `case`
+   (thuộc khối `select-case` đang xét) phối hợp với nó bằng cách truyền giá trị.
+   Trong quá trình phối hợp, goroutine hiện tại được lấy khỏi hàng đợi gửi/nhận của channel.
+*.
+   lấy lock tất cả channel liên quan theo thứ tự lock channel.
+*.
+   lấy goroutine hiện tại khỏi hàng đợi nhận hoặc gửi của channel liên quan
+   trong từng thao tác `case`,
+   {
+   *.
+      nếu goroutine hiện tại được đánh thức do thao tác đóng channel, chuyển đến bước // 5 //.
+   *.
+      nếu goroutine hiện tại được đánh thức bởi thao tác gửi/nhận channel,
+      nhánh `case` tương ứng với thao tác nhận/gửi phối hợp đã được tìm thấy khi lấy khỏi hàng đợi.
+      Vì vậy, chỉ cần nhả lock tất cả channel theo thứ tự ngược với thứ tự lock
+      rồi thực thi nhánh `case` tương ứng.
+   }
+
+*.
+   hoàn tất.
+
+Từ cách triển khai này, ta biết rằng
+*.
+   một goroutine có thể đồng thời nằm trong hàng đợi gửi và hàng đợi nhận của nhiều channel.
+   Thậm chí, nó có thể cùng lúc nằm trong hàng đợi gửi và hàng đợi nhận của cùng một channel.
+*.
+   khi goroutine đang chờ tại khối mã `select-case` được chạy lại,
+   nó sẽ bị gỡ khỏi mọi hàng đợi gửi và nhận của tất cả channel
+   tham gia vào các thao tác channel theo sau từ khóa `case`
+   trong khối `select-case`.
+
+###========== Thêm
+
+Bạn có thể tìm thêm trường hợp sử dụng channel trong __bài viết này`` channel-use-cases.tmd__.
+
+Dù channel giúp ta dễ viết __code đồng thời đúng__,
+như các kỹ thuật đồng bộ dữ liệu khác,
+channel không thể ngăn ta __viết code đồng thời không phù hợp__.
+
+Channel không phải lúc nào cũng là giải pháp tốt nhất cho mọi trường hợp cần đồng bộ dữ liệu.
+Hãy đọc __bài viết này`` concurrent-synchronization-more.tmd__
+và __bài viết này`` concurrent-atomic-operation.tmd__
+để tìm hiểu thêm các kỹ thuật đồng bộ hóa trong Go.
+
+    === code đồng thời đúng một cách dễ dàng :: channel-closing.tmd
+    === viết code đồng thời không phù hợp :: concurrent-common-mistakes.tmd
+

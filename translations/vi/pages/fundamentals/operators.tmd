@@ -1,0 +1,716 @@
+### Các toán tử phổ biến
+
+Phép toán tử là phép toán sử dụng nhiều loại toán tử.
+Bài viết này giới thiệu những toán tử phổ biến trong Go.
+Các toán tử khác sẽ được giới thiệu trong những bài viết sau.
+
+###=========== Một số lưu ý về cách diễn đạt trong phần giải thích toán tử
+
+Bài viết này chỉ giới thiệu các toán tử số học, toán tử bit,
+toán tử so sánh, toán tử boolean và toán tử nối chuỗi.
+Các toán tử này là toán tử hai ngôi hoặc toán tử một ngôi.
+Phép toán với toán tử hai ngôi nhận hai toán hạng,
+còn phép toán với toán tử một ngôi chỉ nhận một toán hạng.
+
+Mỗi phép toán tử được giới thiệu trong bài viết này đều trả về một kết quả.
+
+Bài viết này không nhắm đến độ chính xác tuyệt đối trong một số cách diễn đạt.
+Ví dụ, khi nói toán tử hai ngôi yêu cầu kiểu của hai toán hạng giống nhau,
+ý ở đây là:
+*
+   nếu cả hai toán hạng đều là giá trị có kiểu,
+   thì chúng phải cùng kiểu,
+   hoặc một toán hạng có thể được chuyển đổi ngầm sang kiểu của toán hạng kia.
+*
+   nếu chỉ một toán hạng có kiểu,
+   thì toán hạng còn lại (không định kiểu) phải biểu diễn được
+   thành giá trị thuộc kiểu của toán hạng có kiểu,
+   hoặc giá trị thuộc kiểu mặc định của toán hạng còn lại
+   có thể được chuyển đổi ngầm sang kiểu của toán hạng có kiểu.
+*
+   nếu cả hai toán hạng đều là giá trị không định kiểu,
+   thì chúng phải cùng là giá trị boolean,
+   cùng là giá trị chuỗi hoặc cùng là giá trị số cơ bản.
+
+Tương tự, khi nói một toán tử (dù là hai ngôi hay một ngôi)
+yêu cầu kiểu của một toán hạng thuộc một kiểu nhất định,
+ý ở đây là:
+*
+   nếu toán hạng có kiểu, thì kiểu của nó phải là,
+   hoặc có thể được chuyển đổi ngầm sang, kiểu đó.
+*
+   nếu toán hạng không định kiểu, giá trị đó phải biểu diễn được
+   thành giá trị thuộc kiểu đó,
+   hoặc giá trị thuộc kiểu mặc định của toán hạng
+   có thể được chuyển đổi ngầm sang kiểu đó.
+
+@@@ #constant-expression
+###=========== Biểu thức hằng
+
+Trước khi giới thiệu các loại toán tử,
+ta cần biết biểu thức hằng là gì
+và một đặc điểm trong việc tính giá trị biểu thức hằng.
+Biểu thức sẽ được giải thích trong bài viết sau
+__biểu thức và câu lệnh__.
+Hiện tại, chỉ cần biết rằng phần lớn phép toán được đề cập
+trong bài viết này là biểu thức.
+
+    === biểu thức và câu lệnh :: expressions-and-statements.tmd
+
+Nếu tất cả toán hạng trong một biểu thức đều là hằng,
+thì biểu thức đó được gọi là biểu thức hằng.
+Mọi biểu thức hằng đều được tính tại thời điểm biên dịch.
+Kết quả tính biểu thức hằng vẫn là một hằng.
+
+Chỉ cần có một toán hạng trong biểu thức không phải hằng,
+thì biểu thức đó được gọi là biểu thức không hằng.
+
+###=========== Toán tử số học
+
+Go hỗ trợ năm toán tử số học hai ngôi cơ bản:
+
+#  ### Toán tử
+   ### Tên
+   ### Yêu cầu đối với hai toán hạng
+   ---------------------
+   ### `+`
+   ;;; phép cộng
+   { :4
+   Hai toán hạng phải đều là giá trị thuộc cùng một kiểu số cơ bản.
+   }
+   ---------------------
+   ### `-`
+   ;;; phép trừ
+   ---------------------
+   ### `*`
+   ;;; phép nhân
+   ---------------------
+   ### `/`
+   ;;; phép chia
+   ---------------------
+   ### `%`
+   ;;; phép lấy phần dư
+   {
+   Hai toán hạng phải đều là giá trị thuộc cùng một kiểu số nguyên cơ bản.
+   }
+
+Năm toán tử này cũng thường lần lượt được gọi là toán tử **tổng**,
+**hiệu**, **tích**, **thương** và **modulo**.
+Go 101 sẽ không giải thích chi tiết cách các phép toán này hoạt động.
+
+Go hỗ trợ sáu toán tử số học bit hai ngôi:
+
+#  ### Toán tử
+   ### Tên
+   ### Yêu cầu đối với hai toán hạng và giải thích cơ chế
+   -----------------------------
+   ### `&`
+   @@@ valign="middle" style="white-space: nowrap;"
+   ;;; bitwise and
+   { << :4
+   Hai toán hạng phải đều là giá trị thuộc cùng một kiểu số nguyên.
+
+   Giải thích cơ chế (giá trị có chỉ số dưới `2` là dạng literal nhị phân của giá trị):
+   *
+      ^` 1100$$2$$ & 1010$$2$$ `
+      cho kết quả ^` 1000$$2$$ `
+   *
+      ^` 1100$$2$$ | 1010$$2$$ `
+      cho kết quả ^` 1110$$2$$ `
+   *
+      ^` 1100$$2$$ ^ 1010$$2$$ `
+      cho kết quả ^` 0110$$2$$ `
+   *
+      ^` 1100$$2$$ &^ 1010$$2$$ `
+      cho kết quả ^` 0100$$2$$ `
+   }
+   -----------------------------
+   ### `|`
+   ;;; bitwise or
+   -----------------------------
+   ### `^`
+   ;;; bitwise xor
+   -----------------------------
+   ### `&^`
+   ;;; bitwise clear
+   -----------------------------
+   ### `<<`
+   ;;; dịch bit trái
+   { << :2
+   Toán hạng trái phải là số nguyên
+   và toán hạng phải cũng phải là số nguyên (nếu là hằng thì phải không âm),
+   kiểu của chúng không bắt buộc phải giống nhau.
+   (Lưu ý: trước Go 1.13, toán hạng phải phải là số nguyên không dấu hoặc
+   một hằng số nguyên __không định kiểu__ biểu diễn được thành giá trị `uint`.)
+
+       === không định kiểu :: constants-and-variables.tmd#untyped-value
+
+   Toán hạng phải âm (phải là giá trị không hằng) sẽ gây panic lúc chạy.
+
+   Giải thích cơ chế:
+   *
+      ^` 1100$$2$$ << 3 `
+      cho kết quả ^` 1100000$$2$$ `
+   *
+      ^` 1100$$2$$ >> 3 `
+      cho kết quả ^` 1$$2$$ `
+
+   Lưu ý: trong phép dịch bit phải, mọi bit trống được tạo ra
+   ở bên trái đều được điền bằng bit dấu (bit cao nhất) của toán hạng trái.
+   Ví dụ, nếu toán hạng trái là giá trị `int8` `-128`,
+   hay ^` 10000000$$2$$ ` ở dạng literal nhị phân,
+   thì ^` 10000000$$2$$ >> 2 ` cho kết quả
+   ^` 11100000$$2$$ `, tức là `-32`.
+   }
+   -----------------------------
+   ### `>>`
+   ;;; dịch bit phải
+
+Go cũng hỗ trợ ba toán tử số học một ngôi:
+
+#  ### Toán tử
+   ### Tên
+   ### Giải thích
+   -----------------------------
+   ### `+`
+   ;;; số dương
+   { <<
+   `+n` tương đương với `0 + n`.
+   }
+   -----------------------------
+   ### `-`
+   ;;; số âm
+   { <<
+   `-n` tương đương với `0 - n`.
+   }
+   -----------------------------
+   ### `^`
+   @@@ valign="middle" style="white-space: nowrap;"
+   ;;; bù bit
+       \\ (bitwise not)
+   { <<
+   `^n` tương đương với `m ^ n`,
+   trong đó `m` là một giá trị có tất cả các bit bằng 1.
+   Ví dụ, nếu kiểu của `n` là `int8` thì `m` là `-1`,
+   còn nếu kiểu của `n` là `uint8` thì `m` là `0xFF`.
+   }
+
+Lưu ý:
+*
+   trong nhiều ngôn ngữ khác, toán tử bù bit được ký hiệu là `~`.
+*
+   giống nhiều ngôn ngữ khác, toán tử cộng hai ngôi `+`
+   cũng có thể được dùng làm toán tử **nối chuỗi**, sẽ giới thiệu bên dưới.
+*
+   giống C và C++, toán tử nhân hai ngôi `*` cũng có thể được dùng làm
+   toán tử **giải tham chiếu con trỏ**, còn toán tử bitwise-and `&`
+   có thể dùng để **lấy địa chỉ**.
+   Hãy đọc __con trỏ trong Go__ để biết chi tiết sau.
+       === con trỏ trong Go :: pointer.tmd
+*
+   không giống Java, Go hỗ trợ kiểu số nguyên không dấu,
+   vì vậy Go không có toán tử dịch phải không dấu `>>>`.
+*
+   Go không có toán tử lũy thừa; hãy dùng hàm `Pow`
+   trong package chuẩn `math`.
+   Package và lệnh import sẽ được giới thiệu trong bài tiếp theo
+   __package và import__.
+       === package và import :: packages-and-imports.tmd
+*
+   toán tử xóa bit `&^` là toán tử riêng của Go.
+   `m &^ n` tương đương với `m & (^n)`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+func main() {
+	var (
+		a, b float32 = 12.0, 3.14
+		c, d int16   = 15, -6
+		e	uint8   = 7
+	)
+
+	// Các phép toán dưới đây biên dịch được.
+	_ = 12 + 'A' // hai toán hạng số không định kiểu
+	_ = 12 - a   // một toán hạng không định kiểu và một có kiểu
+	_ = a * b    // hai toán hạng có kiểu
+	_ = c % d
+	_, _ = c + int16(e), uint8(c) + e
+	_, _, _, _ = a / b, c / d, -100 / -9, 1.23 / 1.2
+	_, _, _, _ = c | d, c & d, c ^ d, c &^ d
+	_, _, _, _ = d << e, 123 >> e, e >> 3, 0xF << 0
+	_, _, _, _ = -b, +c, ^e, ^-1
+
+	// Các phép toán sau không biên dịch được.
+	_ = a % b   // lỗi: a và b không phải số nguyên
+	_ = a | b   // lỗi: a và b không phải số nguyên
+	_ = c + e   // lỗi: kiểu không khớp
+	_ = b >> 5  // lỗi: b không phải số nguyên
+	_ = c >> -5 // lỗi: -5 không biểu diễn được thành uint
+
+	_ = e << uint(c) // biên dịch được
+	_ = e << c       // chỉ biên dịch được từ Go 1.13
+	_ = e << -c      // chỉ biên dịch được từ Go 1.13,
+	                 // sẽ gây panic lúc chạy.
+	_ = e << -1      // lỗi: toán hạng phải là số âm
+}
+'''
+
+###----------- Về tràn số
+
+Giá trị hằng có kiểu không được phép tràn,
+nhưng giá trị không hằng và hằng không định kiểu thì được phép tràn,
+dù là kết quả trung gian hay cuối cùng.
+Với giá trị không hằng, phần bit vượt quá bị cắt bỏ (hoặc quay vòng),
+nhưng phần tràn của hằng không định kiểu (theo kiểu mặc định)
+không bị cắt bỏ (hoặc quay vòng).
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+// Kết quả là các giá trị không hằng.
+var a, b uint8 = 255, 1
+// Biên dịch được; các bit tràn phía cao bị cắt bỏ.
+var c = a + b  // c == 0
+// Biên dịch được; các bit tràn phía cao bị cắt bỏ.
+var d = a << b // d == 254
+
+// Kết quả là các hằng không định kiểu.
+const X = 0x1FFFFFFFF * 0x1FFFFFFFF // tràn int
+const R = 'a' + 0x7FFFFFFF          // tràn rune
+// Hai dòng trên đều biên dịch được, dù hai giá trị
+// không định kiểu X và R đều vượt quá kiểu mặc định tương ứng.
+
+// Kết quả phép toán hoặc phép chuyển đổi là giá trị có kiểu.
+// Các dòng dưới đây đều không biên dịch được.
+var e = X // lỗi: hằng X không định kiểu vượt quá int
+var h = R // lỗi: hằng 2147483744 vượt quá rune
+const Y = 128 - int8(1)  // lỗi: 128 vượt quá int8
+const Z = uint8(255) + 1 // lỗi: 256 tràn uint8
+'''
+
+###----------- Về kết quả của phép toán số học
+
+Ngoại trừ phép dịch bit, kết quả của phép toán số học hai ngôi
+*
+   là giá trị có cùng kiểu với hai toán hạng
+   nếu cả hai toán hạng đều có cùng kiểu.
+*
+   là giá trị có cùng kiểu với toán hạng có kiểu
+   nếu chỉ một toán hạng có kiểu.
+   Khi tính toán, giá trị không định kiểu còn lại được suy ra
+   thành giá trị thuộc kiểu của toán hạng có kiểu.
+   Nói cách khác, toán hạng không định kiểu được chuyển đổi ngầm
+   sang kiểu của toán hạng có kiểu.
+*
+   vẫn là giá trị không định kiểu nếu cả hai toán hạng đều không định kiểu.
+   Kiểu mặc định của kết quả là một trong hai kiểu mặc định,
+   cụ thể là kiểu đứng sau trong danh sách: `int`, `rune`,
+   `float64`, `complex128`.
+   Ví dụ, nếu kiểu mặc định của một toán hạng không định kiểu là `int`,
+   còn toán hạng kia là `rune`, kiểu mặc định của kết quả là `rune`.
+
+Quy tắc xác định kết quả của phép dịch bit hơi phức tạp.
+Trước hết, kết quả luôn là giá trị số nguyên.
+Kết quả có kiểu hay không tùy thuộc vào tình huống cụ thể.
+*
+   Nếu toán hạng trái là giá trị có kiểu (giá trị số nguyên),
+   kết quả có cùng kiểu với toán hạng trái.
+*
+   Nếu toán hạng trái là giá trị không định kiểu và toán hạng phải là hằng,
+   toán hạng trái luôn được xem là số nguyên. Nếu kiểu mặc định của nó
+   không phải kiểu số nguyên, nó phải biểu diễn được thành số nguyên
+   không định kiểu và kiểu mặc định sẽ được xem là `int`.
+   Khi đó, kết quả cũng là giá trị không định kiểu và kiểu mặc định
+   giống với kiểu mặc định của toán hạng trái.
+*
+   Nếu toán hạng trái là giá trị không định kiểu và toán hạng phải
+   là số nguyên không hằng, toán hạng trái trước tiên được chuyển
+   sang kiểu mà nó sẽ có nếu thay phép dịch bit bằng chính toán hạng trái.
+   Kết quả là giá trị có kiểu được giả định đó.
+
+Ví dụ:
+@@@ .line-numbers;must-line-numbers
+''' go
+func main() {
+	// Ba giá trị không định kiểu. Kiểu mặc định của chúng là:
+	// int, rune(int32), complex64.
+	const X, Y, Z = 2, 'A', 3i
+
+	var a, b int = X, Y // hai giá trị có kiểu.
+
+	// Kiểu của d là kiểu mặc định của Y: rune.
+	d := X + Y
+	// Kiểu của e là kiểu của a: int.
+	e := Y - a
+	// Kiểu của f là kiểu của a và b: int.
+	f := a * b
+	// Kiểu của g là kiểu mặc định của Z: complex64.
+	g := Z * Y
+
+	// Output: 2 65 (+0.000000e+000+3.000000e+000i)
+	println(X, Y, Z)
+	// Output: 67 63 130 (+0.000000e+000+1.950000e+002i)
+	println(d, e, f, g)
+}
+'''
+
+
+Một ví dụ khác (phép dịch bit):
+@@@ .line-numbers;must-line-numbers
+''' go
+const N = 2
+// A là giá trị không định kiểu (kiểu mặc định là int).
+const A = 3.0 << N // A == 12
+// B là giá trị có kiểu (kiểu là int8).
+const B = int8(3.0) << N // B == 12
+
+var m = uint(32)
+// Ba dòng sau tương đương với nhau.
+// Trong hai dòng tiếp theo, kiểu của hai giá trị "1"
+// đều được suy ra là int64, thay vì int.
+var x int64 = 1 << m
+var y = int64(1 << m)
+var z = int64(1) << m
+
+// Dòng dưới đây không biên dịch được.
+/*
+var _ = 1.23 << m // lỗi: dịch bit với kiểu float64
+*/
+'''
+
+@@@ #bitwise-shift-left-operand-type-deduction
+Quy tắc cuối cùng về phép dịch bit nhằm tránh trường hợp
+một số phép dịch bit cho kết quả khác nhau trên các kiến trúc
+nhưng khác biệt đó không được phát hiện kịp thời.
+Ví dụ, nếu toán hạng `1` được suy ra là `int` thay vì `int64`,
+phép dịch bit ở dòng // 13 // (hoặc dòng // 12 //) sẽ cho kết quả
+khác nhau trên kiến trúc 32 bit (0) và 64 bit (2^$$32$$),
+có thể gây ra lỗi khó phát hiện kịp thời.
+
+Một hệ quả thú vị của quy tắc cuối cùng này được thể hiện
+trong đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+const n = uint(2)
+var m = uint(2)
+
+// Hai dòng sau biên dịch được.
+var _ float64 = 1 << n
+var _ = float64(1 << n)
+
+// Hai dòng sau không biên dịch được.
+var _ float64 = 1 << m
+var _ = float64(1 << m)
+'''
+
+Hai dòng cuối không biên dịch được vì cả hai đều tương đương với:
+
+@@@ .line-numbers
+''' go
+var _ = float64(1) << m
+var _ = 1.0 << m // error: shift of type float64
+'''
+
+
+Một ví dụ khác:
+
+@@@ .line-numbers
+''' go
+package main
+
+const n = uint(8)
+var m = uint(8)
+
+func main() {
+	println(a, b) // 2 0
+}
+
+var a byte = 1 << n / 128
+var b byte = 1 << m / 128
+'''
+
+Chương trình trên in ra `2 0`, vì hai dòng cuối tương đương với:
+
+@@@ .line-numbers
+''' go
+var a = byte(int(1) << n / 128)
+var b = byte(1) << m / 128
+'''
+
+###----------- Về phép chia số nguyên và phép lấy phần dư
+
+Giả sử `x` và `y` là hai toán hạng cùng kiểu số nguyên,
+thương nguyên `q` (`= x / y`) và số dư `r` (`= x % y`)
+thỏa mãn `x == q*y + r`, trong đó `|r| < |y|`.
+Nếu `r` khác 0, dấu của nó giống dấu của `x` (số bị chia).
+Kết quả của `x / y` được làm tròn về 0.
+
+Nếu số chia `y` là hằng, nó không được bằng 0.
+Nếu số chia bằng 0 lúc chạy và là số nguyên,
+sẽ xảy ra panic lúc chạy.
+Panic tương tự exception trong một số ngôn ngữ khác.
+Có thể tìm hiểu thêm về panic trong __bài viết này`` về luồng điều khiển nâng cao.tmd__.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+println( 5/3,   5%3)  // 1 2
+println( 5/-3,  5%-3) // -1 2
+println(-5/3,  -5%3)  // -1 -2
+println(-5/-3, -5%-3) // 1 -2
+
+println(5.0 / 3.0)     // 1.666667
+println((1-1i)/(1+1i)) // -1i
+
+var a, b = 1.0, 0.0
+println(a/b, b/b) // +Inf NaN
+
+_ = int(a)/int(b) // biên dịch được nhưng gây panic lúc chạy.
+
+// Hai dòng dưới đây không biên dịch được.
+println(1.0/0.0) // lỗi: chia cho 0
+println(0.0/0.0) // lỗi: chia cho 0
+'''
+
+###----------- Dùng `op=` với toán tử số học hai ngôi
+
+Với toán tử số học hai ngôi `op`, có thể rút gọn `x = x op y`
+thành `x op= y`.
+Ở dạng rút gọn, `x` chỉ được đánh giá một lần.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+var a, b int8 = 3, 5
+a += b
+println(a) // 8
+a *= a
+println(a) // 64
+a /= b
+println(a) // 12
+a %= b
+println(a) // 2
+b <<= uint(a)
+println(b) // 20
+'''
+
+###----------- Toán tử tăng `++` và giảm `--`
+
+Giống nhiều ngôn ngữ phổ biến khác, Go cũng hỗ trợ
+toán tử tăng `++` và giảm `--`.
+Tuy nhiên, phép toán dùng hai toán tử này không trả về kết quả,
+nên không thể dùng phép toán đó làm __biểu thức__.
+Toán hạng duy nhất phải là giá trị số, không được là hằng,
+và toán tử `++` hoặc `--` phải đứng sau toán hạng.
+
+    === biểu thức :: expressions-and-statements.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	a, b, c := 12, 1.2, 1+2i
+	a++ // hợp lệ. <=> a += 1 <=> a = a + 1
+	b-- // hợp lệ. <=> b -= 1 <=> b = b - 1
+	c++ // hợp lệ
+
+	// Các dòng sau không biên dịch được.
+	/*
+	_ = a++
+	_ = b--
+	_ = c++
+	++a
+	--b
+	++c
+	*/
+}
+'''
+
+###=========== Toán tử nối chuỗi
+
+Như đã đề cập, toán tử cộng cũng có thể dùng để nối chuỗi.
+
+#  ### Toán tử
+   ### Tên
+   ### Yêu cầu đối với hai toán hạng
+   -----------------------------
+   ### ^` +
+   ;;; nối chuỗi
+   { <<
+   Hai toán hạng phải đều là giá trị thuộc cùng một kiểu chuỗi.
+   }
+
+Dạng `op=` cũng áp dụng cho toán tử nối chuỗi.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+println("Go" + "lang") // Golang
+var a = "Go"
+a += "lang"
+println(a) // Golang
+'''
+
+Nếu một trong hai toán hạng của phép nối chuỗi là chuỗi có kiểu,
+thì kiểu của chuỗi kết quả giống với kiểu của chuỗi đó.
+Nếu cả hai toán hạng là chuỗi hằng không định kiểu,
+kết quả cũng là giá trị chuỗi không định kiểu.
+
+###=========== Toán tử boolean (còn gọi là toán tử logic)
+
+Go hỗ trợ hai toán tử boolean hai ngôi và một toán tử boolean một ngôi:
+
+#  ### Toán tử
+   ### Tên
+   ### Yêu cầu đối với hai toán hạng
+   @@@ valign="middle" style="white-space: nowrap;"
+   -----------------------------
+   ### `&&`
+   ;;; boolean and (hai ngôi)
+       \\ còn gọi là and có điều kiện
+   { << :2
+   Hai toán hạng phải đều là giá trị thuộc cùng một kiểu boolean.
+   }
+   -----------------------------
+   ### `||`
+   ;;; boolean or (hai ngôi)
+       \\ còn gọi là or có điều kiện
+   -----------------------------
+   ### `!`
+   ;;; boolean not (một ngôi)
+   { <<
+   Kiểu của toán hạng duy nhất phải là kiểu boolean.
+   }
+
+Có thể dùng toán tử `!=` được giới thiệu ở tiểu mục tiếp theo
+làm toán tử **boolean xor**.
+
+Giải thích cơ chế:
+@@@ .disable-line-numbers111;fixed-width
+''' go
+// x    y       x && y   x || y   !x      !y
+true    true    true     true     false   false
+true    false   false    true     false   true
+false   true    false    true     true    false
+false   false   false    false    true    true
+'''
+
+Nếu một toán hạng là boolean có kiểu, kiểu của boolean kết quả
+giống với kiểu của boolean có kiểu đó.
+Nếu cả hai toán hạng là boolean không định kiểu,
+kết quả cũng là giá trị boolean không định kiểu.
+
+###=========== Toán tử so sánh
+
+Go hỗ trợ sáu toán tử so sánh hai ngôi:
+
+#  ### Toán tử
+   ### Tên
+   ### Yêu cầu đối với hai toán hạng
+   @@@ valign="middle" style="white-space: nowrap;"
+   -----------------------------
+   ### ^` ==
+   ;;; bằng
+   { << :2
+   Nhìn chung, kiểu của hai toán hạng phải giống nhau.
+   Để biết quy tắc chi tiết, hãy đọc __quy tắc so sánh trong Go__.
+       === quy tắc so sánh trong Go :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
+   }
+   -----------------------------
+   ### ^` !=
+   ;;; không bằng
+   -----------------------------
+   ### ^` <
+   ;;; nhỏ hơn
+   { << :4
+   Hai toán hạng phải đều là giá trị thuộc cùng kiểu số nguyên,
+   kiểu dấu phẩy động hoặc kiểu chuỗi.
+   }
+   -----------------------------
+   ### ^` <=
+   ;;; nhỏ hơn hoặc bằng
+   -----------------------------
+   ### ^` >
+   ;;; lớn hơn
+   -----------------------------
+   ### ^` >=
+   ;;; lớn hơn hoặc bằng
+
+Kiểu kết quả của mọi phép so sánh luôn là giá trị boolean không định kiểu.
+Nếu cả hai toán hạng đều là hằng, kết quả cũng là hằng boolean.
+
+Sau này, khi nói hai giá trị có thể so sánh được, nghĩa là chúng có thể
+được so sánh bằng toán tử `==` và `!=`.
+Ta sẽ tìm hiểu sau những kiểu có giá trị không thể so sánh.
+Giá trị thuộc các kiểu cơ bản đều so sánh được.
+
+Lưu ý rằng không phải mọi số thực đều có thể biểu diễn chính xác
+trong bộ nhớ, vì vậy so sánh hai giá trị dấu phẩy động (hoặc số phức)
+có thể không đáng tin cậy. Để xác định hai giá trị dấu phẩy động có bằng nhau,
+nên kiểm tra trị tuyệt đối của hiệu giữa chúng có nhỏ hơn một ngưỡng nhỏ hay không.
+
+###=========== Độ ưu tiên của toán tử
+
+Dưới đây là thứ tự ưu tiên toán tử trong Go.
+Toán tử ở trên có độ ưu tiên cao hơn.
+Các toán tử trên cùng một dòng có độ ưu tiên như nhau.
+Giống nhiều ngôn ngữ khác, `()` có thể dùng để tăng độ ưu tiên.
+
+@@@ .disable-line-numbers111;fixed-width
+''' go
+*   /   %   <<  >>  &   &^
++   -   |   ^
+==  !=  <   <=  >   >=
+&&
+||
+'''
+
+Một khác biệt dễ thấy so với một số ngôn ngữ phổ biến khác
+là trong Go, `<<` và `>>` có độ ưu tiên cao hơn `+` và `-`.
+
+@@@ #constant-expression-more
+###=========== Tìm hiểu thêm về biểu thức hằng
+
+Biến khai báo dưới đây sẽ được khởi tạo thành `2.2` thay vì `2.7`.
+Phép chia có độ ưu tiên cao hơn phép cộng, và trong phép chia,
+cả `3` lẫn `2` đều được xem là số nguyên.
+Kết quả tính `3/2` là `1`.
+
+@@@ .line-numbers
+''' go
+var x = 1.2 + 3/2
+'''
+
+Hai hằng có tên trong chương trình dưới đây không bằng nhau.
+Ở khai báo đầu, `3` và `2` đều được xem là số nguyên.
+Ở khai báo thứ hai, chúng đều được xem là số dấu phẩy động.
+
+@@@ .line-numbers
+''' go
+package main
+
+const x = 3/2*0.1
+const y = 0.1*3/2
+
+func main() {
+	println(x) // +1.000000e-001
+	println(y) // +1.500000e-001
+}
+'''
+
+###=========== Các toán tử khác
+
+Giống như C/C++, Go có hai toán tử liên quan đến con trỏ là `*` và `&`.
+Đúng vậy, chúng có cùng ký hiệu với toán tử nhân và toán tử bitwise-and.
+`&` dùng để lấy địa chỉ của giá trị có thể lấy địa chỉ,
+còn `*` dùng để giải tham chiếu giá trị con trỏ.
+Không giống C/C++, giá trị con trỏ trong Go không hỗ trợ phép toán số học.
+Để biết thêm chi tiết, hãy đọc __con trỏ trong Go__ sau này.
+
+Go còn có một số toán tử khác.
+Chúng sẽ được giới thiệu và giải thích trong các bài viết Go 101 khác.
+

@@ -1,0 +1,603 @@
+### Các kiểu cơ bản và literal giá trị cơ bản
+
+Có thể xem kiểu như khuôn mẫu của giá trị,
+và giá trị như một thể hiện của kiểu.
+Bài viết này giới thiệu các kiểu cơ bản dựng sẵn
+cùng các literal giá trị của chúng trong Go.
+Bài viết này không giới thiệu các kiểu tổ hợp.
+
+@@@ #overview
+###=========== Các kiểu cơ bản dựng sẵn trong Go
+
+Go hỗ trợ các kiểu cơ bản dựng sẵn sau:
+*
+   một kiểu boolean dựng sẵn: `bool`.
+*
+   11 kiểu số nguyên dựng sẵn (các kiểu số nguyên cơ bản):
+   `int8`, `uint8`, `int16`,
+   `uint16`, `int32`, `uint32`,
+   `int64`, `uint64`, `int`, `uint`,
+   and `uintptr`.
+*
+   hai kiểu số dấu phẩy động dựng sẵn: `float32` và `float64`.
+*
+   hai kiểu số phức dựng sẵn: `complex64` và `complex128`.
+*
+   một kiểu string dựng sẵn: `string`.
+
+Mỗi trong số 17 kiểu cơ bản dựng sẵn thuộc một loại kiểu khác nhau trong Go.
+Ta có thể dùng các kiểu dựng sẵn trên trong code mà không cần import package nào,
+dù tên của tất cả các kiểu này đều là identifier không export.
+
+15 trong số 17 kiểu cơ bản dựng sẵn là kiểu số.
+Kiểu số gồm kiểu số nguyên, kiểu số dấu phẩy động và kiểu số phức.
+
+Go cũng hỗ trợ hai alias kiểu dựng sẵn,
+*
+   `byte` là alias dựng sẵn của `uint8`.
+   Có thể xem `byte` và `uint8` là cùng một kiểu.
+*
+   `rune` là alias dựng sẵn của `int32`.
+   Có thể xem `rune` và `int32` là cùng một kiểu.
+
+Các kiểu số nguyên có tên bắt đầu bằng `u` là kiểu unsigned.
+Giá trị của kiểu unsigned luôn không âm.
+Con số trong tên kiểu cho biết một giá trị thuộc kiểu đó chiếm bao nhiêu bit nhị phân
+trong bộ nhớ khi chạy chương trình.
+Ví dụ, mỗi giá trị `uint8` chiếm 8 bit trong bộ nhớ.
+Vì vậy, giá trị lớn nhất của `uint8` là `255` (2^$$8$$-1),
+giá trị lớn nhất của `int8` là `127` (2^$$7$$-1), và
+giá trị nhỏ nhất của `int8` là `-128` (-2^$$7$$).
+
+Nếu một giá trị chiếm **N** bit trong bộ nhớ, ta nói kích thước của giá trị đó là **N** bit.
+Mọi giá trị thuộc cùng một kiểu luôn có kích thước như nhau, vì vậy kích thước giá trị thường được gọi là kích thước kiểu.
+
+Ta thường đo kích thước của một giá trị dựa trên số byte mà nó chiếm trong bộ nhớ.
+Một byte có 8 bit.
+Do đó, kiểu `uint32` có kích thước bốn byte.
+
+Kích thước trong bộ nhớ của các giá trị `uintptr`, `int` và `uint`
+phụ thuộc vào cách triển khai.
+Thông thường, giá trị `int` và `uint` có kích thước
+4 byte trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+Giá trị `uintptr` phải đủ lớn để
+lưu các bit chưa được diễn giải của bất kỳ địa chỉ bộ nhớ nào.
+
+Phần thực và phần ảo của giá trị `complex64` đều là giá trị `float32`,
+còn phần thực và phần ảo của giá trị `complex128` đều là giá trị `float64`.
+
+Trong bộ nhớ, mọi giá trị số dấu phẩy động trong Go đều được lưu theo __định dạng IEEE-754__.
+
+    === Định dạng IEEE-754 :: https://en.wikipedia.org/wiki/IEEE_754
+
+Giá trị boolean biểu thị một giá trị đúng hoặc sai.
+Trong bộ nhớ chỉ có thể có hai giá trị boolean,
+được biểu diễn bằng hai hằng số có tên được khai báo sẵn,
+`false` và `true`.
+Hằng số có tên sẽ được giới thiệu trong __bài tiếp theo__.
+
+    === bài tiếp theo :: constants-and-variables.tmd
+
+Trong logic, giá trị string biểu thị một đoạn văn bản.
+Trong bộ nhớ, giá trị string lưu một dãy byte, là
+biểu diễn mã hóa UTF-8 của đoạn văn bản mà giá trị string biểu thị.
+Bài viết __string trong Go__ ở phần sau sẽ giới thiệu thêm về string.
+
+    === string trong Go :: string.tmd
+
+Mặc dù chỉ có một kiểu dựng sẵn cho mỗi loại boolean và string,
+ta có thể định nghĩa các kiểu boolean và string tùy chỉnh
+dựa trên những kiểu boolean và string dựng sẵn này.
+Vì vậy, có thể có nhiều kiểu boolean và string.
+Điều tương tự cũng đúng với mọi loại kiểu số.
+Dưới đây là một số ví dụ khai báo kiểu.
+Trong các khai báo này, từ `type` là một keyword.
+
+@@@ .line-numbers
+''' go
+/* Một số khai báo định nghĩa kiểu */
+
+// status và bool là hai kiểu khác nhau.
+type status bool
+// MyString và string là hai kiểu khác nhau.
+type MyString string
+// Id và uint64 là hai kiểu khác nhau.
+type Id uint64
+// real và float32 là hai kiểu khác nhau.
+type real float32
+
+/* Một số khai báo alias kiểu */
+
+// boolean và bool chỉ cùng một kiểu.
+type boolean = bool
+// Text và string chỉ cùng một kiểu.
+type Text = string
+// U8, uint8 và byte chỉ cùng một kiểu.
+type U8 = uint8
+// char, rune và int32 chỉ cùng một kiểu.
+type char = rune
+'''
+
+Ta có thể gọi kiểu `real` tùy chỉnh đã định nghĩa ở trên
+và kiểu `float32` dựng sẵn đều là kiểu float32.
+Lưu ý, từ **// float32 //** thứ hai
+trong câu vừa rồi được dùng để chỉ chung,
+còn từ thứ nhất chỉ một kiểu cụ thể.
+Tương tự, `MyString` và `string` đều là kiểu string,
+`status` và `bool` đều là kiểu bool, v.v.
+
+Bài viết
+__Tổng quan hệ thống kiểu của Go__ ở phần sau sẽ giới thiệu thêm về kiểu tùy chỉnh.
+
+    === Tổng quan hệ thống kiểu của Go :: type-system-overview.tmd
+
+###=========== Giá trị zero
+
+Mỗi kiểu có một giá trị zero.
+Có thể xem giá trị zero của một kiểu là giá trị mặc định của kiểu đó.
+*
+   Giá trị zero của kiểu boolean là false.
+*
+   Giá trị zero của kiểu số là zero, dù các giá trị zero thuộc những kiểu số khác nhau có thể chiếm số byte khác nhau trong bộ nhớ.
+*
+   Giá trị zero của kiểu string là string rỗng.
+
+@@@ #basic-value-literals
+###=========== Literal giá trị cơ bản
+
+Literal của một giá trị là cách biểu diễn giá trị đó bằng văn bản trong code.
+Một giá trị có thể có nhiều literal.
+Các literal biểu diễn giá trị thuộc kiểu cơ bản được gọi là literal giá trị cơ bản.
+
+###----------- Literal giá trị boolean
+
+Đặc tả Go không định nghĩa literal boolean.
+Tuy nhiên, trong lập trình nói chung, ta có thể xem hai identifier được khai báo sẵn
+`false` và `true` là literal boolean.
+Nhưng cần lưu ý chúng không phải literal theo nghĩa chặt.
+
+Như đã nói ở trên, giá trị zero của kiểu boolean
+được biểu diễn bằng hằng số `false` được khai báo sẵn.
+
+###----------- Literal giá trị số nguyên
+
+Có bốn dạng literal số nguyên:
+dạng thập phân (cơ số 10), dạng bát phân (cơ số 8),
+dạng thập lục phân (cơ số 16) và dạng nhị phân (cơ số 2).
+Ví dụ, bốn literal số nguyên dưới đây
+đều biểu diễn số `15` ở dạng thập phân.
+
+@@@ .disable-line-numbers111
+''' go
+0xF // dạng thập lục phân (bắt đầu bằng "0x" hoặc "0X")
+0XF
+
+017 // dạng bát phân (bắt đầu bằng "0", "0o" hoặc "0O")
+0o17
+0O17
+
+0b1111 // dạng nhị phân (bắt đầu bằng "0b" hoặc "0B")
+0B1111
+
+15 // dạng thập phân (bắt đầu không phải "0")
+'''
+
+(Lưu ý: dạng nhị phân và dạng bát phân bắt đầu bằng
+`0o` hoặc `0O` được hỗ trợ từ Go 1.13.)
+
+Chương trình sau sẽ in ra hai chuỗi `true`.
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	println(15 == 017) // true
+	println(15 == 0xF) // true
+}
+'''
+
+Lưu ý, hai toán tử `==` là toán tử so sánh bằng,
+sẽ được giới thiệu trong __các toán tử thông dụng__.
+
+    === các toán tử thông dụng :: operators.tmd
+
+Thông thường, giá trị zero của kiểu số nguyên được viết bằng literal `0`,
+nhưng còn nhiều literal hợp lệ khác cho giá trị zero của số nguyên,
+chẳng hạn `00` và `0x0`.
+Thực tế, các literal giá trị zero của những loại kiểu số khác được giới thiệu trong bài này
+cũng có thể biểu diễn giá trị zero của mọi kiểu số nguyên.
+
+###----------- Literal giá trị dấu phẩy động
+
+Literal giá trị dấu phẩy động thập phân có thể gồm phần nguyên thập phân,
+dấu chấm thập phân, phần phân số thập phân và phần số mũ nguyên (cơ số 10).
+Phần số mũ nguyên này bắt đầu bằng chữ `e` hoặc `E` và theo sau là một literal số nguyên thập phân
+(`xEn` tương đương `x` nhân với ^`10^$$n$$`,
+còn `xE-n` tương đương `x` chia cho ^`10^$$n$$`).
+Một số ví dụ:
+@@@ .disable-line-numbers111
+''' go
+1.23
+01.23 // == 1.23
+.23
+1.
+// Chữ "e" hoặc "E" mở đầu phần số mũ (cơ số 10).
+1.23e2  // == 123.0
+123E2   // == 12300.0
+123.E+2 // == 12300.0
+1e-1    // == 0.1
+.1e0    // == 0.1
+0010e-2 // == 0.1
+0e+5    // == 0.0
+'''
+
+Từ Go 1.13, Go còn hỗ trợ một dạng literal dấu phẩy động khác: dạng thập lục phân.
+*
+   Literal dấu phẩy động thập lục phân phải kết thúc bằng phần số mũ cơ số 2,
+   phần này bắt đầu bằng chữ `p` hoặc `P` và theo sau là một literal số nguyên thập phân
+   (`yPn` tương đương `y` nhân với ^`2^$$n$$`, còn `yP-n` tương đương `y` chia cho ^`2^$$n$$`).
+*
+   Tương tự literal số nguyên thập lục phân, literal dấu phẩy động thập lục phân cũng phải bắt đầu bằng `0x` hoặc `0X`.
+   Khác với literal số nguyên thập lục phân, literal dấu phẩy động thập lục phân có thể chứa dấu chấm cơ số và phần phân số thập lục phân.
+
+Các literal dấu phẩy động thập lục phân sau là hợp lệ:
+@@@ .disable-line-numbers111
+''' go
+0x1p-2     // == 1.0/4 = 0.25
+0x2.p10    // == 2.0 * 1024 == 2048.0
+0x1.Fp+0   // == 1+15.0/16 == 1.9375
+0X.8p1     // == 8.0/16 * 2 == 1.0
+0X1FFFP-16 // == 0.1249847412109375
+'''
+
+Tuy nhiên, các literal sau không hợp lệ:
+@@@ .disable-line-numbers111
+''' go
+0x.p1    // phần định trị không có chữ số
+1p-2     // số mũ p yêu cầu phần định trị thập lục phân
+0x1.5e-2 // phần định trị thập lục phân yêu cầu số mũ p
+'''
+
+Lưu ý: literal sau hợp lệ, nhưng nó không phải literal dấu phẩy động.
+Thực ra đây là một biểu thức số học phép trừ.
+Chữ `e` trong đó có nghĩa là `14` ở dạng thập phân.
+`0x15e` là literal số nguyên thập lục phân, `-` là toán tử trừ,
+và `2` là literal số nguyên thập phân.
+(Toán tử số học sẽ được giới thiệu trong bài __các toán tử thông dụng__.)
+
+    === các toán tử thông dụng :: operators.tmd
+
+@@@ .disable-line-numbers111
+''' go
+0x15e-2 // == 0x15e - 2 // biểu thức phép trừ
+'''
+
+Literal tiêu chuẩn cho giá trị zero của kiểu dấu phẩy động là
+`0.0`, nhưng còn nhiều literal hợp lệ khác,
+chẳng hạn `0.`, `.0`, `0e0`, `0x0p0`, v.v.
+Thực tế, các literal giá trị zero của những loại kiểu số khác được giới thiệu trong bài này
+cũng có thể biểu diễn giá trị zero của mọi kiểu dấu phẩy động.
+
+###----------- Literal giá trị ảo
+
+Literal số ảo gồm một literal dấu phẩy động hoặc số nguyên và chữ thường `i`.
+Ví dụ:
+@@@ .disable-line-numbers111
+''' go
+1.23i
+1.i
+.23i
+123i
+0123i   // == 123i (để tương thích ngược. Xem bên dưới.)
+1.23E2i // == 123i
+1e-1i
+011i   // == 11i (để tương thích ngược. Xem bên dưới.)
+00011i // == 11i (để tương thích ngược. Xem bên dưới.)
+// Các dòng sau chỉ biên dịch được từ Go 1.13.
+0o11i    // == 9i
+0x11i    // == 17i
+0b11i    // == 3i
+0X.8p-0i // == 0.5i
+'''
+
+Lưu ý, trước Go 1.13, trong literal số ảo, chữ `i`
+chỉ có thể đứng sau một literal dấu phẩy động.
+Để tương thích với các phiên bản cũ, từ Go 1.13,
+các literal số nguyên ở dạng bát phân không bắt đầu bằng
+`0o` và `0O` vẫn được xem là literal dấu phẩy động,
+chẳng hạn `011i`, `0123i` và `00011i` trong ví dụ trên.
+
+Literal số ảo được dùng để biểu diễn phần ảo của giá trị số phức.
+Dưới đây là một số literal biểu diễn giá trị số phức:
+@@@ .disable-line-numbers111
+''' go
+1 + 2i       // == 1.0 + 2.0i
+1. - .1i     // == 1.0 + -0.1i
+1.23i - 7.89 // == -7.89 + 1.23i
+1.23i        // == 0.0 + 1.23i
+'''
+
+Literal tiêu chuẩn cho giá trị zero của kiểu số phức là
+`0.0+0.0i`, nhưng còn nhiều literal hợp lệ khác,
+chẳng hạn `0i`, `.0i`, `0+0i`, v.v.
+Thực tế, các literal giá trị zero của những loại kiểu số khác được giới thiệu trong bài này
+cũng có thể biểu diễn giá trị zero của mọi kiểu số phức.
+
+@@@ #underscores-in-literals
+###----------- Dùng `_` trong literal số để dễ đọc hơn
+
+Từ Go 1.13, có thể dùng dấu gạch dưới `_` trong literal số nguyên, dấu phẩy động
+và số ảo làm dấu phân tách chữ số để code dễ đọc hơn.
+Tuy nhiên, cần lưu ý rằng trong một literal số,
+*
+   không được dùng `_`
+   làm ký tự đầu tiên hoặc cuối cùng của literal,
+*
+   hai phía của mỗi dấu `_` phải là tiền tố literal
+   (chẳng hạn `0X`) hoặc ký tự chữ số hợp lệ.
+
+Một số literal số chứa dấu gạch dưới hợp lệ và không hợp lệ:
+
+@@@ .disable-line-numbers111
+''' go
+// Các dạng hợp lệ:
+6_9          // == 69
+0_33_77_22   // == 0337722
+0x_Bad_Face  // == 0xBadFace
+0X_1F_FFP-16 // == 0X1FFFP-16
+0b1011_0111 + 0xA_B.Fp2i
+
+// Các dạng không hợp lệ:
+_69        // _ không thể đứng ở ký tự đầu tiên
+69_        // _ không thể đứng ở ký tự cuối cùng
+6__9       // một phía của _ là ký tự không hợp lệ
+0_xBadFace // "x" không phải chữ số bát phân hợp lệ
+1_.5       // "." không phải chữ số bát phân hợp lệ
+1._5       // "." không phải chữ số bát phân hợp lệ
+'''
+
+@@@ #rune
+###----------- Literal giá trị rune
+
+Các kiểu rune, bao gồm kiểu rune tùy chỉnh và
+kiểu `rune` dựng sẵn (còn gọi là kiểu `int32`),
+là các kiểu số nguyên đặc biệt,
+do đó mọi giá trị rune đều có thể được biểu diễn bằng các literal số nguyên đã giới thiệu ở trên.
+Mặt khác, nhiều giá trị thuộc mọi loại kiểu số nguyên cũng có thể
+được biểu diễn bằng literal rune sẽ giới thiệu trong tiểu mục này.
+
+Giá trị rune được dùng để lưu một code point Unicode.
+Thông thường, ta có thể xem một code point là một ký tự Unicode,
+nhưng cần nhớ rằng một số ký tự Unicode
+được cấu thành từ nhiều code point.
+
+Literal rune được viết dưới dạng một hoặc nhiều ký tự đặt trong cặp dấu nháy đơn.
+Các ký tự bên trong biểu thị giá trị của một code point Unicode.
+Literal rune có một vài biến thể nhỏ.
+Dạng literal rune phổ biến nhất là đặt các ký tự được biểu thị
+bởi giá trị rune giữa hai dấu nháy đơn. Ví dụ:
+@@@ .disable-line-numbers111
+''' go
+'a' // một ký tự tiếng Anh
+'π'
+'众' // một ký tự tiếng Trung
+'''
+
+Các biến thể literal rune sau tương đương với `'a'`
+(giá trị Unicode của ký tự `a` là 97).
+@@@ .disable-line-numbers111
+''' go
+// 141 là biểu diễn bát phân của số thập phân 97.
+'\141'
+// 61 là biểu diễn thập lục phân của số thập phân 97.
+'\x61'
+'\u0061'
+'\U00000061'
+'''
+
+Lưu ý, `\` phải được theo sau chính xác bởi ba chữ số bát phân để biểu diễn giá trị byte,
+`\x` phải được theo sau chính xác bởi hai chữ số thập lục phân để biểu diễn giá trị byte,
+`\u` phải được theo sau chính xác bởi bốn chữ số thập lục phân để biểu diễn giá trị rune,
+và `\U` phải được theo sau chính xác bởi tám chữ số thập lục phân để biểu diễn giá trị rune.
+Mỗi dãy chữ số bát phân hoặc thập lục phân như vậy phải biểu diễn code point Unicode hợp lệ; nếu không, chương trình sẽ không biên dịch được.
+
+Chương trình sau sẽ in ra 7 chuỗi `true`.
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	println('a' == 97)
+	println('a' == '\141')
+	println('a' == '\x61')
+	println('a' == '\u0061')
+	println('a' == '\U00000061')
+	println(0x61 == '\x61')
+	println('\u4f17' == '众')
+}
+'''
+
+Thực tế, bốn dạng biến thể literal rune vừa nêu
+hiếm khi được dùng cho giá trị rune.
+Đôi khi chúng được dùng trong literal string diễn giải
+(xem tiểu mục tiếp theo để biết chi tiết).
+
+Nếu literal rune gồm hai ký tự (không tính hai dấu nháy đơn),
+ký tự đầu tiên là `\` và ký tự thứ hai không phải
+là chữ số, `x`, `u` hoặc `U`,
+thì hai ký tự liên tiếp này
+sẽ được escape thành một ký tự đặc biệt.
+Các cặp ký tự có thể được escape gồm:
+@@@ .disable-line-numbers111
+''' go
+\a   (giá trị Unicode 0x07) alert hoặc bell
+\b   (giá trị Unicode 0x08) backspace
+\f   (giá trị Unicode 0x0C) form feed
+\n   (giá trị Unicode 0x0A) line feed hoặc newline
+\r   (giá trị Unicode 0x0D) carriage return
+\t   (giá trị Unicode 0x09) horizontal tab
+\v   (giá trị Unicode 0x0b) vertical tab
+\\   (giá trị Unicode 0x5c) dấu gạch chéo ngược
+\'   (giá trị Unicode 0x27) dấu nháy đơn
+'''
+
+`\n` là cặp ký tự escape được dùng nhiều nhất.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+    println('\n') // 10
+    println('\r') // 13
+    println('\'') // 39
+
+    println('\n' == 10)     // true
+    println('\n' == '\x0A') // true
+'''
+
+Có nhiều literal biểu diễn được giá trị zero của kiểu rune,
+chẳng hạn `'\000'`, `'\x00'`, `'\u0000'`, v.v.
+Thực tế, ta cũng có thể dùng bất kỳ literal số nào đã giới thiệu ở trên để biểu diễn
+giá trị của kiểu rune, chẳng hạn `0`, `0x0`,
+`0.0`, `0e0`, `0i`, v.v.
+
+@@@ #string-literals
+###----------- Literal giá trị string
+
+Giá trị string trong Go được mã hóa UTF-8.
+Thực tế, mọi file mã nguồn Go đều phải tương thích với mã hóa UTF-8.
+
+Có hai dạng literal giá trị string:
+literal string diễn giải (dạng dấu nháy kép)
+và literal string thô (dạng dấu nháy ngược).
+Ví dụ, hai literal string sau là tương đương:
+
+@@@ .disable-line-numbers111
+''' go
+// Dạng diễn giải.
+"Hello\nworld!\n\"你好世界\""
+
+// Dạng thô.
+`Hello
+world!
+"你好世界"`
+'''
+
+Trong literal string diễn giải ở trên, mỗi cặp ký tự `\n`
+sẽ được escape thành một ký tự xuống dòng, và mỗi cặp ký tự `\"`
+sẽ được escape thành một dấu nháy kép.
+Hầu hết các cặp ký tự escape này giống với những cặp dùng
+trong literal rune đã giới thiệu ở trên, ngoại trừ `\"` chỉ
+hợp lệ trong literal string diễn giải, còn `\^``` chỉ hợp lệ trong
+literal rune.
+
+Dãy ký tự gồm `\`, `\x`,
+`\u` và `\U` theo sau bởi một số chữ số bát phân hoặc thập lục phân
+đã giới thiệu ở phần trước cũng có thể được dùng trong literal string diễn giải.
+
+@@@ .disable-line-numbers111
+''' go
+// Các literal string diễn giải sau là tương đương.
+"\141\142\143"
+"\x61\x62\x63"
+"\x61b\x63"
+"abc"
+
+// Các literal string diễn giải sau là tương đương.
+"\u4f17\xe4\xba\xba"
+      // Unicode của 众 là 4f17, được mã hóa UTF-8
+      // thành ba byte: e4 bc 97.
+"\xe4\xbc\x97\u4eba"
+      // Unicode của 人 là 4eba, được mã hóa UTF-8
+      // thành ba byte: e4 ba ba.
+"\xe4\xbc\x97\xe4\xba\xba"
+"众人"
+'''
+
+Lưu ý, mỗi ký tự tiếng Anh (code point) được biểu diễn bằng một byte,
+nhưng mỗi ký tự tiếng Trung (code point) được biểu diễn bằng ba byte.
+
+Trong literal string thô, không có dãy ký tự nào được escape.
+Không được dùng dấu nháy ngược bên trong literal string thô.
+Để tăng khả năng tương thích đa nền tảng, các ký tự carriage return
+(code point Unicode `0x0D`) bên trong literal string thô sẽ bị loại bỏ.
+
+Giá trị zero của kiểu string có thể được viết bằng literal `""` hoặc `^`````.
+
+@@@ #representability
+###=========== Khả năng biểu diễn của literal giá trị số cơ bản
+
+Một literal số chỉ có thể biểu diễn thành giá trị số nguyên nếu không cần làm tròn.
+Ví dụ, `1.23e2` có thể biểu diễn thành giá trị thuộc bất kỳ kiểu số nguyên cơ bản nào,
+nhưng `1.23` thì không thể biểu diễn thành giá trị thuộc bất kỳ kiểu số nguyên cơ bản nào.
+Có thể làm tròn khi dùng literal số để biểu diễn giá trị số cơ bản không nguyên.
+
+Mỗi kiểu số cơ bản có một miền giá trị có thể biểu diễn.
+Vì vậy, nếu literal vượt quá miền giá trị của một kiểu,
+thì literal đó không thể biểu diễn thành giá trị thuộc kiểu ấy.
+
+Một số ví dụ:
+#  ### Literal
+   ### Các kiểu mà giá trị của chúng có thể biểu diễn literal
+   ---
+   ;;; `256`
+   ;;; Mọi kiểu số cơ bản ngoại trừ kiểu int8 và uint8.
+   ---
+   ;;; `255`
+   ;;; Mọi kiểu số cơ bản ngoại trừ kiểu int8.
+   ---
+   ;;; `-123`
+   ;;; Mọi kiểu số cơ bản ngoại trừ các kiểu unsigned.
+   ---
+   ;;; `123`
+   { >< :5
+   Mọi kiểu số cơ bản.
+   }
+   ---
+   ;;; `123.000`
+   ---
+   ;;; `1.23e2`
+   ---
+   ;;; `'a'`
+   ---
+   ;;; `1.0+0i`
+   ---
+   ;;; `1.23`
+   { >< :2
+   Mọi kiểu số dấu phẩy động và số phức cơ bản.
+   }
+   ---
+   ;;; `0x10000000000000000`
+       \\ (16 số 0)
+   ---
+   ;;; `3.5e38`
+   ;;; Mọi kiểu số dấu phẩy động và số phức cơ bản ngoại trừ kiểu float32 và complex64.
+   ---
+   ;;; `1+2i`
+   ;;; Mọi kiểu số phức cơ bản.
+   ---
+   ;;; `2e+308`
+   ;;; Không kiểu cơ bản nào.
+
+
+
+Lưu ý:
+*
+   Vì không có giá trị nào của các kiểu số nguyên cơ bản trong Go có thể chứa
+   `0x10000000000000000`, nên literal này không thể
+   biểu diễn thành giá trị thuộc bất kỳ kiểu số nguyên cơ bản nào.
+*
+   Giá trị IEEE-754 float32 lớn nhất có thể được biểu diễn chính xác
+   là `3.40282346638528859811704183484516925440e+38`,
+   do đó `3.5e38` không thể biểu diễn thành giá trị thuộc
+   bất kỳ kiểu float32 hoặc complex64 nào.
+*
+   Giá trị IEEE-754 float64 lớn nhất có thể được biểu diễn chính xác
+   là `1.797693134862315708145274237317043567981e+308`,
+   do đó `2e+308` không thể biểu diễn thành
+   giá trị thuộc kiểu `float64` hoặc `complex128`.
+*
+   Cuối cùng, lưu ý rằng dù `0x10000000000000000`
+   có thể biểu diễn giá trị thuộc kiểu float32,
+   nhưng nó không thể biểu diễn chính xác bất kỳ giá trị float32 nào trong bộ nhớ.
+   Nói cách khác, nó sẽ được làm tròn thành giá trị float32 gần nhất có thể
+   biểu diễn chính xác trong bộ nhớ khi dùng để biểu diễn giá trị thuộc kiểu float32.

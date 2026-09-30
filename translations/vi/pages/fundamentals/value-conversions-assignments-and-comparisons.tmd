@@ -1,0 +1,591 @@
+### Quy tắc chuyển đổi, gán và so sánh giá trị trong Go
+
+Bài viết này liệt kê tất cả quy tắc chuyển đổi, gán và so sánh giá trị trong Go.
+Lưu ý rằng các kiểu type parameter (thường được dùng trong custom generics) được cố ý bỏ qua
+trong phần mô tả quy tắc chuyển đổi, khả năng gán và so sánh.
+Nói cách khác, cuốn sách này không xét đến các trường hợp có liên quan đến
+__custom generics__.
+
+    === custom generics :: https://go101.org/generics/101.html
+
+@@@ #conversion
+###=========== Quy tắc chuyển đổi giá trị
+
+{ %%
+Lưu ý, định nghĩa về chuyển đổi trong Go 101 không hoàn toàn giống với đặc tả Go.
+Chuyển đổi trong đặc tả Go có nghĩa là chuyển đổi tường minh.
+Chuyển đổi trong Go 101 bao gồm cả chuyển đổi tường minh lẫn chuyển đổi ngầm định.
+}
+
+Trong Go, nếu một giá trị `v` có thể được chuyển đổi tường minh sang kiểu `T`,
+ta có thể biểu diễn phép chuyển đổi dưới dạng `(T)(v)`.
+Trong phần lớn trường hợp, đặc biệt khi `T` là tên kiểu (một identifier),
+có thể viết gọn thành `T(v)`.
+
+Một điều cần biết là,
+khi nói một giá trị `x` có thể được chuyển đổi ngầm định sang kiểu `T`,
+điều đó cũng có nghĩa `x` có thể được chuyển đổi tường minh sang kiểu `T`.
+
+###----------- 1. Quy tắc chuyển đổi hiển nhiên
+
+@@@ .well
+Nếu hai kiểu biểu thị cùng một kiểu,
+thì các giá trị của chúng có thể được chuyển đổi **ngầm định** sang kiểu còn lại.
+
+Ví dụ:
+*
+   các giá trị kiểu `byte` và `uint8` có thể chuyển đổi qua lại.
+*
+   các giá trị kiểu `rune` và `int32` có thể chuyển đổi qua lại.
+*
+   các giá trị kiểu `[]byte` và `[]uint8` có thể chuyển đổi qua lại.
+
+
+Không cần giải thích thêm về quy tắc này, bất kể bạn cho rằng trường hợp này có thực sự là chuyển đổi hay không.
+
+@@@ #conversion-rule-underlying-types
+###----------- 2. Các quy tắc chuyển đổi liên quan đến underlying type
+
+@@@ .well
+{
+Cho một giá trị không phải interface `x` và một kiểu không phải interface `T`, giả sử kiểu của `x` là `Tx`,
+*
+   nếu `Tx` và `T` có cùng __underlying type__ (bỏ qua struct tag),
+   thì có thể chuyển đổi tường minh `x` sang `T`.
+*
+   nếu `Tx` hoặc `T` là __unnamed type__
+   và underlying type của chúng đồng nhất (có xét struct tag),
+   thì có thể chuyển đổi **ngầm định** `x` sang `T`.
+*
+   nếu `Tx` và `T` có underlying type khác nhau,
+   nhưng cả `Tx` và `T` đều là unnamed pointer type,
+   và các kiểu cơ sở của chúng có cùng underlying type (bỏ qua struct tag),
+   thì có thể chuyển đổi tường minh `x` sang `T`.
+}
+
+    === underlying type :: type-system-overview.tmd#underlying-type
+    === unnamed type :: type-system-overview.tmd#named-type
+
+// (Lưu ý: hai chỗ ghi **bỏ qua struct tag** đã có hiệu lực từ Go 1.8.)
+
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	// []int, IntSlice và MySlice có cùng
+	// underlying type: []int
+	type IntSlice []int
+	type MySlice  []int
+	type Foo = struct{n int `foo`}
+	type Bar = struct{n int `bar`}
+
+	var s  = []int{}
+	var is = IntSlice{}
+	var ms = MySlice{}
+	var x map[Bar]Foo
+	var y map[Foo]Bar
+
+	// Cả hai phép chuyển đổi ngầm định đều không hợp lệ.
+	/*
+	is = ms // error
+	ms = is // error
+	*/
+
+	// Ở đây phải dùng chuyển đổi tường minh.
+	is = IntSlice(ms)
+	ms = MySlice(is)
+	x = map[Bar]Foo(y)
+	y = map[Foo]Bar(x)
+
+	// Chuyển đổi ngầm định được phép ở đây.
+	s = is
+	is = s
+	s = ms
+	ms = s
+}
+'''
+
+
+Ví dụ về chuyển đổi liên quan đến pointer:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type MyInt int
+	type IntPtr *int
+	type MyIntPtr *MyInt
+
+	var pi = new(int)  // kiểu của pi là *int
+	// ip và pi có cùng underlying type,
+	// và kiểu của pi là unnamed, nên
+	// phép chuyển đổi ngầm định hợp lệ.
+	var ip IntPtr = pi
+
+	// var _ *MyInt = pi // không thể chuyển đổi ngầm định
+	var _ = (*MyInt)(pi) // hợp lệ, phải chuyển đổi tường minh
+
+	// Giá trị kiểu *int không thể chuyển trực tiếp sang MyIntPtr,
+	// nhưng có thể chuyển gián tiếp.
+	/*
+	var _ MyIntPtr = pi  // không thể chuyển đổi ngầm định
+	var _ = MyIntPtr(pi) // không thể chuyển đổi tường minh
+	*/
+	var _ MyIntPtr = (*MyInt)(pi)  // hợp lệ
+	var _ = MyIntPtr((*MyInt)(pi)) // hợp lệ
+
+	// Giá trị kiểu IntPtr không thể chuyển trực tiếp sang
+	// MyIntPtr, nhưng có thể chuyển gián tiếp.
+	/*
+	var _ MyIntPtr = ip  // không thể chuyển đổi ngầm định
+	var _ = MyIntPtr(ip) // không thể chuyển đổi tường minh
+	*/
+	var _ MyIntPtr = (*MyInt)((*int)(ip))  // hợp lệ
+	var _ = MyIntPtr((*MyInt)((*int)(ip))) // hợp lệ
+}
+'''
+
+###----------- 3. Quy tắc chuyển đổi riêng cho channel
+
+@@@ .well
+Cho một giá trị channel `x`, giả sử kiểu `Tx` của nó là kiểu channel hai chiều, còn `T` cũng là một kiểu channel (hai chiều hoặc một chiều).
+Nếu `Tx` và `T` có cùng kiểu phần tử,
+và `Tx` hoặc `T` là unnamed type,
+thì có thể chuyển đổi **ngầm định** `x` sang `T`.
+
+{ %%
+một lỗi tiềm ẩn: https://github.com/golang/go/issues/29469
+}
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type C chan string
+	type C1 chan<- string
+	type C2 <-chan string
+
+	var ca C
+	var cb chan string
+
+	cb = ca // hợp lệ, cùng underlying type
+	ca = cb // hợp lệ, cùng underlying type
+
+	// Với quy tắc thứ ba này, 4 dòng sau đều biên dịch được.
+	var _, _ chan<- string = ca, cb // hợp lệ
+	var _, _ <-chan string = ca, cb // hợp lệ
+	var _ C1 = cb                   // hợp lệ
+	var _ C2 = cb                   // hợp lệ
+
+	// Giá trị kiểu C không thể chuyển trực tiếp
+	// sang C1 và C2.
+	/*
+	var _ = C1(ca) // lỗi biên dịch
+	var _ = C2(ca) // lỗi biên dịch
+	*/
+
+	// Giá trị kiểu C có thể chuyển gián tiếp
+	// sang C1 và C2.
+	var _ = C1((chan<- string)(ca)) // hợp lệ
+	var _ = C2((<-chan string)(ca)) // hợp lệ
+	var _ C1 = (chan<- string)(ca)  // hợp lệ
+	var _ C2 = (<-chan string)(ca)  // hợp lệ
+}
+'''
+
+@@@ #conversion-rule-implementation
+###----------- 4. Các quy tắc chuyển đổi liên quan đến việc triển khai interface
+
+@@@ .well
+{
+Cho một giá trị `x` và một kiểu interface `I`,
+nếu kiểu (hoặc kiểu mặc định) của `x` là `Tx`
+và `Tx` triển khai `I`,
+thì có thể chuyển đổi **ngầm định** `x` sang kiểu `I`.
+Kết quả chuyển đổi là một interface value (kiểu `I`),
+bao bọc
+*  một bản sao của `x`, nếu `Tx` là kiểu không phải interface;
+*  một bản sao của dynamic value của `x`, nếu `Tx` là kiểu interface.
+}
+
+Hãy đọc __interfaces trong Go__ để biết thêm chi tiết và ví dụ.
+
+    === interfaces in Go :: interface.tmd
+
+###----------- 5. Quy tắc chuyển đổi giá trị không định kiểu
+
+@@@ .well
+Một giá trị không định kiểu có thể được chuyển đổi **ngầm định** sang kiểu `T`,
+nếu giá trị đó có thể biểu diễn dưới dạng một giá trị kiểu `T`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var _ []int = nil
+	var _ map[string]int = nil
+	var _ chan string = nil
+	var _ func()() = nil
+	var _ *bool = nil
+	var _ interface{} = nil
+
+	var _ int = 123.0
+	var _ float64 = 123
+	var _ int32 = 1.23e2
+	var _ int8 = 1 + 0i
+}
+'''
+
+###----------- 6. Quy tắc chuyển đổi hằng số
+
+//
+(Quy tắc này có phần trùng lặp với quy tắc ngay trước đó.)
+
+
+Thông thường, chuyển đổi một hằng số vẫn cho ra một hằng số
+(ngoại trừ khi kiểu đích không phải kiểu cơ bản).
+
+@@@ .well
+Cho một giá trị hằng `x` và một kiểu cơ bản `T`, nếu `x` biểu diễn được thành giá trị kiểu `T`,
+thì có thể chuyển đổi tường minh `x` sang `T`. Cụ thể, nếu `x` là giá trị không định kiểu,
+thì có thể chuyển đổi **ngầm định** `x` sang `T`.
+
+{ %%
+Lưu ý, nếu `x` là hằng số dấu phẩy động và `T` là kiểu dấu phẩy động,
+kết quả chuyển đổi `T(x)` là giá trị của `x` sau khi làm tròn theo quy tắc IEEE 754 round-to-even,
+nhưng giá trị IEEE `-0.0` được làm tròn tiếp thành `0.0` không dấu.
+}
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	// Tất cả các phép chuyển đổi ngầm định đều hợp lệ.
+	const I = 123
+	const I1, I2 int8 = 0x7F, -0x80
+	const I3, I4 int8 = I, 0.0
+	const F = 0.123456789
+	const F32 float32 = F
+	const F32b float32 = I
+	const F64 float64 = F
+	const C1, C2 complex64 = F, I
+	
+	// const F64b float64 = I3 // không biên dịch được
+	const F64b = float64(I3)   // biên dịch được
+	
+	// const I5 int = C2 // không biên dịch được
+	const I5 = int(C2)   // biên dịch được
+}
+'''
+
+###----------- 7. Các quy tắc chuyển đổi số không phải hằng số
+
+@@@ .well
+Các giá trị dấu phẩy động và số nguyên không phải hằng số có thể được chuyển đổi tường minh
+sang mọi kiểu dấu phẩy động và số nguyên.
+
+@@@ .well
+Các giá trị số phức không phải hằng số có thể được chuyển đổi tường minh sang mọi kiểu số phức.
+
+Lưu ý:
+*  Giá trị số phức không phải hằng số không thể chuyển đổi sang kiểu dấu phẩy động và số nguyên.
+*  Giá trị dấu phẩy động và số nguyên không phải hằng số không thể chuyển đổi sang kiểu số phức.
+*  Trong phép chuyển đổi số không phải hằng số, cho phép tràn dữ liệu và làm tròn.
+   Khi chuyển giá trị dấu phẩy động không phải hằng số sang số nguyên, phần thập phân bị loại bỏ (cắt về 0).
+
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a, b = 1.6, -1.6 // cả hai đều có kiểu float64
+	fmt.Println(int(a), int(b)) // 1 -1
+
+	var i, j int16 = 0x7FFF, -0x8000
+	fmt.Println(int8(i), uint16(j)) // -1 32768
+
+	var c1 complex64 = 1 + 2i
+	var _ = complex128(c1)
+}
+'''
+
+###----------- 8. Các quy tắc chuyển đổi liên quan đến string
+
+@@@ .well
+Nếu kiểu (hoặc kiểu mặc định) của một giá trị là kiểu số nguyên,
+thì có thể chuyển đổi tường minh giá trị đó sang kiểu string.
+
+@@@ .well
+Có thể chuyển đổi tường minh một giá trị string sang kiểu slice
+có underlying type là `[]byte` (còn gọi là `[]uint8`),
+và ngược lại.
+
+@@@ .well
+Có thể chuyển đổi tường minh một giá trị string sang kiểu slice
+có underlying type là `[]rune` (còn gọi là `[]int32`),
+và ngược lại.
+
+Hãy đọc __strings trong Go__ để biết thêm chi tiết và ví dụ.
+
+    === strings in Go :: string.tmd#conversions
+
+###----------- 9. Các phép chuyển đổi liên quan đến slice
+
+@@@ .well
+Từ Go 1.17, có thể chuyển đổi một slice sang array pointer.
+Trong phép chuyển đổi này, nếu độ dài của base array type thuộc kiểu pointer
+lớn hơn độ dài của slice, chương trình sẽ panic.
+
+Xem __ví dụ__.
+
+    === an example :: container.tmd#slice-to-array-pointer
+
+@@@ .well
+Từ Go 1.20, có thể chuyển đổi một slice sang array.
+Trong phép chuyển đổi này, nếu độ dài của kiểu array
+lớn hơn độ dài của slice, chương trình sẽ panic.
+
+Xem __ví dụ__.
+
+    === an example :: container.tmd#slice-to-array
+
+###----------- 10. Các quy tắc chuyển đổi liên quan đến unsafe pointer
+
+@@@ .well
+Có thể chuyển đổi tường minh một giá trị pointer thuộc bất kỳ kiểu nào
+sang kiểu có underlying type là `unsafe.Pointer`, và ngược lại.
+
+@@@ .well
+Có thể chuyển đổi tường minh một giá trị `uintptr`
+sang kiểu có underlying type là `unsafe.Pointer`, và ngược lại.
+
+Hãy đọc __unsafe pointer trong Go__ để biết thêm chi tiết và ví dụ.
+
+    === type-unsafe pointers in Go :: unsafe.tmd
+
+###=========== Quy tắc gán giá trị
+
+Có thể xem phép gán là một dạng chuyển đổi ngầm định.
+Các quy tắc chuyển đổi ngầm định được liệt kê trong phần quy tắc chuyển đổi phía trên.
+
+Ngoài những quy tắc đó, giá trị đích trong phép gán phải là giá trị có thể lấy địa chỉ,
+biểu thức chỉ mục của map hoặc blank identifier.
+
+{ %%
+@@@ .well
+{
+Trong phép gán, nếu giá trị đích là một biến mới được khai báo mà không chỉ định
+type trong code, thì kiểu của biến mới là
+*  kiểu của giá trị nguồn, nếu giá trị nguồn có kiểu cụ thể;
+*  kiểu mặc định của giá trị nguồn, nếu giá trị nguồn là hằng số không định kiểu.
+}
+}
+
+Trong phép gán, giá trị nguồn được sao chép sang giá trị đích.
+Nói chính xác hơn, __phần trực tiếp__
+của giá trị nguồn được sao chép sang giá trị đích.
+
+    === direct part :: value-part.tmd
+
+Lưu ý, việc truyền tham số và trả về kết quả thực chất đều là các phép gán giá trị.
+
+{ %%
+Trong phần lớn phép gán giá trị, __phần trực tiếp__
+của mỗi giá trị nguồn được sao chép sang phần trực tiếp của giá trị đích tương ứng,
+ngoại trừ trường hợp giá trị đích là interface value.
+
+Trong phép gán, nếu giá trị đích là interface value còn giá trị nguồn thì không,
+thì (phần trực tiếp của) giá trị nguồn
+sẽ được sao chép và bản sao được lưu trong
+interface value đích dưới dạng dynamic value.
+Compiler tiêu chuẩn có một số xử lý đặc biệt ở đây
+nếu giá trị nguồn không phải pointer.
+Nếu giá trị nguồn không phải pointer,
+phần trực tiếp của giá trị nguồn
+sẽ được sao chép và một pointer trỏ đến bản sao (ẩn và bất biến)
+sẽ được lưu trong interface value đích.
+
+Trong phép gán,
+nếu cả giá trị đích và giá trị nguồn đều là interface value,
+thì (phần trực tiếp của) dynamic value của interface value nguồn
+sẽ được sao chép và bản sao được lưu trong
+interface value đích dưới dạng dynamic value.
+Compiler tiêu chuẩn thực hiện một số tối ưu hóa ở đây để
+trong quá trình này luôn chỉ sao chép một pointer.
+}
+
+@@@ #comparison-rules
+###=========== Quy tắc so sánh giá trị
+
+    === states :: https://golang.org/ref/spec#Comparison_operators
+
+Đặc tả Go __quy định__:
+
+@@@ .alert;alert-success
+Trong mọi phép so sánh, toán hạng thứ nhất phải gán được cho kiểu của toán hạng thứ hai, hoặc ngược lại.
+
+Vì vậy, quy tắc so sánh khá giống quy tắc gán.
+Nói cách khác, hai giá trị so sánh được với nhau nếu một trong hai có thể được chuyển đổi ngầm định sang kiểu của giá trị còn lại.
+Đúng vậy chứ? Gần đúng, vì còn một quy tắc khác được ưu tiên cao hơn quy tắc so sánh cơ bản nêu trên.
+
+{ %%
+https://github.com/golang/go/issues/28164#issuecomment-430733364
+}
+
+@@@ .alert;alert-danger
+Nếu cả hai toán hạng trong phép so sánh đều có kiểu cụ thể, thì kiểu của cả hai phải là __kiểu có thể so sánh__.
+
+    === comparable types :: type-system-overview.tmd#types-not-support-comparison
+
+Theo quy tắc trên, nếu một kiểu không thể so sánh (và bắt buộc phải là kiểu không phải interface) triển khai một kiểu interface,
+thì không được so sánh các giá trị thuộc hai kiểu này, dù các giá trị kiểu trước (không phải interface)
+có thể được chuyển đổi ngầm định sang kiểu interface sau.
+
+Lưu ý, dù các giá trị kiểu slice/map/function không hỗ trợ phép so sánh,
+vẫn có thể so sánh chúng với giá trị nil không định kiểu (còn gọi là identifier `nil` đứng riêng).
+
+Các quy tắc cơ bản vừa mô tả chưa bao quát hết mọi trường hợp.
+Nếu cả hai toán hạng trong phép so sánh đều là giá trị không định kiểu (hằng số) thì sao?
+Các quy tắc bổ sung khá đơn giản:
+*
+   giá trị boolean không định kiểu có thể so sánh với giá trị boolean không định kiểu khác.
+*
+   giá trị số không định kiểu có thể so sánh với giá trị số không định kiểu khác.
+*
+   giá trị string không định kiểu có thể so sánh với giá trị string không định kiểu khác.
+
+
+Kết quả so sánh hai giá trị số không định kiểu đúng như trực giác thông thường.
+
+Lưu ý, không thể so sánh một giá trị nil không định kiểu với một giá trị nil không định kiểu khác.
+
+Mọi phép so sánh đều cho kết quả là một giá trị boolean không định kiểu.
+
+Ví dụ sau minh họa một số phép so sánh liên quan đến các kiểu không thể so sánh.
+
+@@@ .line-numbers
+''' go
+package main
+
+// Một số biến có kiểu không thể so sánh.
+var s []int
+var m map[int]int
+var f func()()
+var t struct {x []int}
+var a [5]map[int]int
+
+func main() {
+	// Các dòng sau không biên dịch được.
+	/*
+	_ = s == s
+	_ = m == m
+	_ = f == f
+	_ = t == t
+	_ = a == a
+	_ = nil == nil
+	_ = s == interface{}(nil)
+	_ = m == interface{}(nil)
+	_ = f == interface{}(nil)
+	*/
+
+	// Các dòng sau biên dịch được.
+	_ = s == nil
+	_ = m == nil
+	_ = f == nil
+	_ = 123 == interface{}(nil)
+	_ = true == interface{}(nil)
+	_ = "abc" == interface{}(nil)
+}
+'''
+
+
+
+@@@ #comparison-implementation
+###----------- Hai giá trị được so sánh như thế nào?
+
+Giả sử hai giá trị so sánh được và chúng có cùng kiểu `T`.
+(Nếu chúng có kiểu khác nhau, một trong hai phải có thể được chuyển đổi ngầm định sang kiểu của giá trị còn lại.
+Ở đây ta không xét trường hợp cả hai giá trị đều không định kiểu.)
+*.
+   Nếu `T` là kiểu boolean,
+   thì hai giá trị bằng nhau chỉ khi cả hai cùng là `true` hoặc cùng là `false`.
+*.
+   Nếu `T` là kiểu số nguyên,
+   thì hai giá trị bằng nhau chỉ khi chúng có cùng biểu diễn trong bộ nhớ.
+*.
+   Nếu `T` là kiểu dấu phẩy động,
+   thì hai giá trị bằng nhau chỉ khi thỏa mãn một trong các điều kiện sau:
+   *  cả hai đều là `+Inf`.
+   *  cả hai đều là `-Inf`.
+   *  mỗi giá trị đều là `-0.0` hoặc `+0.0`.
+   *  cả hai đều không phải `NaN` và có cùng biểu diễn byte trong bộ nhớ.
+
+*.
+   Nếu `T` là kiểu số phức,
+   thì hai giá trị bằng nhau chỉ khi phần thực (dưới dạng giá trị dấu phẩy động)
+   và phần ảo (dưới dạng giá trị dấu phẩy động) của chúng đều bằng nhau.
+*.
+   Nếu `T` là kiểu pointer (an toàn hoặc unsafe),
+   thì hai giá trị bằng nhau chỉ khi địa chỉ bộ nhớ được lưu trong chúng bằng nhau.
+*.
+   Nếu `T` là kiểu channel, hai giá trị channel bằng nhau
+   nếu cả hai cùng tham chiếu đến một giá trị cấu trúc channel nội bộ
+   hoặc cả hai đều là channel nil.
+*.
+   Nếu `T` là kiểu struct, thì
+   __từng cặp field tương ứng
+   của hai giá trị struct sẽ được so sánh__.
+*.
+   Nếu `T` là kiểu array, thì
+   __từng cặp phần tử tương ứng
+   của hai giá trị array sẽ được so sánh__.
+*.
+   Nếu `T` là kiểu interface, hãy đọc
+   __cách so sánh hai giá trị interface__.
+*.
+   Nếu `T` là kiểu string, hãy đọc
+   __cách so sánh hai giá trị string__.
+
+    === ... struct values will be compared :: struct.tmd#comparison
+    === ... array values will be compared :: container.tmd#comparison
+    === ... interface values are compared :: interface.tmd#comparison
+    === ... string values are compared :: string.tmd#comparison
+
+Lưu ý, so sánh hai interface có cùng dynamic type không thể so sánh sẽ gây panic.
+Ví dụ sau minh họa một số phép so sánh có thể gây panic.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	type T struct {
+		a interface{}
+		b int
+	}
+	var x interface{} = []int{}
+	var y = T{a: x}
+	var z = [3]T{{a: y}}
+
+	// Mỗi dòng sau đều có thể gây panic.
+	_ = x == x
+	_ = y == y
+	_ = z == z
+}
+'''
+
+
+

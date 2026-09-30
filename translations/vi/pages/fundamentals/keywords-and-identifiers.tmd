@@ -1,0 +1,114 @@
+### Từ khóa và identifier trong Go
+
+Bài viết này giới thiệu các từ khóa và identifier trong Go.
+
+@@@ #keyword
+###========== Từ khóa
+
+Từ khóa là những từ đặc biệt giúp compiler hiểu và phân tích mã do người dùng viết.
+
+Tính đến hiện tại (Go 1.25), Go chỉ có 25 từ khóa:
+
+@@@ .line-numbers;fixed-width
+''' go
+break     default      func    interface  select
+case      defer        go      map        struct
+chan      else         goto    package    switch
+const     fallthrough  if      range      type
+continue  for          import  return     var
+'''
+
+Chúng có thể được chia thành bốn nhóm:
+*
+   `const`, `func`, `import`, `package`, `type` và `var`
+   được dùng để khai báo mọi loại phần tử mã trong chương trình Go.
+*
+   `chan`, `interface`, `map` và `struct`
+   được dùng làm thành phần trong một số biểu thức kiểu tổ hợp.
+*
+   `break`, `case`, `continue`, `default`, `else`, `fallthrough`,
+   `for`, `goto`, `if`, `range`, `return`, `select` và `switch`
+   được dùng để điều khiển luồng thực thi của mã.
+*
+   `defer` và `go` cũng là các từ khóa điều khiển luồng, nhưng hoạt động theo những cách riêng.
+   Chúng bổ nghĩa cho lời gọi hàm; chúng ta sẽ tìm hiểu về điều này trong __bài viết này__.
+
+    === bài viết này :: control-flows-more.tmd
+
+
+Các từ khóa này sẽ được giải thích chi tiết trong những bài viết khác.
+
+@@@ #identifier
+###========== Identifier
+
+Identifier là một token chỉ có thể gồm các chữ cái Unicode,
+các chữ số Unicode và `_` (dấu gạch dưới), đồng thời phải bắt đầu bằng
+một chữ cái Unicode hoặc `_`.
+Ở đây,
+*
+   chữ cái Unicode là các ký tự thuộc những nhóm Letter
+   // Lu //, // Ll //, // Lt //, // Lm // hoặc // Lo //.
+*
+   chữ số Unicode là các ký tự thuộc nhóm Number
+   // Nd // trong Tiêu chuẩn Unicode.
+
+**Từ khóa** không thể được dùng làm identifier.
+
+Identifier `_` là một identifier đặc biệt, được gọi là **blank identifier**.
+
+Sau này, chúng ta sẽ biết rằng mọi tên kiểu, biến, hằng, nhãn,
+tên package và tên import package đều phải là identifier.
+
+Identifier bắt đầu bằng một __chữ cái Unicode viết hoa__
+được gọi là **identifier được export**.
+Từ **// được export //** có thể được hiểu là
+**// public //** trong nhiều ngôn ngữ khác.
+Các identifier không bắt đầu bằng chữ cái Unicode viết hoa được gọi là identifier không được export.
+Từ **// không được export //** có thể được hiểu là
+**// private //** trong nhiều ngôn ngữ khác.
+Hiện tại (Go 1.25), các ký tự phương Đông được xem là chữ cái không được export.
+Đôi khi, identifier không được export cũng được gọi là unexported identifier.
+
+    === chữ cái Unicode viết hoa :: https://www.fileformat.info/info/unicode/category/Lu/list.htm
+
+Dưới đây là một số identifier được export hợp lệ:
+@@@ .line-numbers;fixed-width
+''' go
+Player_9
+DoSomething
+VERSION
+Ĝo
+Π
+'''
+
+Dưới đây là một số identifier không được export hợp lệ:
+@@@ .line-numbers;fixed-width
+''' go
+_
+_status
+memStat
+book
+π
+一个类型
+변수
+エラー
+'''
+
+Còn dưới đây là một số token không hợp lệ khi dùng làm identifier:
+@@@ .line-numbers;fixed-width
+''' go
+// Bắt đầu bằng một chữ số Unicode.
+123
+3apples
+
+// Chứa ký tự Unicode không
+// đáp ứng các yêu cầu.
+a.b
+*ptr
+$name
+a@b.c
+
+// Đây là các từ khóa.
+type
+range
+'''

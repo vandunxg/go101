@@ -1,0 +1,337 @@
+### Khai báo hàm và lời gọi hàm
+
+Ngoài các phép toán với toán tử được giới thiệu trong bài trước,
+các thao tác với hàm cũng là một loại thao tác phổ biến trong lập trình.
+Các thao tác này thường được gọi là lời gọi hàm.
+Bài viết này giới thiệu cách khai báo và gọi hàm.
+
+@@@ #declaration
+###========== Khai báo hàm
+
+Hãy xem một khai báo hàm.
+@@@ .line-numbers
+''' go
+func SquaresOfSumAndDiff(a int64, b int64) (s int64, d int64) {
+	x, y := a + b, a - b
+	s = x * x
+	d = y * y
+	return // <=> return s, d
+}
+'''
+
+Ta có thể thấy một khai báo hàm gồm nhiều phần.
+Theo thứ tự từ trái sang phải:
+
+*.
+   Phần đầu tiên là từ khóa `func`.
+*.
+   Phần tiếp theo là tên hàm, tên này phải là một identifier.
+   Ở đây, tên hàm là `SquareOfSumAndDiff`.
+*.
+   Phần thứ ba là danh sách khai báo tham số đầu vào,
+   được đặt trong một cặp `()`.
+*.
+   Phần thứ tư là danh sách khai báo kết quả đầu ra (hay kết quả trả về).
+   Hàm Go có thể trả về nhiều kết quả.
+   Trong ví dụ cụ thể này, danh sách khai báo kết quả cũng được đặt trong một cặp `()`.
+   Tuy nhiên, nếu danh sách này trống hoặc chỉ gồm một khai báo kết quả không tên,
+   thì có thể bỏ cặp `()` trong danh sách khai báo kết quả (xem chi tiết bên dưới).
+*.
+   Phần cuối cùng là thân hàm,
+   được đặt trong một cặp `{}`.
+   Trong thân hàm,
+   từ khóa `return` dùng để kết thúc luồng thực thi bình thường theo thứ tự
+   và chuyển sang giai đoạn thoát (xem phần sau nữa) của một lời gọi hàm.
+
+Trong ví dụ trên, mỗi khai báo tham số và kết quả gồm
+một tên và một kiểu (kiểu đứng sau tên).
+Có thể xem khai báo tham số và kết quả như khai báo biến thông thường
+nhưng không có từ khóa `var`.
+Hàm được khai báo ở trên có hai tham số là `a` và `b`,
+và có hai kết quả là `s` và `d`.
+Kiểu của tất cả tham số và kết quả đều là `int64`.
+Tham số và kết quả được xem là các biến cục bộ bên trong
+thân hàm tương ứng.
+
+Các tên trong danh sách khai báo kết quả của một khai báo hàm
+có thể hoặc phải được viết đồng loạt, hoặc đồng loạt bị lược bỏ.
+Cả hai cách đều thường được dùng trong thực tế.
+Nếu một kết quả được khai báo kèm tên,
+thì đó được gọi là kết quả có tên;
+nếu không, đó là kết quả không tên.
+
+Khi tất cả kết quả trong khai báo hàm đều không tên,
+thì trong thân hàm tương ứng,
+từ khóa `return` phải theo sau bởi một dãy giá trị trả về,
+mỗi giá trị tương ứng với một khai báo kết quả của hàm.
+Ví dụ, khai báo hàm sau tương đương với khai báo ở trên.
+@@@ .line-numbers
+''' go
+func SquaresOfSumAndDiff(a int64, b int64) (int64, int64) {
+	return (a+b) * (a+b), (a-b) * (a-b)
+}
+'''
+
+Trên thực tế, nếu các tham số hoàn toàn không được dùng trong thân hàm tương ứng,
+thì cũng có thể đồng loạt lược bỏ tên trong danh sách khai báo tham số của hàm.
+Tuy vậy, tham số không tên hiếm khi được dùng trong thực tế.
+
+Mặc dù trông như các biến tham số và kết quả được khai báo
+bên ngoài thân hàm, chúng vẫn được xem là các biến cục bộ thông thường bên trong thân hàm.
+Điểm khác biệt là các biến cục bộ có tên không phải `_` được khai báo
+trong thân hàm luôn phải được sử dụng trong thân hàm.
+Các tên khác `_` của biến cục bộ cấp package, tham số và kết quả
+trong một khai báo hàm không được trùng nhau.
+
+Go không hỗ trợ giá trị tham số mặc định.
+Giá trị ban đầu của mỗi kết quả là zero value của kiểu tương ứng.
+Ví dụ, hàm sau luôn in ra (và trả về) `0 false`.
+@@@ .line-numbers
+''' go
+func f() (x int, y bool) {
+	println(x, y) // 0 false
+	return
+}
+'''
+
+Nếu phần kiểu của một số tham số liên tiếp trong danh sách khai báo tham số giống nhau,
+thì các tham số đó có thể dùng chung phần kiểu trong danh sách.
+Điều tương tự cũng áp dụng cho danh sách khai báo kết quả.
+Ví dụ, hai khai báo hàm `SquaresOfSumAndDiff` ở trên tương đương với khai báo sau:
+@@@ .line-numbers
+''' go
+func SquaresOfSumAndDiff(a, b int64) (s, d int64) {
+	return (a+b) * (a+b), (a-b) * (a-b)
+	// Dòng trên tương đương
+	// với dòng sau.
+	/*
+	s = (a+b) * (a+b); d = (a-b) * (a-b); return
+	*/
+}
+'''
+
+Lưu ý rằng, kể cả khi cả hai kết quả đều có tên,
+từ khóa `return` vẫn có thể theo sau bởi các giá trị trả về.
+
+Nếu danh sách khai báo kết quả trong một khai báo hàm chỉ có một khai báo kết quả không tên,
+thì không cần đặt danh sách đó trong `()`.
+Nếu khai báo hàm không có kết quả trả về,
+thì có thể bỏ hoàn toàn phần danh sách khai báo kết quả.
+Không thể bỏ phần danh sách khai báo tham số,
+kể cả khi hàm được khai báo không có tham số nào.
+
+Dưới đây là một số ví dụ khai báo hàm khác.
+@@@ .line-numbers
+''' go
+func CompareLower4bits(m, n uint32) (r bool) {
+	r = m&0xF > n&0xF
+	return
+	// Hai dòng trên tương đương
+	// với dòng sau.
+	/*
+	return m&0xF > n&0xF
+	*/
+}
+
+// Hàm này không có tham số. Danh sách khai báo
+// kết quả chỉ gồm một kết quả không tên, vì vậy
+// không cần đặt danh sách trong ().
+func VersionString() string {
+	return "go1.0"
+}
+
+// Hàm này không có kết quả. Tất cả tham số
+// đều không có tên vì ta không cần dùng đến chúng.
+// Danh sách khai báo kết quả để trống (nên được lược bỏ).
+func doNothing(string, int) {
+}
+'''
+
+Một điều ta đã biết từ các bài viết trước trong Go 101 là
+hàm `main` làm điểm vào của mỗi chương trình Go được khai báo
+không có tham số và kết quả.
+
+Lưu ý rằng hàm phải được khai báo trực tiếp ở cấp package.
+Nói cách khác, không thể khai báo một hàm bên trong thân của hàm khác.
+Ở phần sau, ta sẽ biết rằng có thể định nghĩa hàm ẩn danh bên trong thân các hàm khác.
+Tuy nhiên, hàm ẩn danh không phải là khai báo hàm.
+
+@@@ #call
+###========== Lời gọi hàm
+
+Có thể gọi một hàm đã khai báo bằng tên hàm theo sau là danh sách đối số.
+Danh sách đối số phải được đặt trong `()`.
+Ta thường gọi việc này là truyền đối số (hay truyền tham số).
+Mỗi đối số đơn trị tương ứng với (được truyền cho) một tham số.
+
+Lưu ý: truyền đối số cũng là phép gán giá trị.
+
+Kiểu của đối số không bắt buộc phải giống hệt kiểu của tham số tương ứng.
+Điều kiện duy nhất là đối số phải __assignable__
+(tức có thể được chuyển đổi ngầm) sang kiểu của tham số tương ứng.
+
+    === assignable :: constants-and-variables.tmd#assignment
+
+Nếu hàm có kết quả trả về, mỗi lần gọi hàm được xem là một biểu thức.
+Nếu hàm trả về nhiều kết quả, mỗi lần gọi hàm được xem là một biểu thức đa giá trị.
+Có thể gán một biểu thức đa giá trị cho một danh sách giá trị đích có cùng số lượng phần tử.
+
+Ví dụ đầy đủ sau minh họa cách gọi một số hàm đã khai báo.
+
+@@@ .line-numbers
+''' go
+package main
+
+func SquaresOfSumAndDiff(a int64, b int64) (int64, int64) {
+	return (a+b) * (a+b), (a-b) * (a-b)
+}
+
+func CompareLower4bits(m, n uint32) (r bool) {
+	r = m&0xF > n&0xF
+	return
+}
+
+// Khởi tạo một biến cấp package
+// bằng lời gọi hàm.
+var v = VersionString()
+
+func main() {
+	println(v) // v1.0
+	x, y := SquaresOfSumAndDiff(3, 6)
+	println(x, y) // 81 9
+	b := CompareLower4bits(uint32(x), uint32(y))
+	println(b) // false
+	// "Go" được suy ra là một string,
+	// còn 1 được suy ra là một int32.
+	doNothing("Go", 1)
+}
+
+func VersionString() string {
+	return "v1.0"
+}
+
+func doNothing(string, int32) {
+}
+'''
+
+Từ ví dụ trên, ta biết một hàm có thể được khai báo
+trước hoặc sau bất kỳ lời gọi nào đến hàm đó.
+
+Trong Go, lời gọi hàm có thể được trì hoãn hoặc được thực thi trong goroutine mới (luồng nhẹ).
+Hãy đọc __một bài viết sau__ để biết chi tiết.
+
+    === a later article :: control-flows-more.tmd
+
+@@@ #exiting-phase
+###========== Giai đoạn thoát (hay trả về) của một lời gọi hàm
+
+Trong Go, ngoài giai đoạn thực thi bình thường theo thứ tự,
+một lời gọi hàm còn có thể trải qua giai đoạn thoát (còn gọi là giai đoạn trả về).
+Giai đoạn thoát của lời gọi hàm bắt đầu khi hàm được gọi thực hiện trả về.
+Nói cách khác, khi lời gọi hàm trả về thì có thể hàm đó vẫn chưa thoát hẳn.
+
+Có thể xem giải thích chi tiết hơn về giai đoạn thoát của lời gọi hàm trong
+__bài viết này__.
+
+    === this article :: panic-and-recover-more.tmd#exiting-phase
+
+###========== Hàm ẩn danh
+
+Go hỗ trợ hàm ẩn danh.
+Định nghĩa hàm ẩn danh gần giống với khai báo hàm,
+ngoại trừ phần định nghĩa hàm ẩn danh không có tên hàm.
+
+Có thể gọi hàm ẩn danh ngay sau khi định nghĩa.
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	// Hàm ẩn danh này không có tham số
+	// nhưng có hai kết quả.
+	x, y := func() (int, int) {
+		println("This function has no parameters.")
+		return 3, 4
+	}() // Gọi hàm. Không cần đối số.
+
+	// Hàm ẩn danh sau không có kết quả.
+
+	func(a, b int) {
+		// Dòng sau in ra: a*a + b*b = 25
+		println("a*a + b*b =", a*a + b*b)
+	}(x, y) // Truyền đối số x và y cho tham số a và b.
+
+	func(x int) {
+		// Tham số x che khuất biến x ở phạm vi bên ngoài.
+		// Dòng sau in ra: x*x + y*y = 32
+		println("x*x + y*y =", x*x + y*y)
+	}(y) // Truyền đối số y cho tham số x.
+
+	func() {
+		// Dòng sau in ra: x*x + y*y = 25
+		println("x*x + y*y =", x*x + y*y)
+	}() // Không cần đối số.
+}
+'''
+
+Lưu ý rằng hàm ẩn danh cuối cùng nằm trong phạm vi của
+các biến `x` và `y` được khai báo ở trên,
+nên có thể trực tiếp sử dụng hai biến này.
+Những hàm như vậy được gọi là closure.
+Trên thực tế, có thể xem mọi hàm do người dùng định nghĩa trong Go là closure.
+Đó là lý do các hàm Go linh hoạt như hàm trong nhiều ngôn ngữ động.
+
+Ở phần sau, ta sẽ biết rằng có thể gán một hàm ẩn danh
+cho một giá trị hàm rồi gọi nó vào bất kỳ lúc nào sau đó.
+
+###========== Hàm dựng sẵn
+
+Go có một số hàm dựng sẵn,
+ví dụ như các hàm `println` và `print`.
+Ta có thể gọi các hàm này mà không cần import package nào.
+
+Ta có thể dùng các hàm dựng sẵn `real` và `imag`
+để lấy phần thực và phần ảo của một giá trị phức.
+Ta có thể dùng hàm dựng sẵn `complex` để tạo một giá trị phức.
+Lưu ý rằng nếu mọi đối số của một lời gọi đến một trong hai hàm này
+đều là hằng số,
+thì lời gọi được tính toán tại thời điểm biên dịch,
+và giá trị kết quả của lời gọi cũng là một hằng số.
+Đặc biệt, nếu có bất kỳ đối số nào là hằng số không định kiểu,
+thì giá trị kết quả cũng là hằng số không định kiểu.
+Lời gọi đó được xem là một biểu thức hằng.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+// c là một hằng số phức không định kiểu.
+const c = complex(1.6, 3.3)
+
+// Kết quả của real(c) và imag(c) đều là
+// giá trị dấu phẩy động không định kiểu. Bên dưới,
+// cả hai đều được suy ra là giá trị kiểu float32.
+var a, b float32 = real(c), imag(c)
+
+// d được suy ra là giá trị có kiểu complex64.
+// Kết quả của real(d) và imag(d) đều là
+// giá trị có kiểu float32.
+var d = complex(a, b)
+
+// e được suy ra là giá trị có kiểu complex128.
+// Kết quả của real(e) và imag(e) đều là
+// giá trị có kiểu float64.
+var e = c
+'''
+
+Các hàm dựng sẵn khác sẽ được giới thiệu trong những bài viết Go 101 sau.
+
+###========== Tìm hiểu thêm về hàm
+
+Còn nhiều khái niệm và chi tiết liên quan đến hàm
+chưa được đề cập trong bài viết này.
+Ta sẽ tìm hiểu chúng trong bài viết sau về
+__kiểu và giá trị hàm__.
+
+    === function types and values :: function.tmd
+

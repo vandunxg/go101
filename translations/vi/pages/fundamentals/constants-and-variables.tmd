@@ -1,0 +1,987 @@
+### Hằng số và biến
+
+Bài viết này giới thiệu cách khai báo hằng số và biến trong Go.
+Bài viết cũng giới thiệu khái niệm giá trị chưa định kiểu và phép chuyển đổi tường minh.
+
+Các literal được giới thiệu trong __bài viết trước__ đều được gọi là hằng số không tên (hoặc hằng số literal), ngoại trừ `false` và `true`, là hai hằng số có tên được khai báo sẵn (tích hợp sẵn). Bài viết này sẽ giới thiệu cách khai báo hằng số có tên tùy chỉnh.
+
+    === bài viết trước :: basic-types-and-value-literals.tmd
+
+@@@ #untyped-value
+###=========== Giá trị chưa định kiểu và giá trị có định kiểu
+
+Trong Go, một số giá trị chưa có định kiểu.
+Giá trị chưa định kiểu là giá trị mà kiểu của nó chưa được xác định.
+Ngược lại, kiểu của giá trị có định kiểu đã được xác định.
+
+Hầu hết giá trị chưa định kiểu đều có một kiểu mặc định.
+`nil` được khai báo sẵn là giá trị chưa định kiểu duy nhất
+không có kiểu mặc định.
+Ta sẽ tìm hiểu thêm về `nil` trong các bài Go 101 khác.
+
+Mọi hằng số literal (hằng số không tên) đều là giá trị chưa định kiểu. Trên thực tế, trong Go, phần lớn giá trị chưa định kiểu là hằng số literal và hằng số có tên (sẽ được giới thiệu bên dưới trong bài này). Các giá trị chưa định kiểu khác gồm `nil` vừa đề cập và một số kết quả boolean do các phép toán sẽ được giới thiệu trong những bài khác trả về.
+
+Kiểu mặc định của một hằng số literal được xác định dựa trên dạng literal của nó.
+*
+   Kiểu mặc định của string literal là `string`.
+*
+   Kiểu mặc định của boolean literal là `bool`.
+*
+   Kiểu mặc định của integer literal là `int`.
+*
+   Kiểu mặc định của rune literal là `rune` (hay còn gọi là `int32`).
+*
+   Kiểu mặc định của floating-point literal là `float64`.
+*
+   Nếu literal có phần ảo,
+   kiểu mặc định của nó là `complex128`.
+
+@@@ #explicit-conversion
+###=========== Chuyển đổi tường minh các hằng số chưa định kiểu
+
+Giống nhiều ngôn ngữ khác, Go cũng hỗ trợ chuyển đổi giá trị.
+Ta có thể dùng dạng `T(v)` để chuyển giá trị `v`
+sang kiểu được biểu thị bởi `T`
+(hay nói ngắn gọn là kiểu `T`).
+Nếu phép chuyển đổi `T(v)` hợp lệ,
+compiler Go xem `T(v)` là giá trị có định kiểu `T`.
+Dĩ nhiên, để phép chuyển đổi `T(v)` hợp lệ với một kiểu `T` cụ thể,
+giá trị `v` không thể tùy ý.
+
+Các quy tắc dưới đây áp dụng cho cả hằng số literal được giới thiệu trong
+bài viết trước và hằng số có tên chưa định kiểu sẽ được giới thiệu ngay sau đây.
+
+Với hằng số chưa định kiểu `v`,
+có hai trường hợp mà `T(v)` hợp lệ.
+*.
+   `v` (hoặc literal mà `v` biểu thị) có thể
+   __biểu diễn được__
+   dưới dạng một giá trị thuộc kiểu cơ bản `T`.
+   Giá trị kết quả là hằng số có định kiểu `T`.
+*.
+   Kiểu mặc định của `v` là kiểu số nguyên (`int`
+   hoặc `rune`) và `T` là kiểu string.
+   Kết quả của `T(v)` là một string kiểu `T`,
+   chứa biểu diễn UTF-8 của số nguyên dưới dạng một mã điểm Unicode.
+   Giá trị số nguyên nằm ngoài miền mã điểm Unicode hợp lệ
+   tạo ra string có biểu diễn `"\uFFFD"`
+   (hay `"\xef\xbf\xbd"`).
+   `0xFFFD` là mã điểm của ký tự thay thế Unicode.
+   String thu được khi chuyển đổi từ số nguyên luôn chứa đúng một rune.
+   (Lưu ý: các phiên bản Go sau này có thể __chỉ cho phép chuyển integer kiểu rune hoặc byte sang string__.
+   Từ Go Toolchain 1.15, lệnh `go vet` cảnh báo việc chuyển integer không phải rune hoặc byte sang string.)
+
+    === biểu diễn được :: basic-types-and-value-literals.tmd#representability
+    === ... sang string :: https://github.com/golang/go/issues/3939
+
+!
+   Trên thực tế, trường hợp thứ hai không yêu cầu `v` phải là hằng số.
+   Nếu `v` là hằng số thì kết quả chuyển đổi cũng là hằng số;
+   nếu không, kết quả không phải hằng số.
+
+Ví dụ, các phép chuyển đổi sau đều hợp lệ.
+@@@ .disable-line-numbers111
+''' go
+// Việc làm tròn xảy ra ở 3 dòng sau.
+complex128(1 + -1e-1000i)  // 1.0+0.0i
+float32(0.49999999)        // 0.5
+float32(17000000000000000)
+// Các dòng này không làm tròn.
+float32(123)
+uint(1.0)
+int8(-123)
+int16(6+0i)
+complex128(789)
+
+string(65)          // "A"
+string('A')         // "A"
+string('\u68ee')    // "森"
+string(-1)          // "\uFFFD"
+string(0xFFFD)      // "\uFFFD"
+string(0x2FFFFFFFF) // "\uFFFD"
+'''
+
+Còn các phép chuyển đổi sau đều không hợp lệ.
+@@@ .disable-line-numbers111
+''' go
+// 1.23 không thể biểu diễn thành giá trị kiểu int.
+int(1.23)
+// -1 không thể biểu diễn thành giá trị kiểu uint8.
+uint8(-1)
+// 1+2i không thể biểu diễn thành giá trị kiểu float64.
+float64(1+2i)
+
+// Hằng số -1e+1000 tràn kiểu float64.
+float64(-1e1000)
+// Hằng số 0x10000000000000000 tràn kiểu int.
+int(0x10000000000000000)
+
+// Kiểu mặc định của 65.0 là float64,
+// vốn không phải kiểu integer.
+string(65.0)
+// Kiểu mặc định của 66+0i là complex128,
+// vốn không phải kiểu integer.
+string(66+0i)
+'''
+
+!
+   Từ các ví dụ trên, ta thấy một hằng số chưa định kiểu
+   (chẳng hạn `-1e1000` và `0x10000000000000000`)
+   thậm chí có thể không biểu diễn được thành giá trị thuộc kiểu mặc định của nó.
+
+Lưu ý rằng,
+đôi khi phải viết phép chuyển đổi tường minh dưới dạng `(T)(v)`
+để tránh nhập nhằng.
+Trường hợp này thường xảy ra khi `T` không phải identifier.
+
+Ta sẽ tìm hiểu thêm các quy tắc chuyển đổi tường minh trong những bài Go 101 khác.
+
+@@@ #type-deduce
+###=========== Giới thiệu về suy luận kiểu trong Go
+
+Go hỗ trợ suy luận kiểu. Nói cách khác, trong nhiều trường hợp, lập trình viên
+không cần chỉ định tường minh kiểu của một số giá trị trong code.
+Compiler Go sẽ suy luận kiểu của các giá trị này dựa vào ngữ cảnh.
+
+Suy luận kiểu cũng thường được gọi là type inference.
+
+Trong code Go, nếu một vị trí cần giá trị thuộc một kiểu nhất định và một giá trị chưa định kiểu
+(thường là hằng số) biểu diễn được thành giá trị thuộc kiểu đó,
+thì có thể dùng giá trị chưa định kiểu tại vị trí ấy.
+Compiler Go sẽ xem giá trị đó là giá trị có định kiểu tương ứng.
+Các vị trí như vậy gồm toán hạng trong phép toán, đối số trong
+lời gọi hàm, giá trị đích hoặc giá trị nguồn trong phép gán, v.v.
+
+Một số ngữ cảnh không yêu cầu kiểu cụ thể cho các giá trị được dùng.
+Nếu dùng giá trị chưa định kiểu trong ngữ cảnh đó, compiler Go sẽ
+xem giá trị ấy là giá trị có kiểu mặc định của nó.
+
+Có thể xem hai trường hợp suy luận kiểu này là các phép chuyển đổi ngầm định.
+
+Các phần khai báo hằng số và biến bên dưới sẽ đưa ra một số trường hợp suy luận kiểu.
+Những quy tắc và trường hợp khác sẽ được giới thiệu trong các bài viết sau.
+
+@@@ #constant
+###=========== Khai báo hằng số
+
+Các hằng số không tên đều là giá trị boolean, số hoặc string.
+Tương tự, hằng số có tên cũng chỉ có thể là giá trị
+boolean, số hoặc string.
+Từ khóa `const` dùng để khai báo hằng số có tên.
+Chương trình sau có một số khai báo hằng số.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+// Khai báo riêng hai hằng số. Đúng vậy,
+// có thể dùng chữ cái ngoài ASCII trong identifier.
+const π = 3.1416
+const Pi = π // <=> const Pi = 3.1416
+
+// Khai báo nhiều hằng số theo nhóm.
+const (
+	No         = !Yes
+	Yes        = true
+	MaxDegrees = 360
+	Unit       = "radian"
+)
+
+func main() {
+	// Khai báo nhiều hằng số trên một dòng.
+	const TwoPi, HalfPi, Unit2 = π * 2, π * 0.5, "degree"
+}
+'''
+
+Đặc tả Go gọi mỗi dòng có ký hiệu `=` trong
+nhóm khai báo hằng số ở trên là một **// constant specification //**.
+
+Trong ví dụ trên,
+ký hiệu `*` là toán tử nhân
+và ký hiệu `!` là toán tử phủ định boolean.
+Các toán tử sẽ được giới thiệu trong bài tiếp theo,
+__các toán tử thông dụng__.
+
+    === các toán tử thông dụng :: operators.tmd
+
+Ký hiệu `=` có nghĩa là “liên kết” (bind), không phải “gán” (assign).
+Ta nên hiểu mỗi constant specification
+là một identifier được khai báo và liên kết với literal giá trị cơ bản tương ứng.
+Hãy đọc phần cuối của bài này để biết thêm giải thích.
+
+Trong ví dụ trên, hai hằng số có tên `π` và `Pi`
+đều được liên kết với literal `3.1416`.
+Có thể dùng hai hằng số này ở nhiều nơi trong code.
+Nếu không khai báo hằng số, literal `3.1416` sẽ phải
+xuất hiện ở những nơi đó. Nếu sau này muốn đổi literal
+thành `3.14`, ta phải sửa nhiều chỗ.
+Nhờ khai báo hằng số, literal `3.1416`
+chỉ xuất hiện trong một khai báo hằng số,
+nên ta chỉ cần sửa một chỗ.
+Đó là mục đích chính của việc khai báo hằng số.
+
+Từ đây, thuật ngữ **// non-constant //** (không phải hằng số)
+dùng để chỉ các giá trị không phải hằng số.
+Các biến được giới thiệu bên dưới
+đều thuộc một loại giá trị không phải hằng số.
+
+Lưu ý, có thể khai báo hằng số ở cả
+cấp package (ngoài thân mọi hàm) lẫn bên trong thân hàm.
+Hằng số được khai báo trong thân hàm gọi là hằng số cục bộ.
+Hằng số được khai báo ngoài thân mọi hàm
+gọi là hằng số cấp package.
+Ta cũng thường gọi hằng số cấp package là hằng số toàn cục.
+
+Thứ tự khai báo các hằng số cấp package không quan trọng.
+Trong ví dụ trên, có thể đổi thứ tự khai báo
+`No` và `Yes`.
+
+Tất cả hằng số trong ví dụ trước đều chưa định kiểu.
+Kiểu mặc định của một hằng số có tên chưa định kiểu
+trùng với kiểu của literal được liên kết với nó.
+
+###----------- Hằng số có tên và có định kiểu
+
+Ta có thể khai báo hằng số có định kiểu; mọi hằng số có định kiểu đều có tên.
+Trong ví dụ sau, cả bốn hằng số được khai báo đều là giá trị có định kiểu.
+`X` và `Y` đều có kiểu `float32`,
+còn `A` và `B` đều có kiểu `int64`.
+
+@@@ .line-numbers
+''' go
+const X float32 = 3.14
+
+const (
+	A, B int64   = -3, 5
+	Y    float32 = 2.718
+)
+'''
+
+Nếu khai báo nhiều hằng số có định kiểu trong cùng một constant specification,
+thì chúng phải có cùng kiểu, như hai hằng số
+`A` và `B` trong ví dụ trên.
+
+Ta cũng có thể dùng phép chuyển đổi tường minh để cung cấp đủ thông tin
+cho compiler Go suy luận kiểu của các hằng số có tên có định kiểu.
+Đoạn code trên tương đương với đoạn dưới đây,
+trong đó `X`, `Y`, `A` và `B`
+đều là hằng số có định kiểu.
+
+@@@ .line-numbers
+''' go
+const X = float32(3.14)
+
+const (
+	A, B = int64(-3), int64(5)
+	Y    = float32(2.718)
+)
+'''
+
+Nếu liên kết một literal giá trị cơ bản với hằng số có định kiểu, literal đó
+phải biểu diễn được thành giá trị thuộc kiểu của hằng số.
+Các khai báo hằng số có định kiểu sau không hợp lệ.
+
+@@@ .line-numbers
+''' go
+// lỗi: 256 tràn kiểu uint8
+const a uint8 = 256
+// lỗi: 256 tràn kiểu uint8
+const b = uint8(255) + uint8(1)
+// lỗi: 128 tràn kiểu int8
+const c = int8(-128) / int8(-1)
+// lỗi: -1 tràn kiểu uint
+const MaxUint_a = uint(^0)
+// lỗi: -1 tràn kiểu uint
+const MaxUint_b uint = ^0
+'''
+
+Trong ví dụ trên và các ví dụ tiếp theo, `^` là toán tử bitwise NOT.
+
+Khai báo hằng số có định kiểu sau hợp lệ trên hệ điều hành 64-bit,
+nhưng không hợp lệ trên hệ điều hành 32-bit.
+Mỗi giá trị `uint` chỉ có 32 bit trên hệ điều hành 32-bit.
+`(1 << 64) - 1` không thể biểu diễn bằng giá trị 32-bit.
+(Ở đây, `<<` là toán tử dịch trái theo bit.)
+
+@@@ .line-numbers
+''' go
+const MaxUint uint = (1 << 64) - 1
+'''
+
+Vậy khai báo hằng số `uint` có định kiểu và liên kết nó
+với giá trị `uint` lớn nhất như thế nào? Hãy dùng cách sau.
+
+@@@ .line-numbers
+''' go
+const MaxUint = ^uint(0)
+'''
+
+Tương tự, ta có thể khai báo hằng số `int` có định kiểu
+và liên kết nó với giá trị `int` lớn nhất.
+(Ở đây, `>>` là toán tử dịch phải theo bit.)
+
+@@@ .line-numbers
+''' go
+const MaxInt = int(^uint(0) >> 1)
+'''
+
+Có thể dùng cách tương tự để lấy số bit của một native word
+và kiểm tra hệ điều hành hiện tại là 32-bit hay 64-bit.
+
+@@@ .line-numbers
+''' go
+// NativeWordBits là 64 hoặc 32.
+const NativeWordBits = 32 << (^uint(0) >> 63)
+const Is64bitOS = ^uint(0) >> 63 != 0
+const Is32bitOS = ^uint(0) >> 32 == 0
+'''
+
+Ở đây, `!=` và `==` lần lượt là toán tử khác và toán tử bằng.
+
+###----------- Tự động hoàn tất trong khai báo hằng số
+
+Trong khai báo hằng số dạng nhóm, ngoại trừ constant specification đầu tiên,
+các constant specification khác có thể chưa đầy đủ.
+Một constant specification chưa đầy đủ chỉ chứa danh sách identifier.
+Compiler sẽ tự hoàn tất các dòng chưa đầy đủ bằng cách
+sao chép phần còn thiếu từ constant specification hoàn chỉnh đầu tiên đứng trước.
+Ví dụ, khi biên dịch, compiler sẽ tự động
+hoàn tất đoạn code sau
+
+@@@ .line-numbers
+''' go
+const (
+	X float32 = 3.14
+	Y           // ở đây phải là một identifier
+	Z           // ở đây phải là một identifier
+
+	A, B = "Go", "language"
+	C, _
+	// Trong dòng trên, blank identifier
+	// bắt buộc phải có mặt.
+)
+'''
+
+thành
+
+@@@ .line-numbers
+''' go
+const (
+	X float32 = 3.14
+	Y float32 = 3.14
+	Z float32 = 3.14
+
+	A, B = "Go", "language"
+	C, _ = "Go", "language"
+)
+'''
+
+###----------- `iota` trong khai báo hằng số
+
+Tính năng tự hoàn tất kết hợp với tính năng tạo hằng số `iota`
+mang lại nhiều tiện lợi khi lập trình Go.
+`iota` là hằng số được khai báo sẵn,
+chỉ có thể dùng trong các khai báo hằng số khác.
+Nó được khai báo như sau
+
+@@@ .line-numbers
+''' go
+const iota = 0
+'''
+
+Tuy nhiên, giá trị `iota` trong code không phải lúc nào cũng là `0`.
+Khi dùng hằng số `iota` được khai báo sẵn
+trong một khai báo hằng số tùy chỉnh, tại thời điểm biên dịch,
+trong phạm vi khai báo hằng số tùy chỉnh đó,
+giá trị của nó được đặt lại thành `0` ở constant specification đầu tiên của mỗi nhóm hằng số
+và tăng thêm `1` sau mỗi constant specification.
+Nói cách khác, trong constant specification thứ **// n //**
+của một khai báo hằng số, `iota` có giá trị **// n //** (bắt đầu từ 0).
+Vì vậy, `iota` chỉ hữu ích trong khai báo hằng số dạng nhóm.
+
+Ví dụ sau dùng cả tính năng tự hoàn tất
+lẫn tính năng tạo hằng số `iota`.
+Hãy đọc các chú thích để hiểu điều gì xảy ra khi biên dịch.
+Ký hiệu `+` trong ví dụ này là toán tử cộng.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	const (
+		k = 3 // lúc này, iota == 0
+
+		m float32 = iota + .5 // m float32 = 1 + .5
+		n                     // n float32 = 2 + .5
+
+		p = 9             // lúc này, iota == 3
+		q = iota * 2      // q = 4 * 2
+		_                 // _ = 5 * 2
+		r                 // r = 6 * 2
+		s, t = iota, iota // s, t = 7, 7
+		u, v              // u, v = 8, 8
+		_, w              // _, w = 9, 9
+	)
+
+	const x = iota // x = 0
+	const (
+		y = iota // y = 0
+		z        // z = 1
+	)
+
+	println(m)             // +1.500000e+000
+	println(n)             // +2.500000e+000
+	println(q, r)          // 8 12
+	println(s, t, u, v, w) // 7 7 8 8 9
+	println(x, y, z)       // 0 0 1
+}
+'''
+
+Ví dụ trên chỉ minh họa các quy tắc của
+tính năng tạo hằng số `iota`.
+Trong thực tế, ta nên dùng nó theo cách có ý nghĩa hơn.
+Chẳng hạn:
+
+@@@ .line-numbers
+''' go
+const (
+	Failed = iota - 1 // == -1
+	Unknown           // == 0
+	Succeeded         // == 1
+)
+
+const (
+	Readable = 1 << iota // == 1
+	Writable             // == 2
+	Executable           // == 4
+)
+'''
+
+Ở đây, ký hiệu `-` là toán tử trừ,
+còn `<<` là toán tử dịch trái.
+Cả hai toán tử sẽ được giới thiệu trong bài tiếp theo.
+
+@@@ #variable
+###=========== Biến, khai báo biến và phép gán giá trị
+
+Biến là các giá trị có tên.
+Biến được lưu trong bộ nhớ khi chương trình chạy.
+Giá trị mà biến biểu thị có thể được thay đổi khi chương trình chạy.
+
+Mọi biến đều là giá trị có định kiểu.
+Khi khai báo biến, phải cung cấp đủ thông tin
+để compiler suy luận kiểu của biến.
+
+Biến được khai báo trong thân hàm gọi là biến cục bộ.
+Biến được khai báo ngoài thân mọi hàm
+gọi là biến cấp package.
+Ta cũng thường gọi biến cấp package là biến toàn cục.
+
+Có hai dạng khai báo biến cơ bản:
+dạng chuẩn và dạng rút gọn.
+Chỉ có thể dùng dạng rút gọn để khai báo biến cục bộ.
+
+###----------- Dạng khai báo biến chuẩn
+
+Mỗi khai báo chuẩn bắt đầu bằng từ khóa `var`,
+sau đó là tên biến được khai báo.
+Tên biến phải là __identifier__.
+
+    === identifier :: keywords-and-identifiers.tmd#identifier
+
+Dưới đây là một số dạng khai báo chuẩn đầy đủ.
+Trong các khai báo này,
+kiểu và giá trị khởi tạo của các biến đều được chỉ định.
+@@@ .line-numbers;must-line-numbers
+''' go
+var lang, website string = "Go", "https://golang.org"
+var compiled, dynamic bool = true, false
+var announceYear int = 2009
+'''
+
+Như ta thấy, có thể khai báo nhiều biến cùng nhau
+trong một khai báo biến.
+Lưu ý rằng mỗi khai báo biến chỉ có thể chỉ định một kiểu.
+Vì vậy, các biến được khai báo trong cùng một dòng phải có cùng kiểu.
+
+Trên thực tế, ít khi dùng dạng khai báo chuẩn đầy đủ vì nó dài dòng.
+Hai biến thể của dạng khai báo chuẩn được giới thiệu
+bên dưới phổ biến hơn.
+Trong hai biến thể đó, hoặc kiểu, hoặc giá trị khởi tạo của
+các biến được khai báo sẽ được lược bỏ.
+
+Dưới đây là một số khai báo biến chuẩn không chỉ định kiểu biến.
+Compiler sẽ suy luận kiểu của các biến được khai báo theo kiểu
+(hoặc kiểu mặc định) của giá trị khởi tạo tương ứng.
+Thực tế, các khai báo sau tương đương với những khai báo ở trên.
+Lưu ý rằng trong các khai báo này, kiểu của nhiều biến
+trên cùng một dòng có thể khác nhau.
+
+@@@ .line-numbers
+''' go
+// Kiểu của biến lang và dynamic
+// lần lượt được compiler suy luận thành các kiểu tích hợp sẵn
+// "string" và "bool".
+var lang, dynamic = "Go", false
+
+// Kiểu của các biến compiled và announceYear
+// lần lượt được suy luận thành các kiểu tích hợp sẵn
+// "bool" và "int".
+var compiled, announceYear = true, 2009
+
+// Kiểu của biến website sẽ được
+// suy luận thành kiểu tích hợp sẵn "string".
+var website = "https://golang.org"
+'''
+
+Có thể xem việc suy luận kiểu trong ví dụ trên là các phép chuyển đổi ngầm định.
+
+Dưới đây là một số khai báo chuẩn không chỉ định giá trị khởi tạo.
+Trong các khai báo này, mọi biến được khởi tạo
+bằng zero value của kiểu tương ứng.
+
+@@@ .line-numbers
+''' go
+// Cả hai được khởi tạo bằng string rỗng.
+var lang, website string
+// Cả hai được khởi tạo bằng false.
+var interpreted, dynamic bool
+// n được khởi tạo bằng 0.
+var n int
+'''
+
+Có thể nhóm nhiều biến trong một khai báo chuẩn
+bằng cách dùng `()`. Ví dụ:
+
+@@@ .line-numbers
+''' go
+var (
+	lang, bornYear, compiled     = "Go", 2007, true
+	announceAt, releaseAt    int = 2009, 2012
+	createdBy, website       string
+)
+'''
+
+Ví dụ trên được định dạng bằng lệnh `go fmt`
+được cung cấp trong Go Toolchain.
+Trong ví dụ trên, mỗi dòng trong ba dòng được đặt trong `()`;
+đó được gọi là variable specification.
+
+Nhìn chung, khai báo các biến liên quan cùng nhau
+sẽ giúp code dễ đọc hơn.
+
+@@@ #assignment
+###----------- Phép gán giá trị thuần
+
+Trong các khai báo biến ở trên, ký hiệu `=` có nghĩa là phép gán.
+Sau khi khai báo biến, ta có thể thay đổi giá trị của nó bằng phép gán giá trị thuần.
+Tương tự khai báo biến, một phép gán thuần có thể gán nhiều giá trị.
+
+Các biểu thức ở bên trái ký hiệu `=` trong phép gán thuần
+gọi là giá trị đích (destination hoặc target).
+Chúng phải là giá trị có thể lấy địa chỉ, biểu thức chỉ mục map hoặc blank identifier.
+Địa chỉ giá trị và map sẽ được giới thiệu trong các bài sau.
+
+Hằng số là bất biến, vì vậy hằng số không thể xuất hiện bên trái phép gán thuần
+với vai trò giá trị đích; nó chỉ có thể xuất hiện bên phải làm giá trị nguồn.
+Biến có thể dùng làm cả giá trị nguồn lẫn giá trị đích,
+nên có thể xuất hiện ở cả hai vế của phép gán thuần.
+
+Blank identifier cũng có thể xuất hiện bên trái phép gán giá trị thuần làm
+giá trị đích; khi đó, ta bỏ qua giá trị đích ấy.
+Không thể dùng blank identifier làm giá trị nguồn trong phép gán.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+const N = 123
+var x int
+var y, z float32
+
+N = 9 // lỗi: không thể thay đổi hằng số N
+y = N // được: N được suy luận thành giá trị float32
+x = y // lỗi: không khớp kiểu
+x = N // được: N được suy luận thành giá trị int
+y = x // lỗi: không khớp kiểu
+z = y // được
+_ = y // được
+
+x, y = y, x // lỗi: không khớp kiểu
+x, y = int(y), float32(x) // được
+z, y = y, z               // được
+_, y = y, z               // được
+z, _ = y, z               // được
+_, _ = y, z               // được
+x, y = 69, 1.23           // được
+'''
+
+Dòng code cuối trong ví dụ trên dùng phép chuyển đổi tường minh để
+làm cho các giá trị đích và nguồn tương ứng khớp kiểu.
+Các quy tắc chuyển đổi tường minh cho giá trị số không phải hằng số
+được giới thiệu bên dưới.
+Go không hỗ trợ phép gán nối chuỗi. Ví dụ, code sau không hợp lệ.
+@@@ .line-numbers
+''' go
+var a, b int
+a = b = 123 // lỗi cú pháp
+'''
+
+###----------- Dạng khai báo biến rút gọn
+
+Ta cũng có thể dùng dạng khai báo biến rút gọn.
+Dạng này chỉ dùng để khai báo biến cục bộ.
+Hãy xem ví dụ có một số khai báo biến rút gọn sau.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	// Cả lang và year đều là biến mới được khai báo.
+	lang, year := "Go language", 2007
+
+	// Chỉ createdBy là biến mới được khai báo.
+	// Biến year đã được khai báo trước đó,
+	// nên ở đây giá trị của nó chỉ được
+	// thay đổi, hay có thể nói là được khai báo lại.
+	year, createdBy := 2009, "Google Research"
+
+	// Đây là phép gán thuần.
+	lang, year = "Go", 2012
+
+	print(lang, " is created by ", createdBy)
+	println(", and released at year", year)
+}
+'''
+Mỗi khai báo biến rút gọn phải khai báo ít nhất một biến mới.
+
+Khai báo biến rút gọn và khai báo biến chuẩn có một số điểm khác nhau.
+*.
+   Trong dạng khai báo rút gọn, phải lược bỏ từ khóa `var`
+   và kiểu của biến.
+*.
+   Phải dùng ký hiệu gán `:=` thay cho `=`.
+*.
+   Trong khai báo biến rút gọn, biến cũ và biến mới
+   có thể cùng xuất hiện bên trái `:=`. Tuy nhiên, bên trái
+   phải có ít nhất một biến mới.
+
+!
+   Lưu ý, khai báo biến rút gọn có một giới hạn so với phép gán thuần.
+   **Trong khai báo biến rút gọn, mọi phần tử bên trái
+   ký hiệu `:=` phải là identifier thuần.**
+   Điều này có nghĩa một số phần tử khác có thể nhận phép gán,
+   sẽ được giới thiệu trong các bài khác,
+   không thể xuất hiện bên trái `:=`.
+   Các phần tử này gồm qualified identifier, phần tử container,
+   phép dereference pointer và bộ chọn trường struct.
+   Phép gán thuần không có giới hạn này.
+
+###----------- Về thuật ngữ “assignment”
+
+Từ đây, khi nhắc đến từ “assignment”,
+nó có thể chỉ phép gán thuần, khai báo biến rút gọn,
+hoặc variable specification có giá trị khởi tạo trong khai báo biến chuẩn.
+Trên thực tế, định nghĩa tổng quát hơn còn bao gồm
+__truyền đối số cho hàm__, được giới thiệu trong bài tiếp theo.
+
+    === truyền đối số cho hàm :: function-declarations-and-calls.tmd#call
+
+Ta nói **// `x` có thể gán cho `y` //**
+nếu `y = x` là câu lệnh hợp lệ (biên dịch được).
+Giả sử kiểu của `y` là `Ty`,
+đôi khi để tiện mô tả, ta cũng có thể nói
+**// `x` có thể gán cho kiểu `Ty` //**.
+
+Nhìn chung, nếu `x` có thể gán cho `y`,
+thì `y` phải có thể thay đổi; kiểu của `x` và `y`
+phải giống nhau hoặc `x` có thể được chuyển đổi ngầm định sang
+kiểu của `y`.
+Dĩ nhiên, `y` cũng có thể là blank identifier `_`.
+
+###----------- Mỗi biến cục bộ được khai báo phải được sử dụng hiệu quả ít nhất một lần
+
+Lưu ý, cả Go compiler chuẩn và gccgo đều không cho phép khai báo biến cục bộ nhưng không sử dụng.
+Biến cấp package không có giới hạn này.
+
+Nếu một biến cục bộ chỉ được dùng làm giá trị đích,
+nó vẫn bị xem là chưa sử dụng.
+Ví dụ, trong chương trình sau, `r` chỉ được dùng làm giá trị đích.
+
+@@@ .line-numbers
+''' go
+package main
+
+// Một số biến cấp package.
+var x, y, z = 123, true, "foo"
+
+func main() {
+	var q, r = 789, false
+	r, s := true, "bar"
+	r = y // r chưa được sử dụng.
+	x = q // q được sử dụng.
+}
+'''
+Biên dịch chương trình trên sẽ tạo ra các lỗi sau
+(giả sử file nguồn có tên `example-unused.go`):
+
+@@@ .output
+'''
+./example-unused.go:6:6: r declared and not used
+./example-unused.go:7:16: s declared and not used
+'''
+
+Cách sửa rất đơn giản: ta có thể gán `r` và `s`
+vào blank identifier để tránh lỗi biên dịch.
+
+@@@ .line-numbers
+''' go
+package main
+
+var x, y, z = 123, true, "foo"
+
+func main() {
+	var q, r = 789, false
+	r, s := true, "bar"
+	r = y
+	x = q
+
+	_, _ = r, s // đánh dấu r và s đã được sử dụng.
+}
+'''
+
+Nhìn chung, không nên dùng cách sửa trên trong code production.
+Chỉ nên dùng trong giai đoạn phát triển/debug.
+Để lại biến cục bộ không dùng là thói quen không tốt,
+vì chúng ảnh hưởng tiêu cực đến khả năng đọc hiểu code và hiệu năng thực thi chương trình.
+
+###----------- Quan hệ phụ thuộc giữa các biến cấp package ảnh hưởng đến thứ tự khởi tạo
+
+Với ví dụ sau,
+
+@@@ .line-numbers
+''' go
+var x, y = a+1, 5         // 8 5
+var a, b, c = b+1, c+1, y // 7 6 5
+'''
+
+thứ tự khởi tạo các biến cấp package là `y = 5`,
+`c = y`, `b = c+1`, `a = b+1`,
+và `x = a+1`.
+
+Ở đây, ký hiệu `+` là toán tử cộng,
+sẽ được giới thiệu trong bài tiếp theo.
+
+Các biến cấp package không thể phụ thuộc vòng tròn trong khai báo.
+Code sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+var x, y = y, x
+'''
+
+###=========== Khả năng lấy địa chỉ của giá trị
+
+Trong Go, một số giá trị có thể lấy địa chỉ (có địa chỉ để truy cập đến chúng).
+Mọi biến đều có thể lấy địa chỉ, còn mọi hằng số thì không.
+Ta có thể tìm hiểu thêm về địa chỉ và pointer trong bài __pointer trong Go__,
+và về các giá trị khác có hoặc không thể lấy địa chỉ trong những bài sau.
+
+    === pointer trong Go :: pointer.tmd
+
+###=========== Chuyển đổi tường minh các giá trị số không phải hằng số
+
+Trong Go, không thể gán hai giá trị có định kiểu thuộc hai kiểu cơ bản khác nhau cho nhau.
+Nói cách khác, kiểu của giá trị đích và giá trị nguồn trong một
+phép gán phải giống nhau nếu cả hai đều là giá trị cơ bản.
+Nếu kiểu của giá trị cơ bản nguồn khác kiểu của
+giá trị cơ bản đích, thì phải chuyển đổi tường minh giá trị nguồn
+sang kiểu của giá trị đích.
+
+Như đã đề cập, có thể chuyển giá trị integer không phải hằng số sang string.
+Sau đây là hai trường hợp chuyển đổi hợp lệ khác giữa các giá trị số
+không phải hằng số.
+
+*
+   Có thể chuyển đổi tường minh giá trị floating-point và integer không phải hằng số
+   sang bất kỳ kiểu floating-point hoặc integer nào khác.
+*
+   Có thể chuyển đổi tường minh giá trị complex không phải hằng số
+   sang bất kỳ kiểu complex nào khác.
+
+Khác với phép chuyển đổi số hằng, phép chuyển đổi số không phải hằng số cho phép tràn.
+Khi chuyển giá trị floating-point không phải hằng số sang integer, việc làm tròn cũng được cho phép.
+Nếu giá trị floating-point không phải hằng số không gây tràn kiểu integer,
+phần thập phân của giá trị sẽ bị loại bỏ
+(theo hướng về 0) khi chuyển sang kiểu integer.
+
+Trong mọi phép chuyển đổi không phải hằng số có liên quan đến giá trị floating-point hoặc complex,
+nếu kiểu kết quả không thể biểu diễn giá trị,
+thì phép chuyển đổi vẫn thành công nhưng giá trị kết quả phụ thuộc vào implementation.
+
+Trong ví dụ sau, các phép chuyển đổi ngầm định dự kiến
+ở dòng // 7 // và dòng // 18 // đều không hoạt động.
+Các phép chuyển đổi tường minh ở dòng // 5 // và dòng // 16 // cũng không được phép.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+const a = -1.23
+// Kiểu của b được suy luận là float64.
+var b = a
+// lỗi: hằng số 1.23 bị cắt cụt khi chuyển sang integer.
+var x = int32(a)
+// lỗi: không thể gán float64 cho int32.
+var y int32 = b
+	// hợp lệ: z == -1 và z có kiểu int32.
+//       Phần thập phân của b bị loại bỏ.
+var z = int32(b)
+
+const k int16 = 255
+// Kiểu của n được suy luận là int16.
+var n = k
+// lỗi: hằng số 256 tràn kiểu uint8.
+var f = uint8(k + 1)
+// lỗi: không thể gán int16 cho uint8.
+var g uint8 = n + 1
+	// hợp lệ: h == 0 và h có kiểu uint8.
+//       n+1 tràn kiểu uint8 và bị cắt cụt.
+var h = uint8(n + 1)
+
+'''
+
+Có thể hiểu rằng giá trị `a` ở dòng // 3 // được chuyển đổi ngầm định
+sang kiểu mặc định của nó (`float64`), do đó kiểu
+của `b` được suy luận là `float64`.
+Các quy tắc chuyển đổi ngầm định khác sẽ được giới thiệu trong những bài sau.
+
+###=========== Phạm vi của biến và hằng số có tên
+
+Trong Go, ta có thể dùng cặp `{` và `}` để tạo thành một code block.
+Một code block có thể chứa các code block lồng nhau.
+Biến hoặc hằng số có tên được khai báo trong code block bên trong sẽ che khuất
+biến và hằng số cùng tên được khai báo ở các code block bên ngoài.
+Ví dụ, chương trình sau khai báo ba biến riêng biệt,
+cả ba đều tên `x`.
+`x` bên trong che khuất `x` bên ngoài.
+
+@@@ .line-numbers
+''' go
+package main
+
+const y = 789
+var x int = 123
+
+func main() {
+	// Biến x che khuất biến cấp package x
+	// đã khai báo ở phía trên.
+	var x = true
+
+	// Một code block lồng nhau.
+	{
+		// Ở đây, x và y bên trái đều là
+		// biến mới được khai báo. Các biến
+		// bên phải đã được khai báo ở block ngoài.
+		x, y := x, y
+
+		// Trong code block này, x và y vừa được
+		// khai báo sẽ che khuất các identifier cùng tên
+		// đã khai báo ở block bên ngoài.
+		x, z := !x, y/10 // chỉ z là biến mới được khai báo
+		y /= 100
+		println(x, y, z) // false 7 78
+	}
+	println(x) // true
+	println(z) // lỗi: z chưa được định nghĩa.
+}
+'''
+
+Phạm vi (vùng có thể nhìn thấy trong code) của biến cấp package
+(hoặc hằng số có tên) là toàn bộ package nơi biến
+(hoặc hằng số có tên) đó được khai báo.
+Phạm vi của biến cục bộ (hoặc hằng số có tên) bắt đầu từ cuối
+khai báo và kết thúc ở cuối code block trong cùng chứa nó.
+Đó là lý do dòng cuối trong hàm `main`
+của ví dụ trên không biên dịch được.
+
+Code block và phạm vi identifier sẽ được giải thích chi tiết trong bài
+__block và phạm vi__ ở phần sau.
+
+    === block và phạm vi :: blocks-and-scopes.tmd
+
+###=========== Tìm hiểu thêm về khai báo hằng số
+
+###----------- Giá trị của hằng số chưa định kiểu có thể tràn kiểu mặc định
+
+Ví dụ, code sau biên dịch bình thường.
+
+@@@ .line-numbers
+''' go
+// 3 hằng số có tên chưa định kiểu. Các giá trị
+// được liên kết đều tràn kiểu mặc định
+// tương ứng. Trường hợp này được cho phép.
+const n = 1 << 64          // tràn kiểu int
+const r = 'a' + 0x7FFFFFFF // tràn kiểu rune
+const x = 2e+308           // tràn kiểu float64
+
+func main() {
+	_ = n >> 2
+	_ = r - 0x7FFFFFFF
+	_ = x / 2
+}
+'''
+
+Nhưng code sau không biên dịch được vì các hằng số đều có định kiểu.
+
+@@@ .line-numbers
+''' go
+// 3 hằng số có tên có định kiểu. Giá trị được
+// liên kết không được phép tràn kiểu mặc định
+// tương ứng. Cả 3 dòng đều gây lỗi biên dịch.
+const n int = 1 << 64           // tràn kiểu int
+const r rune = 'a' + 0x7FFFFFFF // tràn kiểu rune
+const x float64 = 2e+308        // tràn kiểu float64
+'''
+
+###----------- Mỗi identifier hằng số có tên được thay bằng literal đã liên kết khi biên dịch
+
+Có thể xem khai báo hằng số là macro `#define` nâng cao trong C.
+Khai báo hằng số định nghĩa một hằng số có tên biểu thị một literal.
+Mọi chỗ xuất hiện của hằng số có tên sẽ được thay thế bằng literal
+mà nó biểu thị tại thời điểm biên dịch.
+
+Nếu hai toán hạng của một phép toán đều là hằng số,
+thì phép toán sẽ được tính tại thời điểm biên dịch.
+Hãy đọc bài tiếp theo __các toán tử thông dụng__ để biết chi tiết.
+
+    === common operators :: operators.tmd
+
+Ví dụ, khi biên dịch, đoạn code sau
+
+@@@ .line-numbers
+''' go
+package main
+
+const X = 3
+const Y = X + X
+var a = X
+
+func main() {
+	b := Y
+	println(a, b, X, Y)
+}
+'''
+
+sẽ được hiểu thành
+
+@@@ .line-numbers
+''' go
+package main
+
+var a = 3
+
+func main() {
+	b := 6
+	println(a, b, 3, 6)
+}
+'''

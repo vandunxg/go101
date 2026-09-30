@@ -1,0 +1,174 @@
+### Biểu thức, câu lệnh và câu lệnh đơn giản
+
+Bài viết này giới thiệu về biểu thức và câu lệnh trong Go.
+
+Nói đơn giản, một biểu thức đại diện cho một giá trị, còn một câu lệnh đại diện cho một thao tác.
+Tuy nhiên, trên thực tế, một số biểu thức đặc biệt có thể được tạo thành từ và đại diện cho nhiều giá trị,
+và một số câu lệnh có thể được tạo thành từ nhiều thao tác/câu lệnh con.
+Tùy ngữ cảnh, một số câu lệnh cũng có thể được xem là biểu thức.
+
+Câu lệnh đơn giản là một số câu lệnh đặc biệt.
+Trong Go, một số phần của mọi loại luồng điều khiển đều phải là
+câu lệnh đơn giản, và một số phần phải là biểu thức.
+Luồng điều khiển sẽ được giới thiệu trong bài Go 101 tiếp theo.
+
+Bài viết này sẽ không đưa ra định nghĩa chính xác cho biểu thức và câu lệnh.
+Điều đó rất khó thực hiện.
+Bài viết này chỉ liệt kê một số trường hợp biểu thức và câu lệnh.
+Bài viết không đề cập đến mọi loại biểu thức và câu lệnh,
+nhưng sẽ liệt kê mọi loại câu lệnh đơn giản.
+
+@@@ #expressions
+###========== Một số trường hợp biểu thức
+
+Phần lớn biểu thức trong Go là biểu thức đơn giá trị.
+Mỗi biểu thức đại diện cho một giá trị. Các biểu thức khác đại diện cho nhiều giá trị
+và được gọi là biểu thức đa giá trị.
+
+Trong phạm vi tài liệu này, khi nhắc đến một biểu thức, chúng tôi muốn nói đến
+biểu thức đơn giá trị, trừ khi có ghi rõ khác đi.
+
+Các literal giá trị, biến và hằng có tên đều là biểu thức đơn giá trị,
+còn được gọi là biểu thức cơ bản.
+
+Các phép toán (không bao gồm phần gán) sử dụng những toán tử được giới thiệu trong
+bài __common operators__ đều là biểu thức đơn giá trị.
+
+    === common operators :: operators.tmd
+
+Nếu một hàm trả về ít nhất một kết quả, thì lời gọi hàm (không bao gồm
+phần gán) là biểu thức. Cụ thể, nếu một hàm trả về nhiều hơn
+một kết quả, thì lời gọi hàm đó thuộc loại biểu thức đa giá trị. Lời gọi
+hàm không trả về kết quả không phải là biểu thức.
+
+Method có thể được xem là hàm đặc biệt.
+Vì vậy, các trường hợp hàm vừa nêu cũng áp dụng cho method.
+Method sẽ được giải thích chi tiết trong bài __method in Go__ sau này.
+
+    === method in Go :: method.tmd
+
+Trên thực tế, sau này ta sẽ biết các hàm tự định nghĩa, bao gồm cả method,
+đều là function value, nên chúng cũng là biểu thức (đơn giá trị).
+Sau này ta sẽ tìm hiểu thêm về __function types and values__.
+
+    === function types and values :: function.tmd
+
+Các thao tác nhận dữ liệu từ channel (không bao gồm phần gán) cũng là biểu thức.
+Các thao tác trên channel sẽ được giới thiệu trong bài
+__channels in Go__ sau này.
+
+    === channels in Go :: channel.tmd
+
+Trong Go, một số biểu thức, bao gồm thao tác nhận dữ liệu từ channel, có thể có kết quả tùy chọn.
+Các biểu thức này có thể xuất hiện dưới dạng biểu thức đơn giá trị hoặc đa giá trị, tùy vào ngữ cảnh.
+Ta sẽ tìm hiểu các biểu thức như vậy trong những bài Go 101 khác sau này.
+
+@@@ #simple-statements
+###========== Một số trường hợp câu lệnh đơn giản
+
+Có sáu loại câu lệnh đơn giản.
+
+*.
+   các dạng khai báo biến rút gọn
+*.
+   phép gán giá trị thuần túy (không kết hợp với khai báo biến),
+   bao gồm các phép toán dạng `x op= y`.
+*.
+   lời gọi hàm/method và thao tác nhận dữ liệu từ channel.
+   Như đã đề cập ở phần trước, các câu lệnh đơn giản này cũng có thể được dùng làm biểu thức.
+*.
+   thao tác gửi dữ liệu vào channel.
+*.
+   không làm gì (còn gọi là câu lệnh rỗng).
+   Ta sẽ tìm hiểu một số cách dùng câu lệnh rỗng trong bài tiếp theo.
+*.
+   `x++` và `x--`.
+
+
+Một lần nữa, thao tác nhận và gửi dữ liệu từ/vào channel sẽ được giới thiệu trong bài
+__channels in Go__.
+
+Lưu ý, không thể dùng `x++` và `x--` làm biểu thức.
+Go cũng không hỗ trợ các dạng cú pháp `++x` và `--x`.
+
+
+###========== Một số trường hợp câu lệnh không đơn giản
+
+Danh sách chưa đầy đủ các câu lệnh không đơn giản:
+
+*
+   các dạng khai báo biến tiêu chuẩn.
+   Đúng vậy, khai báo biến rút gọn là câu lệnh đơn giản,
+   nhưng khai báo biến tiêu chuẩn thì không.
+*
+   khai báo hằng có tên.
+*
+   khai báo kiểu tùy chỉnh.
+*
+   khai báo import package.
+*
+   khối mã tường minh.
+   Một khối mã tường minh bắt đầu bằng `{` và kết thúc bằng `}`.
+   Một khối mã có thể chứa nhiều câu lệnh con.
+*
+   khai báo hàm.
+   Một khai báo hàm có thể chứa nhiều câu lệnh con.
+*
+   luồng điều khiển và các lệnh nhảy trong quá trình thực thi mã.
+   Hãy đọc __the next article__ để biết chi tiết.
+*
+   các dòng `return` trong khai báo hàm.
+*
+   lời gọi hàm được defer và việc tạo goroutine.
+   Hai nội dung này sẽ được giới thiệu trong __the article after next__.
+
+    === the next article :: control-flows.tmd
+    === the article after next :: control-flows-more.tmd
+
+###========== Ví dụ về biểu thức và câu lệnh
+
+@@@ .line-numbers
+''' go
+// Một số câu lệnh không đơn giản.
+import "time"
+var a = 123
+const B = "Go"
+type Choice bool
+func f() int {
+	for a < 10 {
+		break
+	}
+
+	// Đây là một khối mã tường minh.
+	{
+		// ...
+	}
+	return 567
+}
+
+// Một số câu lệnh đơn giản:
+c := make(chan bool) // các channel sẽ được giải thích sau
+a = 789
+a += 5
+a = f() // ở đây f() được dùng làm biểu thức
+a++
+a--
+c <- true // thao tác gửi dữ liệu vào channel
+z := <-c  // thao tác nhận dữ liệu từ channel được dùng làm
+          // giá trị nguồn trong một câu lệnh gán.
+
+// Một số biểu thức:
+123
+true
+B
+B + " language"
+a - 789
+a > 0 // một giá trị boolean chưa định kiểu
+f     // một function value có kiểu "func ()"
+
+// Các trường hợp sau có thể được dùng làm câu lệnh đơn giản lẫn biểu thức.
+f()
+<-c // thao tác nhận dữ liệu từ channel
+'''
+
+

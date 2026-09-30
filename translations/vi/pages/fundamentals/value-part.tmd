@@ -1,0 +1,345 @@
+### Các phần của giá trị
+
+Các bài viết tiếp theo sẽ giới thiệu thêm nhiều loại kiểu Go.
+Để hiểu những bài viết đó dễ dàng và sâu hơn,
+bạn nên đọc phần nội dung dưới đây trong bài viết hiện tại trước.
+
+###=========== Hai nhóm kiểu Go
+
+Có thể xem Go là một ngôn ngữ thuộc họ C, điều này được thể hiện qua
+hai bài viết trước về __con trỏ trong Go__ và __struct trong Go__.
+Cấu trúc bộ nhớ của kiểu struct và kiểu con trỏ trong Go và C khá giống nhau.
+
+    === con trỏ trong Go :: pointer.tmd
+    === struct trong Go :: struct.tmd
+
+Mặt khác, cũng có thể xem Go là một framework ngôn ngữ C.
+Điều này chủ yếu thể hiện ở việc Go hỗ trợ một số kiểu
+có cấu trúc bộ nhớ của giá trị không hoàn toàn minh bạch,
+trong khi đặc trưng chính của kiểu C là cấu trúc bộ nhớ của giá trị minh bạch.
+Mỗi giá trị C chiếm __một khối bộ nhớ__ (một vùng nhớ liên tục).
+Tuy nhiên, giá trị của một số kiểu Go thường có thể được lưu trên nhiều khối bộ nhớ.
+
+    === một khối bộ nhớ :: memory-block.tmd
+
+Sau đây, ta gọi các phần của một giá trị (nằm trên những khối bộ nhớ khác nhau) là các phần giá trị.
+Một giá trị được lưu trên nhiều khối bộ nhớ gồm một phần giá trị trực tiếp
+và một số phần gián tiếp bên dưới được phần giá trị trực tiếp đó __tham chiếu__.
+
+    === được tham chiếu :: pointer.tmd#references
+
+Các đoạn trên mô tả hai nhóm kiểu Go:
+#  ### Các kiểu mà mỗi giá trị chỉ được lưu trên một khối bộ nhớ duy nhất
+   ### Các kiểu mà mỗi giá trị có thể được lưu trên nhiều khối bộ nhớ
+   -----
+   && res/value-parts-single.png
+   ;;; && res/value-parts-multiple.png
+   -----
+   { ><
+   kiểu boolean
+   \\ kiểu số
+   \\ kiểu con trỏ
+   \\ kiểu con trỏ không an toàn
+   \\ kiểu struct
+   \\ kiểu array
+   }
+   { ><
+   kiểu slice
+   \\ kiểu map
+   \\ kiểu channel
+   \\ kiểu hàm
+   \\ kiểu interface
+   \\ kiểu string
+   }
+
+Các bài viết Go 101 tiếp theo sẽ giải thích chi tiết nhiều kiểu được liệt kê trong bảng trên.
+Bài viết hiện tại chỉ nhằm chuẩn bị để bạn hiểu những phần giải thích đó dễ hơn.
+
+Lưu ý:
+*
+   việc giá trị interface và string có thể chứa các phần bên dưới hay không
+   phụ thuộc vào compiler. Với cách triển khai của Go compiler tiêu chuẩn,
+   giá trị interface và string có thể chứa các phần bên dưới.
+*
+   rất khó, thậm chí có thể không thể chứng minh,
+   liệu giá trị hàm có thể chứa các phần bên dưới hay không.
+   Trong Go 101, ta sẽ xem giá trị hàm là có thể chứa các phần bên dưới.
+
+
+Các kiểu thuộc nhóm thứ hai giúp lập trình Go thuận tiện hơn rất nhiều
+nhờ đóng gói nhiều chi tiết triển khai.
+Các Go compiler khác nhau có thể dùng cách triển khai nội bộ khác nhau cho những kiểu này,
+nhưng hành vi bên ngoài của giá trị thuộc các kiểu đó
+phải đáp ứng các yêu cầu trong đặc tả Go.
+
+Các kiểu thuộc nhóm thứ hai không phải là những kiểu nền tảng của ngôn ngữ;
+ta có thể tự triển khai chúng từ đầu bằng các kiểu thuộc nhóm thứ nhất.
+Tuy nhiên, nhờ đóng gói những chức năng phổ biến hoặc đặc thù
+và hỗ trợ các kiểu này như những công dân hạng nhất trong Go,
+việc lập trình Go trở nên thú vị và hiệu quả hơn.
+
+Mặt khác, cách đóng gói dùng để triển khai các kiểu thuộc nhóm thứ hai
+che giấu nhiều định nghĩa nội bộ của chúng.
+Điều này khiến lập trình viên Go khó quan sát toàn bộ bức tranh về các kiểu đó,
+đôi khi còn gây trở ngại cho việc hiểu Go sâu hơn.
+
+Để giúp các gopher hiểu rõ hơn những kiểu thuộc nhóm thứ hai và giá trị của chúng,
+phần tiếp theo của bài viết sẽ giới thiệu các định nghĩa cấu trúc nội bộ
+của những kiểu này.
+Bài viết không giải thích chi tiết cách triển khai chúng.
+Các giải thích ở đây dựa trên cách triển khai của Go compiler tiêu chuẩn,
+nhưng không hoàn toàn giống với cách triển khai đó.
+
+###=========== Hai loại kiểu con trỏ trong Go
+
+Trước khi trình bày định nghĩa cấu trúc nội bộ của các kiểu thuộc nhóm thứ hai,
+ta hãy làm rõ thêm về con trỏ và việc tham chiếu.
+
+Ta đã tìm hiểu __con trỏ Go__ trong bài viết trước đó.
+Các kiểu con trỏ trong bài viết ấy là kiểu con trỏ an toàn kiểu.
+Thực tế, Go cũng hỗ trợ __kiểu con trỏ không an toàn kiểu__.
+Kiểu `unsafe.Pointer` do package chuẩn `unsafe` cung cấp
+tương tự `void*` trong ngôn ngữ C.
+
+    === con trỏ Go :: pointer.tmd
+    === kiểu con trỏ không an toàn kiểu :: unsafe.tmd
+
+Trong hầu hết các bài viết khác của Go 101, nếu không nói rõ,
+khi nhắc đến kiểu con trỏ thì ý nói kiểu con trỏ an toàn kiểu.
+Tuy nhiên, ở những phần tiếp theo của bài viết này,
+khi nhắc đến con trỏ thì có thể là con trỏ an toàn kiểu hoặc con trỏ không an toàn kiểu.
+
+Giá trị con trỏ lưu địa chỉ bộ nhớ của một giá trị khác,
+trừ khi giá trị con trỏ đó là con trỏ nil.
+Ta có thể nói giá trị con trỏ __tham chiếu__ đến giá trị kia,
+hoặc giá trị kia được giá trị con trỏ tham chiếu.
+Giá trị cũng có thể được tham chiếu gián tiếp.
+*
+   Nếu một giá trị struct `a` có trường con trỏ `b`
+   tham chiếu đến giá trị `c`, ta cũng có thể nói giá trị struct
+   `a` tham chiếu đến giá trị `c`.
+*
+   Nếu giá trị `x` tham chiếu (trực tiếp hoặc gián tiếp)
+   đến giá trị `y`, và giá trị `y` tham chiếu
+   (trực tiếp hoặc gián tiếp) đến giá trị `z`,
+   ta cũng có thể nói giá trị `x` tham chiếu (gián tiếp) đến giá trị `z`.
+
+    === việc tham chiếu :: pointer.tmd#references
+
+Dưới đây, ta gọi kiểu struct có các trường mang kiểu con trỏ là **kiểu bọc con trỏ**,
+và gọi kiểu mà giá trị của nó có thể chứa con trỏ (trực tiếp hoặc gián tiếp)
+là **kiểu chứa con trỏ**.
+Kiểu con trỏ và kiểu bọc con trỏ đều là kiểu chứa con trỏ.
+Kiểu array có kiểu phần tử chứa con trỏ cũng là kiểu chứa con trỏ.
+(Kiểu array sẽ được giải thích trong bài viết tiếp theo.)
+
+@@@ #internal-definitions
+###=========== (Có thể là) định nghĩa nội bộ của các kiểu thuộc nhóm thứ hai
+
+Để hiểu rõ hơn hành vi lúc chạy của các giá trị thuộc nhóm thứ hai,
+ta có thể hình dung rằng những kiểu này được định nghĩa nội bộ
+bằng các kiểu thuộc nhóm thứ nhất như bên dưới.
+Nếu bạn chưa dùng nhiều kiểu Go,
+hiện tại chưa cần cố hiểu cặn kẽ các định nghĩa này.
+Thay vào đó, chỉ cần nắm khái quát và đọc lại bài viết
+khi đã có thêm kinh nghiệm lập trình Go.
+Chỉ cần hiểu sơ bộ các định nghĩa này cũng đủ giúp lập trình viên Go
+nắm rõ hơn những kiểu được giải thích trong các bài viết tiếp theo.
+
+###----------- Định nghĩa nội bộ của kiểu map, channel và hàm
+
+{ %%
+https://groups.google.com/forum/#!topic/golang-nuts/91phVZwiDf8
+}
+
+Định nghĩa nội bộ của kiểu map, channel và hàm tương tự nhau:
+@@@ .line-numbers
+''' go
+// kiểu map
+type _map *hashtableImpl
+
+// kiểu channel
+type _channel *channelImpl
+
+// kiểu hàm
+type _function *functionImpl
+'''
+
+Như vậy, về nội bộ, ba kiểu này chỉ là các kiểu con trỏ.
+Nói cách khác, phần trực tiếp của giá trị thuộc các kiểu này là con trỏ.
+Với mỗi giá trị khác zero của các kiểu này,
+phần trực tiếp (một con trỏ) tham chiếu đến phần triển khai bên dưới gián tiếp.
+
+Nhân tiện, Go compiler tiêu chuẩn dùng hashtable để triển khai map.
+
+###----------- Định nghĩa nội bộ của kiểu slice
+
+Định nghĩa nội bộ của kiểu slice như sau:
+@@@ .line-numbers
+''' go
+type _slice struct {
+	// tham chiếu đến các phần tử bên dưới
+	elements unsafe.Pointer
+	// số phần tử và dung lượng
+	len, cap int
+}
+'''
+
+Về nội bộ, kiểu slice là kiểu struct bọc con trỏ.
+Mỗi giá trị slice khác zero có một phần bên dưới gián tiếp,
+nơi lưu các giá trị phần tử của slice.
+Trường `elements` trong phần trực tiếp tham chiếu đến phần bên dưới gián tiếp đó.
+
+###----------- Định nghĩa nội bộ của kiểu string
+
+Sau đây là định nghĩa nội bộ của kiểu string:
+@@@ .line-numbers
+''' go
+type _string struct {
+	elements *byte // tham chiếu đến các byte bên dưới
+	len      int   // số byte
+}
+'''
+
+Về nội bộ, kiểu string cũng là kiểu struct bọc con trỏ.
+Mỗi giá trị string có một phần bên dưới gián tiếp lưu các byte của nó;
+trường `elements` của giá trị string tham chiếu đến phần gián tiếp đó.
+
+@@@ #interface-structure
+###----------- Định nghĩa nội bộ của kiểu interface
+
+Sau đây là định nghĩa nội bộ của kiểu interface tổng quát:
+@@@ .line-numbers
+''' go
+type _interface struct {
+	dynamicType  *_type         // kiểu động
+	dynamicValue unsafe.Pointer // giá trị động
+}
+'''
+
+Về nội bộ, kiểu interface cũng là kiểu struct bọc con trỏ.
+Định nghĩa nội bộ của kiểu interface có hai trường con trỏ.
+Mỗi giá trị interface khác zero có hai phần bên dưới gián tiếp,
+lần lượt lưu kiểu động và giá trị động của giá trị interface đó.
+Hai phần gián tiếp được tham chiếu bởi các trường `dynamicType`
+và `dynamicValue` của giá trị interface.
+
+Thực tế, với Go compiler tiêu chuẩn, định nghĩa trên chỉ được dùng
+cho kiểu interface rỗng.
+Kiểu interface rỗng là kiểu interface không khai báo method nào.
+Ta sẽ tìm hiểu thêm về interface trong bài __interface trong Go__ sau này.
+Với kiểu interface không rỗng, định nghĩa sau được sử dụng.
+
+    === interface trong Go :: interface.tmd
+
+@@@ .line-numbers
+''' go
+type _interface struct {
+	dynamicTypeInfo *struct {
+		dynamicType *_type       // kiểu động
+		methods     []*_function // bảng method
+	}
+	dynamicValue unsafe.Pointer // giá trị động
+}
+'''
+
+Trường `methods` của trường `dynamicTypeInfo`
+trong một giá trị interface lưu các method mà kiểu động của giá trị interface đó
+triển khai cho kiểu interface của chính giá trị interface ấy.
+
+{ %%
+Go runtime sẽ tạo tối đa một struct thông tin kiểu động cho mỗi cặp
+kiểu interface và kiểu động, rồi lưu struct đó trong vùng toàn cục.
+Với Go runtime tiêu chuẩn, một giá trị struct thông tin kiểu động
+sẽ không bị garbage collection sau khi được tạo.
+Mọi giá trị `_type` cũng được lưu trong vùng toàn cục.
+Nói cách khác, các giá trị `_type` và struct thông tin kiểu động
+được nhiều giá trị interface dùng chung, chúng không thuộc về
+một giá trị interface cụ thể nào.
+Vì vậy, bài viết này xem mỗi giá trị interface có thể có tối đa một giá trị bên dưới,
+được trường `dynamicValue` tham chiếu.
+}
+
+
+@@@ #about-value-copy
+###=========== Các phần giá trị bên dưới không được sao chép khi gán giá trị
+
+Giờ ta đã biết định nghĩa nội bộ của các kiểu thuộc nhóm thứ hai
+là kiểu chứa con trỏ (kiểu con trỏ hoặc kiểu bọc con trỏ).
+Điều này rất hữu ích để hiểu hành vi sao chép giá trị trong Go.
+
+Trong Go, mỗi phép gán giá trị (bao gồm truyền tham số, v.v.)
+là một phép sao chép nông nếu giá trị đích và giá trị nguồn có cùng kiểu
+(nếu chúng khác kiểu, ta có thể xem như giá trị nguồn được chuyển đổi ngầm
+sang kiểu đích trước khi gán).
+Nói cách khác, trong phép gán giá trị, chỉ phần trực tiếp của giá trị nguồn
+được sao chép sang giá trị đích.
+Nếu giá trị nguồn có các phần giá trị bên dưới,
+các phần trực tiếp của giá trị đích và nguồn sẽ cùng tham chiếu
+đến những phần giá trị bên dưới đó; nói cách khác, giá trị đích và nguồn
+sẽ dùng chung các phần giá trị bên dưới.
+
+{ ><
+&& res/value-parts-copy.png
+}
+
+Trên thực tế, xét về lý thuyết, mô tả trên chưa hoàn toàn chính xác với string và interface.
+__FAQ chính thức của Go__ nói rằng khi sao chép một giá trị interface,
+phần giá trị động bên dưới của nó cũng cần được sao chép.
+Tuy nhiên, vì giá trị động của interface là chỉ đọc,
+Go compiler/runtime tiêu chuẩn không sao chép phần giá trị động bên dưới
+khi sao chép giá trị interface.
+Có thể xem đây là một tối ưu hóa của compiler.
+Tình huống tương tự cũng xảy ra với giá trị string;
+Go compiler/runtime tiêu chuẩn cũng áp dụng cách tối ưu đó khi sao chép string.
+Do vậy, với Go compiler/runtime tiêu chuẩn,
+mô tả ở phần trước hoàn toàn chính xác với giá trị thuộc mọi kiểu.
+
+    === FAQ chính thức của Go :: https://golang.org/doc/faq#pass_by_value
+
+Vì một phần bên dưới gián tiếp có thể không thuộc riêng về giá trị nào,
+nên nó không được tính vào kích thước mà hàm `unsafe.Sizeof` trả về.
+
+{ %%
+Như đã đề cập, về nội bộ, giá trị map trong Go là hashtable.
+Khi dùng giá trị interface hoặc string làm khóa map,
+các phần bên dưới của chúng được tính khi tính hash.
+Khi dùng channel làm khóa map, các phần bên dưới của nó không được tính khi tính hash.
+Không thể dùng giá trị slice, map và hàm làm khóa map.
+}
+
+@@@ #more=about-reference
+###=========== Về thuật ngữ “kiểu tham chiếu” và “giá trị tham chiếu”
+
+Từ **// reference //** trong cộng đồng Go khá lộn xộn.
+Nó gây ra nhiều nhầm lẫn.
+Một số bài viết, kể cả một số bài viết __chính thức__,
+dùng **// reference //** để bổ nghĩa cho kiểu và giá trị,
+hoặc xem **// reference //** là đối lập với **// value //**.
+Go 101 kiên quyết không khuyến khích cách dùng này.
+Tôi thực sự không muốn tranh luận về điểm này.
+Ở đây, tôi chỉ liệt kê một số cách dùng sai rõ ràng của **// reference //**:
+*
+   trong Go chỉ có kiểu slice, map, channel và hàm là kiểu tham chiếu.
+   (Nếu thực sự cần dùng thuật ngữ **// reference type //** trong Go,
+   thì không nên loại bất kỳ kiểu chứa con trỏ nào khỏi nhóm kiểu tham chiếu.)
+*
+   tham chiếu đối lập với giá trị.
+   (Nếu thực sự cần dùng thuật ngữ **// reference value //** trong Go,
+   hãy xem giá trị tham chiếu là một loại giá trị đặc biệt,
+   thay vì xem nó là đối lập với giá trị.)
+*
+   một số tham số được truyền bằng tham chiếu.
+   (Xin lỗi, mọi tham số trong Go đều được truyền bằng bản sao
+   **của các phần trực tiếp**.)
+
+    === các bài viết chính thức :: https://golang.org/doc/faq#references
+
+Tôi không cho rằng các thuật ngữ **// reference type //** hoặc **// reference value //**
+hoàn toàn vô ích với Go; tôi chỉ nghĩ chúng không thiết yếu,
+đồng thời gây nhiều nhầm lẫn khi sử dụng Go.
+Nếu cần những thuật ngữ này, tôi muốn định nghĩa chúng là các kiểu chứa con trỏ.
+Theo ý kiến cá nhân tôi, tốt nhất chỉ nên dùng từ **// reference //**
+để diễn tả quan hệ giữa các giá trị, dưới dạng động từ hoặc danh từ,
+và không bao giờ dùng nó như tính từ.
+Điều này sẽ giúp tránh nhiều nhầm lẫn khi học, dạy và sử dụng Go.

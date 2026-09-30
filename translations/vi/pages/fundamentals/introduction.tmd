@@ -1,0 +1,133 @@
+### Giới thiệu về Go
+
+Go là một ngôn ngữ lập trình biên dịch, có kiểu tĩnh, ra đời tại Google.
+Nhiều thành viên trong nhóm nòng cốt thiết kế Go và phát triển công cụ đã có nhiều năm
+kinh nghiệm trong lĩnh vực nghiên cứu ngôn ngữ lập trình.
+
+Go có nhiều tính năng. Một số tính năng độc đáo, một số được mượn từ các ngôn ngữ lập trình khác:
+*
+   hỗ trợ lập trình đồng thời tích hợp sẵn
+   -
+      goroutine (green thread) và khả năng dễ dàng khởi chạy goroutine mới.
+   -
+      channel (dựa trên mô hình CSP) và cơ chế select để đồng bộ hóa giữa các goroutine.
+
+*
+   các kiểu container `map` và `slice` là những thành phần hạng nhất.
+*
+   tính đa hình thông qua interface.
+*
+   đóng gói giá trị và reflection thông qua interface.
+*
+   con trỏ.
+*
+   function closure.
+*
+   method.
+*
+   lời gọi hàm trì hoãn.
+*
+   nhúng kiểu.
+*
+   suy luận kiểu.
+*
+   an toàn bộ nhớ.
+*
+   tự động garbage collection.
+*
+   khả năng tương thích đa nền tảng tốt.
+*
+   generics tùy chỉnh (từ Go 1.18).
+*
+   iterator tùy chỉnh (từ Go 1.23).
+
+Ngoài các tính năng trên, Go còn có những điểm nổi bật sau:
+*
+   Cú pháp của Go được thiết kế có chủ đích để đơn giản, rõ ràng
+   và tương tự các ngôn ngữ lập trình phổ biến khác.
+   Nhờ đó, việc bắt đầu lập trình Go khá dễ dàng.
+*
+   Go đi kèm một bộ package mã nguồn chuẩn phong phú, cung cấp đủ loại chức năng
+   thông dụng. Phần lớn các package đều hỗ trợ đa nền tảng.
+*
+   Go còn có một cộng đồng năng động, cùng nhiều thư viện và dự án Go của bên thứ ba
+   chất lượng cao để import và sử dụng.
+
+Những người lập trình Go thường được gọi là gopher.
+
+Thực tế, dù Go là ngôn ngữ lập trình biên dịch và có kiểu tĩnh,
+Go cũng có nhiều tính năng thường chỉ có trong các ngôn ngữ script động.
+Kết hợp hai kiểu đặc tính này trong một ngôn ngữ không dễ,
+nhưng Go đã làm được.
+Nói cách khác, Go vừa có tính nghiêm ngặt của ngôn ngữ tĩnh,
+vừa có tính linh hoạt của ngôn ngữ động.
+Không thể nói sự kết hợp này không có đánh đổi,
+nhưng tác động của những đánh đổi đó nhỏ hơn nhiều so với lợi ích mà sự kết hợp mang lại trong Go.
+
+Khả năng dễ đọc là một yếu tố quan trọng, ảnh hưởng lớn đến thiết kế của Go.
+Một gopher có thể dễ dàng hiểu mã Go do các gopher khác viết.
+
+Hiện nay, compiler Go phổ biến nhất được viết bằng Go và do nhóm thiết kế Go duy trì.
+Sau đây, ta sẽ gọi nó là compiler Go chuẩn, hoặc `gc`
+(viết tắt của Go compiler, không phải garbage collection GC).
+Nhóm thiết kế Go cũng duy trì một compiler Go thứ hai là `gccgo`.
+Hiện nay, `gccgo` ít phổ biến hơn `gc`, nhưng vẫn luôn đóng vai trò làm tài liệu tham chiếu,
+và cả hai compiler đều đang được phát triển tích cực.
+Hiện tại, nhóm Go tập trung cải tiến `gc`.
+
+`gc` được cung cấp trong Go Toolchain
+(bộ công cụ phát triển Go do nhóm Go duy trì).
+Go Toolchain 1.0 được phát hành vào tháng 3 năm 2012.
+Phiên bản Go luôn tương ứng với phiên bản Go Toolchain.
+Mỗi năm đã và đang có hai phiên bản lớn được phát hành.
+
+Kể từ khi Go 1.0 ra mắt, cú pháp của Go chỉ thay đổi đôi chút,
+nhưng các công cụ trong Go Toolchain đã được cải tiến nhiều qua từng phiên bản,
+đặc biệt là `gc`.
+Ví dụ, độ trễ đáng kể do garbage collection gây ra là lời phê bình phổ biến
+đối với các ngôn ngữ quản lý bộ nhớ tự động.
+Tuy nhiên, kể từ Go 1.8, những cải tiến trong cách triển khai garbage collection đồng thời
+của `gc` về cơ bản đã loại bỏ vấn đề độ trễ này.
+
+`gc` hỗ trợ biên dịch đa nền tảng.
+Ví dụ, ta có thể build một executable cho Windows trên hệ điều hành Linux và ngược lại.
+
+Các chương trình viết bằng ngôn ngữ Go thường được biên dịch rất nhanh.
+Thời gian biên dịch là yếu tố quan trọng ảnh hưởng đến trải nghiệm phát triển.
+Thời gian build ngắn là một lý do khiến nhiều lập trình viên thích lập trình bằng Go.
+
+Các ưu điểm của executable Go gồm:
+*
+   mức sử dụng bộ nhớ nhỏ
+*
+   thực thi mã nhanh (nhanh hơn nhiều so với ngôn ngữ script động, nhưng chậm hơn một chút so với C/C++)
+*
+   thời gian khởi động ngắn (mang lại trải nghiệm triển khai rất tốt)
+
+Một số ngôn ngữ biên dịch khác như C/C++/Rust cũng có thể có ba ưu điểm này
+(và mỗi ngôn ngữ có thể có những ưu điểm riêng so với Go),
+nhưng chúng thiếu ba đặc điểm quan trọng của Go:
+*
+   biên dịch nhanh, giúp trải nghiệm phát triển cục bộ thuận lợi
+   và rút ngắn chu kỳ lặp triển khai
+*
+   linh hoạt như các ngôn ngữ động
+*
+   hỗ trợ lập trình đồng thời tích hợp sẵn
+
+Kết hợp lại, tất cả ưu điểm trên khiến Go trở thành một ngôn ngữ nổi bật
+và là lựa chọn tốt cho nhiều loại dự án, đặc biệt là ứng dụng mạng
+và công cụ hệ thống.
+
+Cuối cùng, Go không hoàn hảo ở mọi khía cạnh.
+Thiết kế của Go có những đánh đổi nhất định.
+Go cũng thực sự có một số hạn chế. Ví dụ:
+
+*  Hiện Go chưa hỗ trợ các giá trị bất biến tùy ý, dẫn đến việc
+   nhiều giá trị trong các package chuẩn vốn không được dự định cho phép sửa đổi lại được khai báo dưới dạng biến.
+   Đây là một điểm yếu tiềm ẩn về bảo mật trong một số chương trình Go.
+*  Độ phức tạp và lỗi tăng lên trong các bản phát hành gần đây:
+   Những thay đổi mới được đưa vào Go 1.22 và 1.23 đã làm ngữ nghĩa của ngôn ngữ phức tạp hơn ngoài dự kiến
+   và bổ sung các hành vi ngầm.
+   Hơn nữa, những thay đổi này gây ra vấn đề không tương thích ngược và lỗi,
+   mà những người đưa ra thay đổi dường như không sẵn lòng khắc phục.

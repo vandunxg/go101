@@ -1,0 +1,332 @@
+### Tìm hiểu thêm về các lời gọi hàm được defer
+
+Các lời gọi hàm được defer đã được __giới thiệu trước đây__.
+Do kiến thức về Go của bạn đọc khi đó còn hạn chế,
+bài viết ấy chưa đề cập đến một số chi tiết và trường hợp sử dụng khác của lời gọi hàm được defer.
+Phần còn lại của bài viết này sẽ đề cập đến những chi tiết và trường hợp sử dụng đó.
+
+    === introduced before :: control-flows-more.tmd#defer
+
+###========== Không thể defer lời gọi đến nhiều hàm dựng sẵn có giá trị trả về
+
+Trong Go, bạn có thể bỏ qua toàn bộ giá trị trả về từ lời gọi hàm tự định nghĩa.
+Tuy nhiên, với các hàm dựng sẵn có danh sách kết quả trả về không rỗng,
+__không được bỏ qua__ các giá trị trả về từ lời gọi của chúng,
+ngoại trừ lời gọi đến các hàm dựng sẵn `copy` và `recover`.
+Mặt khác, ta đã biết rằng các giá trị trả về từ lời gọi hàm được defer phải bị bỏ qua,
+vì vậy không thể defer lời gọi đến nhiều hàm dựng sẵn.
+
+    === mustn't be absent :: exceptions.tmd#discard-return-results
+
+May mắn là trong thực tế, hiếm khi cần defer lời gọi đến hàm dựng sẵn
+(có danh sách kết quả trả về không rỗng).
+Theo những gì tôi biết, đôi khi chỉ cần defer lời gọi đến hàm dựng sẵn `append`.
+Trong trường hợp này, ta có thể defer lời gọi đến một hàm vô danh
+bọc bên ngoài lời gọi `append`.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	s := []string{"a", "b", "c", "d"}
+	defer fmt.Println(s) // [a x y d]
+	// defer append(s[:1], "x", "y") // lỗi
+	defer func() {
+		_ = append(s[:1], "x", "y")
+	}()
+}
+'''
+
+@@@ #function-evaluation-time
+###========== Thời điểm đánh giá giá trị hàm được defer
+
+Hàm được gọi (giá trị hàm) trong một lời gọi hàm được defer sẽ được đánh giá
+khi lời gọi được đưa vào stack các lời gọi defer của goroutine hiện tại.
+Ví dụ, chương trình sau sẽ in ra `false`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var f = func () {
+		fmt.Println(false)
+	}
+	defer f()
+	f = func () {
+		fmt.Println(true)
+	}
+}
+'''
+
+Hàm được gọi trong một lời gọi hàm được defer có thể là một giá trị hàm nil.
+Trong trường hợp này, panic sẽ xảy ra khi lời gọi đến hàm nil được thực thi,
+chứ không phải khi lời gọi được đưa vào stack các lời gọi defer của goroutine hiện tại.
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	defer fmt.Println("reachable 1")
+	var f func() // mặc định f là nil
+	defer f()    // panic xảy ra ở đây
+	// Các dòng sau vẫn được thực thi.
+	fmt.Println("reachable 2")
+	f = func() {} // không có tác dụng ngăn panic
+}
+'''
+
+###========== Thời điểm đánh giá các đối số receiver của lời gọi method được defer
+
+Như đã giải thích trước đó, các đối số của một lời gọi hàm được defer
+__cũng được đánh giá khi__ lời gọi được đưa vào stack các lời gọi defer
+của goroutine hiện tại.
+
+    === also evaluated when :: control-flows-more.tmd#argument-evaluation-moment
+
+Các đối số receiver của method cũng không ngoại lệ.
+Ví dụ, chương trình sau in ra `1342`.
+
+@@@ .line-numbers
+''' go
+package main
+
+type T int
+
+func (t T) M(n int) T {
+  print(n)
+  return t
+}
+
+func main() {
+	var t T
+	// "t.M(1)" là đối số receiver của lời gọi method
+	// ".M(2)", nên nó được đánh giá khi lời gọi ".M(2)"
+	// được đưa vào stack các lời gọi defer.
+	defer t.M(1).M(2)
+	t.M(3).M(4)
+}
+'''
+
+###========== Lời gọi được defer giúp code rõ ràng hơn và giảm khả năng mắc lỗi
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+import "os"
+
+func withoutDefers(filepath string, head, body []byte) error {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Seek(16, 0)
+	if err != nil {
+		f.Close()
+		return err
+	}
+
+	_, err = f.Write(head)
+	if err != nil {
+		f.Close()
+		return err
+	}
+
+	_, err = f.Write(body)
+	if err != nil {
+		f.Close()
+		return err
+	}
+
+	err = f.Sync()
+	f.Close()
+	return err
+}
+
+func withDefers(filepath string, head, body []byte) error {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Seek(16, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(head)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(body)
+	if err != nil {
+		return err
+	}
+
+	return f.Sync()
+}
+'''
+
+{ %%
+https://joeshaw.org/dont-defer-close-on-writable-files/
+}
+
+Bạn thấy cách nào rõ ràng hơn? Có lẽ là cách dùng lời gọi defer, dù chỉ nhỉnh hơn một chút.
+Đồng thời, cách này cũng giảm khả năng mắc lỗi: hàm không dùng defer có nhiều lời gọi `f.Close()`,
+nên dễ bỏ sót một lời gọi hơn.
+
+Ví dụ sau cho thấy lời gọi defer cũng có thể giúp giảm khả năng mắc lỗi.
+Nếu các lời gọi `doSomething` gây panic trong ví dụ dưới đây,
+hàm `f2` sẽ thoát mà không mở khóa giá trị `Mutex`.
+Vì vậy, hàm `f1` ít có khả năng mắc lỗi hơn.
+
+@@@ .line-numbers
+''' go
+var m sync.Mutex
+
+func f1() {
+	m.Lock()
+	defer m.Unlock()
+	doSomething()
+}
+
+func f2() {
+	m.Lock()
+	doSomething()
+	m.Unlock()
+}
+'''
+
+###========== Hiệu năng bị giảm do defer lời gọi hàm
+
+Không phải lúc nào cũng nên dùng lời gọi hàm được defer.
+Với Go compiler chính thức, trước phiên bản 1.13,
+lời gọi hàm được defer gây ra một số tổn thất hiệu năng khi chạy.
+Từ Go Toolchain 1.13, một số trường hợp dùng defer phổ biến đã được tối ưu đáng kể,
+nên nhìn chung ta không cần bận tâm đến vấn đề hiệu năng do lời gọi defer gây ra.
+Cảm ơn Dan Scales đã thực hiện những tối ưu tuyệt vời này.
+
+{ %%
+Ví dụ, trong ví dụ sau, các method `CounterB`
+và `IncreaseB` hiệu quả hơn nhiều so với các method
+`CounterA` và `IncreaseA`.
+
+@@@ .line-numbers
+''' go
+import "sync"
+
+type T struct {
+	mu sync.Mutex
+	n  int64
+}
+
+func (t *T) CounterA() int64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.n
+}
+
+func (t *T) CounterB() (count int64) {
+	t.mu.Lock()
+	count = t.n
+	t.mu.Unlock()
+	return
+}
+
+func (t *T) IncreaseA() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.n++
+}
+
+func (t *T) IncreaseB() {
+	t.mu.Lock()
+	t.n++ // chắc chắn dòng này sẽ không gây panic
+	t.mu.Unlock()
+}
+'''
+
+Trong các hàm phiên bản B, ta phải bảo đảm rằng đoạn code giữa lời gọi
+`Lock` và `Unlock` sẽ không bao giờ gây panic.
+Nhìn chung, nên dùng các hàm phiên bản A trong thực tế.
+Chỉ nên dùng phiên bản B khi thực sự cần quan tâm đến hiệu năng
+của các hàm liên quan.
+}
+
+@@@ #kind-of-resource-leaking
+###========== Có thể gây rò rỉ tài nguyên khi defer lời gọi hàm
+
+Một stack các lời gọi defer quá lớn cũng có thể tiêu tốn nhiều bộ nhớ,
+và một số tài nguyên có thể không được giải phóng kịp thời nếu các lời gọi bị trì hoãn quá lâu.
+
+Ví dụ, nếu có nhiều file cần xử lý trong một lần gọi hàm sau,
+thì một số lượng lớn file handler sẽ chưa được giải phóng trước khi hàm kết thúc.
+
+@@@ .line-numbers
+''' go
+func writeManyFiles(files []File) error {
+	for _, file := range files {
+		f, err := os.Open(file.path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		_, err = f.WriteString(file.content)
+		if err != nil {
+			return err
+		}
+
+		err = f.Sync()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+'''
+
+Trong những trường hợp như vậy, ta có thể dùng một hàm vô danh để bao quanh các lời gọi defer,
+nhờ đó các hàm được defer sẽ được thực thi sớm hơn. Ví dụ,
+ta có thể viết lại hàm trên như sau để cải thiện nó:
+
+@@@ .line-numbers
+''' go
+func writeManyFiles(files []File) error {
+	for _, file := range files {
+		if err := func() error {
+			f, err := os.Open(file.path)
+			if err != nil {
+				return err
+			}
+			// method Close sẽ được gọi ở cuối
+			// lượt lặp hiện tại.
+			defer f.Close()
+
+			_, err = f.WriteString(file.content)
+			if err != nil {
+				return err
+			}
+
+			return f.Sync()
+		}(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+'''
+
