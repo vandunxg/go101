@@ -1,0 +1,421 @@
+""" html
+<h1>Giải thích chi tiết cơ chế Panic/Recover</h1>
+
+<p>
+Cơ chế panic và recover đã được
+<a href="control-flows-more.html#panic-recover">giới thiệu trước đó</a>,
+và một số trường hợp sử dụng panic/recover được trình bày trong
+<a href="panic-and-recover-use-cases.html">bài viết trước</a>.
+Bài viết này sẽ giải thích chi tiết cơ chế panic/recover.
+Các giai đoạn thoát của lời gọi hàm cũng sẽ được giải thích chi tiết.
+</p>
+
+<a class="anchor" id="exiting-phase"></a>
+<h3>Các giai đoạn thoát của lời gọi hàm</h3>
+
+<div>
+<p>
+Trong Go, một lời gọi hàm có thể trải qua giai đoạn thoát trước khi kết thúc hoàn toàn.
+Trong giai đoạn này, các lời gọi hàm được hoãn (deferred) và đã được đưa vào defer-call stack
+trong quá trình thực thi lời gọi hàm sẽ được chạy (theo thứ tự ngược với thứ tự được đưa vào).
+Khi tất cả lời gọi bị hoãn đã kết thúc hoàn toàn,
+giai đoạn thoát kết thúc và lời gọi hàm cũng kết thúc hoàn toàn.
+</p>
+
+<p>
+Ở một số tài liệu khác, giai đoạn thoát cũng có thể được gọi là giai đoạn trả về.
+</p>
+
+Một lời gọi hàm có thể bước vào giai đoạn thoát (hoặc kết thúc trực tiếp) theo ba cách:
+<ol>
+<li>
+	sau khi lời gọi trả về bình thường.
+</li>
+<li>	khi một panic xảy ra trong lời gọi.
+</li>
+<li>	sau khi hàm <code>runtime.Goexit</code> được gọi và kết thúc hoàn toàn trong lời gọi.
+</li>
+</ol>
+
+Ví dụ, trong đoạn mã sau:
+<ul>
+<li>	lời gọi hàm <code>f0</code> hoặc <code>f1</code>
+	sẽ bước vào giai đoạn thoát sau khi trả về bình thường.
+</li>
+<li>	lời gọi hàm <code>f2</code> sẽ bước vào giai đoạn thoát
+	sau khi xảy ra panic do chia cho 0.
+</li>
+<li>	lời gọi hàm <code>f3</code> sẽ bước vào giai đoạn thoát
+	sau khi lời gọi hàm <code>runtime.Goexit</code> kết thúc hoàn toàn.
+</li>
+</ul>
+
+<pre class="line-numbers"><code class="language-go">import (
+	"fmt"
+	"runtime"
+)
+
+func f0() int {
+	var x = 1
+	defer fmt.Println("exits normally:", x)
+	x++
+	return x
+}
+
+func f1() {
+	var x = 1
+	defer fmt.Println("exits normally:", x)
+	x++
+}
+
+func f2() {
+	var x, y = 1, 0
+	defer fmt.Println("exits for panicking:", x)
+	x = x / y // will panic
+	x++       // unreachable
+}
+
+func f3() int {
+	x := 1
+	defer fmt.Println("exits for Goexiting:", x)
+	x++
+	runtime.Goexit()
+	return x+x // unreachable
+}
+</code></pre>
+
+<p>
+Nhân tiện, hàm <code>runtime.Goexit()</code> không nhằm mục đích gọi trong main goroutine của chương trình.
+</p>
+</div>
+
+<a class="anchor" id="function-call-assosiations"></a>
+<a class="anchor" id="function-call-associations"></a>
+<h3>Liên kết panic với lời gọi hàm</h3>
+<div>
+
+<p>
+Khi một panic xảy ra trực tiếp trong lời gọi hàm,
+ta nói panic chưa được recover đó bắt đầu được liên kết với lời gọi hàm.
+Việc liên kết một panic với lời gọi hàm khiến lời gọi hàm bước ngay vào giai đoạn thoát.
+</p>
+
+Lời gọi <code>runtime.Goexit</code> tạo ra tín hiệu Goexit và liên kết tín hiệu đó với lời gọi.
+Ta có thể xem tín hiệu Goexit là một panic đặc biệt và đôi khi bên dưới gọi tín hiệu Goexit là panic Goexit.
+Panic Goexit hoạt động giống panic thông thường ở một số khía cạnh,
+nhưng cũng có hai điểm khác biệt:
+
+<ol>
+<li>
+	Không thể recover panic Goexit.
+</li>
+<li>	Panic Goexit vô hại. Nó không làm chương trình gặp sự cố.
+</li>
+</ol>
+
+<p>
+Tại một thời điểm bất kỳ khi chương trình đang chạy, một lời gọi hàm có thể liên kết với tối đa một panic chưa được recover,
+có thể là panic thông thường hoặc tín hiệu Goexit.
+Khi một lời gọi hàm được gọi, ban đầu chưa có panic nào liên kết với lời gọi đó,
+bất kể lời gọi bên ngoài (lời gọi lồng bên trong) đã bước vào giai đoạn thoát hay chưa.
+Tất nhiên, panic có thể xảy ra sau đó trong quá trình thực thi lời gọi hàm,
+vì vậy một panic có thể được liên kết với lời gọi hàm về sau.
+</p>
+
+Nếu một lời gọi đang liên kết với một panic chưa được recover thì:
+<ul>
+<li>	lời gọi sẽ không còn liên kết với panic nào khi panic chưa được recover đó được recover.
+</li>
+<li>	khi có panic mới xảy ra trong lời gọi hàm, panic mới sẽ thay thế panic cũ
+	và trở thành panic chưa được recover liên kết với lời gọi hàm.
+</li>
+</ul>
+
+Ví dụ, trong chương trình sau, panic được recover là panic 3,
+tức panic cuối cùng được liên kết với lời gọi hàm <code>main</code>.
+
+<pre class="line-numbers"><code class="language-go">package main
+
+import "fmt"
+
+func main() {
+	defer func() {
+		fmt.Println(recover()) // 3
+	}()
+	
+	defer panic(3) // sẽ thay thế panic 2
+	defer panic(2) // sẽ thay thế panic 1
+	defer panic(1) // sẽ thay thế panic 0
+	panic(0)
+}
+</code></pre>
+
+<p>
+</p>
+
+Tuy không thường gặp, nhiều panic chưa được recover có thể cùng tồn tại trong một goroutine.
+Mỗi panic liên kết với một lời gọi hàm chưa kết thúc trong call stack của goroutine đó.
+Khi một lời gọi lồng bên trong kết thúc hoàn toàn mà vẫn đang liên kết với một panic chưa được recover,
+panic chưa được recover đó sẽ lan truyền sang lời gọi bên ngoài (lời gọi đã gọi lời gọi lồng bên trong).
+Hiệu ứng này giống như panic xảy ra trực tiếp trong lời gọi bên ngoài. Cụ thể:
+<ul>
+<li>	nếu trước đó lời gọi bên ngoài đã liên kết với một panic chưa được recover,
+	panic cũ sẽ bị panic lan truyền thay thế.
+	Trong trường hợp này, chắc chắn lời gọi bên ngoài đã bước vào giai đoạn thoát,
+	vì vậy lời gọi hàm tiếp theo trong defer-call stack sẽ được gọi.
+</li>
+<li>	nếu trước đó lời gọi bên ngoài chưa liên kết với panic chưa được recover nào,
+	panic lan truyền sẽ được liên kết với lời gọi bên ngoài.
+	Trong trường hợp này, lời gọi bên ngoài có thể đã bước vào giai đoạn thoát hoặc chưa.
+	Nếu chưa, nó sẽ bước ngay vào giai đoạn thoát.
+</li>
+</ul>
+
+<p>
+Vì vậy, khi một goroutine kết thúc, trong goroutine đó có thể còn tối đa một panic chưa được recover.
+Nếu goroutine kết thúc khi vẫn còn panic chưa được recover và panic đó không phải panic Goexit,
+toàn bộ chương trình sẽ gặp sự cố và thông tin về panic chưa được recover sẽ được báo cáo.
+Nếu không, goroutine kết thúc bình thường (êm ái).
+Đó là lý do panic Goexit được xem là vô hại.
+</p>
+
+Chương trình ví dụ sau sẽ gặp sự cố khi chạy,
+vì panic 2 vẫn chưa được recover khi goroutine mới kết thúc.
+
+<pre class="line-numbers"><code class="language-go">package main
+
+func main() {
+	// Goroutine mới.
+	go func() {
+		// Đây là một lời gọi hàm ẩn danh được hoãn.
+		// Khi lời gọi này kết thúc hoàn toàn, panic 2 sẽ lan truyền
+		// đến lời gọi hàm khởi đầu của goroutine mới và thay thế panic 0.
+		// Panic 2 sẽ không bao giờ được recover.
+		defer func() {
+			// Như đã giải thích trong ví dụ trước,
+			// panic 2 sẽ thay thế panic 1.
+			defer panic(2)
+			
+			// Khi lời gọi hàm ẩn danh kết thúc hoàn toàn, panic 1
+			// sẽ lan truyền đến (và được liên kết với) lời gọi hàm
+			// ẩn danh được hoãn bên ngoài.
+			func () {
+				// Ngay khi panic 1 xảy ra, trong goroutine mới
+				// sẽ cùng tồn tại hai panic chưa được recover.
+				// Một panic (panic 0) liên kết với lời gọi hàm
+				// khởi đầu của goroutine mới; panic còn lại
+				// (panic 1) liên kết với lời gọi hàm ẩn danh hiện tại.
+				panic(1)
+			}()
+		}()
+		panic(0)
+	}()
+	
+	select{}
+}
+</code></pre>
+
+Kết quả (khi biên dịch chương trình trên bằng Go compiler chuẩn v1.25.n):
+<pre class="output"><code>panic: 0
+	panic: 1
+	panic: 2
+
+...
+</code></pre>
+
+<p>
+Định dạng kết quả chưa hoàn hảo,
+có thể khiến một số người nghĩ rằng panic 0 là panic cuối cùng chưa được recover,
+trong khi thực tế panic cuối cùng chưa được recover là panic 2.
+</p>
+
+Chương trình sau sẽ kết thúc bình thường khi chạy.
+Lời gọi <code>runtime.Goexit</code> ở cuối đóng vai trò như một thao tác recover cuối cùng.
+
+<pre class="line-numbers"><code class="language-go">package main
+
+import "runtime"
+
+func f() {
+	// Tín hiệu Goexit thay thế panic "bye"
+	// và trở thành panic cuối cùng (vô hại).
+	defer runtime.Goexit()
+	panic("bye")
+}
+
+func main() {
+	go f()
+	
+	for runtime.NumGoroutine() > 1 {
+		runtime.Gosched()
+	}
+}
+</code></pre>
+
+</div>
+
+<a class="anchor" id="some-recovers-are-no-ops"></a>
+<h3>Một số lời gọi <code>recover</code> không có tác dụng</h3>
+<div>
+
+Hàm dựng sẵn <code>recover</code> phải được gọi ở đúng vị trí thì mới có tác dụng.
+Nếu không, lời gọi sẽ không làm gì cả.
+Ví dụ, không lời gọi <code>recover</code> nào trong ví dụ sau recover được panic <code>bye</code>.
+
+<pre class="line-numbers"><code class="language-go">package main
+
+func main() {
+	defer func() {
+		defer func() {
+			recover() // không có tác dụng
+		}()
+	}()
+	defer func() {
+		func() {
+			recover() // không có tác dụng
+		}()
+	}()
+	func() {
+		defer func() {
+			recover() // không có tác dụng
+		}()
+	}()
+	func() {
+		defer recover() // không có tác dụng
+	}()
+	func() {
+		recover() // không có tác dụng
+	}()
+	recover()       // không có tác dụng
+	defer recover() // không có tác dụng
+	panic("bye")
+}
+</code></pre>
+
+<p>
+</p>
+
+Ta đã biết lời gọi <code>recover</code> sau đây có tác dụng.
+
+<pre class="line-numbers"><code class="language-go">package main
+
+func main() {
+	defer func() {
+		recover() // có tác dụng
+	}()
+
+	panic("bye")
+}
+</code></pre>
+
+<p>
+</p>
+
+
+Vậy tại sao các lời gọi <code>recover</code> trong ví dụ đầu tiên của mục này lại không có tác dụng?
+Hãy xem phiên bản hiện tại của <a href="https://golang.org/ref/spec#Handling_panics">đặc tả Go</a>:
+
+<div class="alert alert-success">
+Giá trị trả về của <code>recover</code> là <code>nil</code> nếu xảy ra bất kỳ điều kiện nào sau đây:
+<ul>
+<li>đối số của <code>panic</code> là nil;</li>
+<li>goroutine không ở trạng thái panicking;</li>
+<li><code>recover</code> không được gọi trực tiếp bởi một hàm bị hoãn.</li>
+</ul>
+</div>
+
+<p>
+<a href="panic-and-recover-use-cases.html#avoid-verbose">Một ví dụ</a>
+trong bài viết trước minh họa trường hợp điều kiện thứ nhất.
+</p>
+
+Hầu hết lời gọi <code>recover</code> trong ví dụ đầu tiên của mục này thỏa mãn
+điều kiện thứ hai hoặc thứ ba được nêu trong đặc tả Go,
+ngoại trừ lời gọi đầu tiên. Đúng vậy, mô tả hiện tại vẫn chưa chính xác.
+Điều kiện thứ ba nên được diễn đạt như sau:
+
+<ul>
+<li>	<code>recover</code> không được gọi trực tiếp bởi một hàm bị hoãn <b>mà lời gọi hàm đó được gọi trực tiếp
+	bởi lời gọi hàm đang liên kết với panic dự kiến sẽ được recover</b>.
+</li>
+</ul>
+
+<p>
+Trong ví dụ đầu tiên của mục này, panic dự kiến sẽ được recover đang liên kết với lời gọi hàm
+<code>main</code>. Lời gọi <code>recover</code> đầu tiên được gọi trực tiếp bởi một lời gọi hàm bị hoãn,
+nhưng lời gọi hàm bị hoãn đó không được gọi trực tiếp bởi lời gọi hàm <code>main</code>.
+Đó là lý do lời gọi <code>recover</code> đầu tiên không có tác dụng.
+</p>
+
+Trên thực tế, đặc tả Go hiện tại cũng chưa giải thích rõ vì sao lời gọi <code>recover</code> thứ hai
+(xét theo thứ tự các dòng mã), được kỳ vọng recover panic 1,
+trong ví dụ sau lại không có tác dụng.
+
+<pre class="line-numbers"><code class="language-go">// Chương trình này kết thúc mà không recover panic 1.
+package main
+
+func demo() {
+	defer func() {
+		defer func() {
+			recover() // lời gọi này recover panic 2
+		}()
+
+		defer recover() // không có tác dụng
+
+		panic(2)
+	}()
+	panic(1)
+}
+
+func main() {
+	demo()
+}
+</code></pre>
+
+<p>
+Điều đặc tả Go không đề cập là mỗi lời gọi <code>recover</code> được xem như một nỗ lực
+recover panic chưa được recover mới nhất trong goroutine hiện tại.
+Tất nhiên, nếu không có panic chưa được recover mới nhất nào hoặc panic đó là tín hiệu Goexit không thể recover,
+thì lời gọi <code>recover</code> sẽ không có tác dụng.
+</p>
+
+<p>
+Go runtime cho rằng lời gọi <code>recover</code> thứ hai trong ví dụ trên đang cố recover
+panic chưa được recover mới nhất, tức panic 2, vốn liên kết với lời gọi hàm gọi lời gọi
+<code>recover</code> thứ hai. Lời gọi <code>recover</code> thứ hai không được gọi trực tiếp bởi
+một lời gọi hàm bị hoãn mà lời gọi đó được thực hiện bởi lời gọi hàm đang liên kết với panic.
+Thay vào đó, nó được gọi trực tiếp bởi chính lời gọi hàm đang liên kết với panic.
+Đó là lý do lời gọi <code>recover</code> thứ hai không có tác dụng.
+</p>
+
+</div>
+
+
+<a class="anchor" id="summary"></a>
+<h3>Tóm tắt</h3>
+
+<div>
+
+Đến đây, ta có thể tóm tắt ngắn gọn những lời gọi <code>recover</code> nào có tác dụng:
+<div class="alert alert-warning">
+Lời gọi <code>recover</code> chỉ có tác dụng nếu hàm gọi trực tiếp lời gọi <code>recover</code> là một hàm bị hoãn,
+và hàm gọi trực tiếp hàm bị hoãn đó đang liên kết với panic chưa được recover mới nhất
+trong goroutine hiện tại, đồng thời panic mới nhất đó không phải tín hiệu Goexit.
+Lời gọi <code>recover</code> có tác dụng sẽ gỡ liên kết giữa panic chưa được recover mới nhất
+và lời gọi hàm đang liên kết với panic đó,
+đồng thời trả về giá trị được truyền cho lời gọi <code>panic</code>
+đã tạo ra panic chưa được recover mới nhất.
+</div>
+
+</div>
+
+<!--
+các lỗi khác:
+* https://github.com/golang/go/issues/43942
+* https://github.com/golang/go/issues/43941
+* https://github.com/golang/go/issues/43921
+* https://github.com/golang/go/issues/43920
+-->
+
+
+"""

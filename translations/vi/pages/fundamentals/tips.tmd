@@ -1,0 +1,881 @@
+### Mẹo Go 101
+
+Mục lục
+
+@@@ #tips.html .summaries
+*
+   __Làm thế nào buộc người dùng package phải ghi tên trường trong struct composite literal?`` #force-to-use-keyed-struct-literals__
+*
+   __Làm thế nào khiến một kiểu struct không thể so sánh?`` #make-struct-type-incomparable__
+*
+   __Không dùng phép gán giá trị có các biểu thức tương tác với nhau.`` #dont-use-assignments-with-expression-dependencies__
+*
+   __Làm thế nào mô phỏng `for i in 0..N` như trong một số ngôn ngữ khác?`` #simulate-loop-from-0-to-n__
+*
+   __Nên đặt lại các pointer ở những phần tử được giải phóng sau mọi thao tác trên slice để tránh rò rỉ bộ nhớ nếu không chắc chúng sẽ được dùng lại.`` #reset-pointers-for-dead-elements__
+*
+   __Không nên sao chép giá trị thuộc một số kiểu trong package chuẩn.`` #avoid-copying-values-of-some-types__
+*
+   __Có thể dùng tối ưu hóa memclr để đặt lại một dãy phần tử liên tiếp trong array hoặc slice.`` #memclr__
+*
+   __Làm thế nào kiểm tra một giá trị có method mà không import package `reflect`?`` #check-method-existence__
+*
+   __Làm thế nào clone slice hiệu quả và chính xác?`` #clone-slice-efficiently-and-perfectly__
+*
+   __Nên dùng cú pháp subslice ba chỉ số trong một số trường hợp.`` #use-three-index-subslice-form__
+*
+   __Dùng hàm ẩn danh để thực thi sớm một số lời gọi hàm deferred.`` #execute-deferred-calls-earlier__
+*
+   __Xác nhận và thể hiện rằng kiểu tự định nghĩa triển khai một interface cụ thể.`` #assert-implementation__
+*
+   __Một số mẹo assertion tại thời điểm biên dịch.`` #assert-at-compile-time__
+*
+   __Khai báo hằng int và uint lớn nhất như thế nào?`` #declare-max-int-uint__
+*
+   __Phát hiện kích thước word gốc khi biên dịch như thế nào?`` #detect-word-size-at-compile-time__
+*
+   __Làm thế nào bảo đảm giá trị 64-bit được thao tác bởi hàm atomic 64-bit luôn căn chỉnh 64-bit trên kiến trúc 32-bit?`` #_64bit-alignment-guarantee__
+*
+   __Tránh boxing giá trị lớn vào interface.`` #avoid-boxing-large-size-values__
+*
+   __Tối ưu bằng BCE (bounds check elimination).`` #make-use-of-bce__
+
+
+
+@@@ .summaries-items
+{
+
+@@@ #force-to-use-keyed-struct-literals
+###========== Làm thế nào buộc người dùng package phải ghi tên trường trong struct composite literal?
+
+Nhà phát triển package có thể thêm field không export, kích thước bằng 0 vào định nghĩa kiểu struct,
+để compiler ngăn người dùng package tạo composite literal có một số
+field nhưng không ghi tên trường.
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+// foo.go
+package foo
+
+type Config struct {
+	_    [0]int
+	Name string
+	Size int
+}
+'''
+
+@@@ .line-numbers
+''' go
+// main.go
+package main
+
+import "foo"
+
+func main() {
+	//_ = foo.Config{[0]int{}, "bar", 123} // lỗi
+	_ = foo.Config{Name: "bar", Size: 123} // biên dịch thành công
+}
+'''
+
+Cố gắng không đặt field không export, kích thước bằng 0 ở cuối struct,
+vì __làm vậy có thể tăng kích thước của kiểu struct__.
+
+    === doing so ... :: unofficial-faq.tmd#final-zero-size-field
+
+@@@ #make-struct-type-incomparable
+###========== Làm thế nào khiến một kiểu struct không thể so sánh?
+
+Đôi khi, ta muốn ngăn kiểu struct tự định nghĩa được dùng làm kiểu key của map.
+then we can put a field of a non-exported zero-size incomparable type
+vào struct để khiến kiểu đó không thể so sánh.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+type T struct {
+	dummy        [0]func()
+	AnotherField int
+}
+
+var x map[T]int // compile error: invalid map key type T
+
+func main() {
+	var a, b T
+	_ = a == b // compile error: invalid operation:
+}
+'''
+
+@@@ #dont-use-assignments-with-expression-dependencies
+###========== Không dùng phép gán giá trị có các biểu thức tương tác với nhau.
+
+Hiện tại (Go 1.25),
+__thứ tự đánh giá một số biểu thức trong phép gán nhiều giá trị không được xác định__ khi các biểu thức tương tác với nhau.
+Vì vậy, hãy tách phép gán nhiều giá trị thành các phép gán đơn
+nếu có hoặc không thể chắc chắn về sự phụ thuộc giữa các biểu thức liên quan.
+
+    === some evaluation orders ... :: https://github.com/go101/go101/wiki/Some-evaluation-orders-in-multi-value-assignments-are-unspecified
+
+Trên thực tế, một số phép gán đơn viết không tốt cũng có thứ tự đánh giá biểu thức không rõ ràng.
+Ví dụ, chương trình sau có thể in `[7 0 9]`, `[0 8 9]`,
+hoặc `[7 8 9]`, tùy cách triển khai compiler.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+var a = &[]int{1, 2, 3}
+var i int
+func f() int {
+	i = 1
+	a = &[]int{7, 8, 9}
+	return 0
+}
+
+func main() {
+	// Thứ tự đánh giá của "a", "i"
+	// và "f()" không được xác định.
+	(*a)[i] = f()
+	fmt.Println(*a)
+}
+'''
+
+Nói cách khác, lời gọi hàm trong phép gán giá trị có thể
+ảnh hưởng đến kết quả đánh giá của các biểu thức không phải lời gọi hàm trong cùng phép gán.
+Đọc __thứ tự đánh giá trong Go__ để biết chi tiết.
+
+    === evaluation orders in Go :: evaluation-orders.tmd
+
+@@@ #simulate-loop-from-0-to-n
+###========== Làm thế nào mô phỏng `for i in 0..N` như trong một số ngôn ngữ khác?
+
+Ta có thể range qua array có phần tử kích thước bằng 0 hoặc pointer nil trỏ đến array để mô phỏng vòng lặp này.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	const N = 5
+
+	for i := range [N]struct{}{} {
+		fmt.Println(i)
+	}
+	for i := range [N][0]int{} {
+		fmt.Println(i)
+	}
+	for i := range (*[N]int)(nil) {
+		fmt.Println(i)
+	}
+}
+'''
+
+Lưu ý: từ Go 1.22, có thể dùng trực tiếp `for i = range N`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	const N = 5
+
+	for i := range N {
+		fmt.Println(i)
+	}
+}
+'''
+
+@@@ #reset-pointers-for-dead-elements
+###========== Nên đặt lại các pointer ở những phần tử được giải phóng sau mọi thao tác trên slice để tránh rò rỉ bộ nhớ nếu không chắc chúng sẽ được dùng lại.
+
+Đọc về __xóa phần tử slice__ và __dạng rò rỉ bộ nhớ do không đặt lại pointer trong phần tử slice đã xóa__ để biết chi tiết.
+
+    === delete slice elements :: container.tmd#delete-slice-elements
+    === kind-of memory leaking ... :: memory-leaking.tmd#dead-slice-elements
+
+@@@ #avoid-copying-values-of-some-types
+###========== Không nên sao chép giá trị thuộc một số kiểu trong package chuẩn.
+
+Không nên sao chép giá trị kiểu `bytes.Buffer`, kiểu `strings.Builder`
+và các kiểu trong package chuẩn `sync`.
+(Thực tế không nên sao chép chúng, dù sao chép không có vấn đề
+trong một số trường hợp cụ thể.)
+
+Cách triển khai `strings.Builder` sẽ phát hiện
+việc sao chép giá trị `strings.Builder` không hợp lệ.
+Khi phát hiện trường hợp đó, chương trình sẽ panic. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "strings"
+
+func main() {
+	var b strings.Builder
+	b.WriteString("hello ")
+	var b2 = b
+	b2.WriteString("world!") // panic tại đây
+}
+'''
+
+Việc sao chép giá trị của các kiểu trong package chuẩn `sync` sẽ được
+lệnh `go vet` trong Go Toolchain cảnh báo.
+
+@@@ .line-numbers
+''' go
+// demo.go
+package demo
+
+import "sync"
+
+func f(m sync.Mutex) { // cảnh báo
+	m.Lock()
+	defer m.Unlock()
+	// thực hiện công việc ...
+}
+'''
+
+@@@ .output
+'''
+$ go vet demo.go
+./demo.go:5: f passes lock by value: sync.Mutex
+'''
+
+Việc sao chép giá trị `bytes.Buffer` không được phát hiện khi chạy chương trình
+hoặc bằng lệnh `go vet`. Hãy cẩn thận để tránh việc này.
+
+@@@ #memclr
+###========== Có thể dùng tối ưu hóa memclr để đặt lại một dãy phần tử liên tiếp trong array hoặc slice.
+
+Đọc về __tối ưu hóa `memclr`__ để biết chi tiết.
+
+    === the `memclr` optimization :: container.tmd#memclr
+
+@@@ #check-method-existence
+###========== Làm thế nào kiểm tra một giá trị có method mà không import package `reflect`?
+
+Dùng cách trong ví dụ sau.
+(Giả sử method cần kiểm tra là `M(int) string`.)
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type A int
+type B int
+func (b B) M(x int) string {
+	return fmt.Sprint(b, ": ", x)
+}
+
+func check(v interface{}) bool {
+	_, has := v.(interface{M(int) string})
+	return has
+}
+
+func main() {
+	var a A = 123
+	var b B = 789
+	fmt.Println(check(a)) // false
+	fmt.Println(check(b)) // true
+}
+'''
+
+@@@ #clone-slice-efficiently-and-perfectly
+###========== Làm thế nào clone slice hiệu quả và chính xác?
+
+Đọc __bài wiki này`` https://github.com/go101/go101/wiki/How-to-perfectly-clone-a-slice%3F__
+và __bài wiki này`` https://github.com/go101/go101/wiki/How-to-efficiently-clone-a-slice%3F__
+để biết chi tiết.
+
+@@@ #use-three-index-subslice-form
+###========== Nên dùng cú pháp subslice ba chỉ số trong một số trường hợp.
+
+Giả sử package cung cấp hàm `func NewX(...Option) *X`,
+và hàm này gộp các option đầu vào với một số
+option mặc định nội bộ, thì không nên triển khai như sau.
+
+@@@ .line-numbers
+''' go
+func NewX(opts ...Option) *X {
+	options := append(opts, defaultOpts...)
+	// Dùng các option đã gộp để tạo và trả về một X.
+	// ...
+}
+'''
+
+Không nên dùng cách triển khai trên vì lời gọi
+`append` có thể sửa đổi dãy `Option` bên dưới
+của tham số `opts`.
+Trong hầu hết trường hợp, đây không phải vấn đề.
+Tuy nhiên, trong một số trường hợp đặc biệt, việc này có thể gây kết quả ngoài dự kiến.
+
+Để tránh sửa đổi dãy `Option` bên dưới của
+tham số đầu vào, hãy dùng cách sau.
+
+@@@ .line-numbers
+''' go
+func NewX(opts ...Option) *X {
+	opts = append(opts[:len(opts):len(opts)], defaultOpts...)
+	// Dùng các option đã gộp để tạo và trả về một X.
+	// ...
+}
+'''
+
+Ở phía gọi hàm `NewX`,
+không nên cho rằng và dựa vào việc hàm `NewX`
+sẽ không sửa các phần tử bên dưới của slice được truyền vào,
+vì vậy tốt nhất hãy truyền các argument này bằng cú pháp subslice ba chỉ số.
+
+Một trường hợp khác nên dùng cú pháp subslice ba chỉ số được đề cập
+trong __bài wiki này__.
+
+Một nhược điểm của cú pháp subslice ba chỉ số là hơi dài dòng.
+Thực tế, tôi từng đưa ra __một đề xuất__
+để rút gọn cú pháp nhưng đề xuất đã bị từ chối.
+
+    === this wiki article :: https://github.com/go101/go101/wiki/The-capacity-of-the-result-byte-%28or-rune%29-slice-of-a-conversion-from-a-string-is-undefined
+    === a proposal :: https://github.com/golang/go/issues/25638
+
+@@@ #execute-deferred-calls-earlier
+###========== Dùng hàm ẩn danh để thực thi sớm một số lời gọi hàm deferred.
+
+Đọc __bài viết này__ để biết chi tiết.
+
+    === this article :: defer-more.tmd#kind-of-resource-leaking
+
+@@@ #assert-implementation
+###========== Xác nhận và thể hiện rằng kiểu tự định nghĩa triển khai một interface cụ thể.
+
+Có thể gán giá trị thuộc kiểu tự định nghĩa cho biến có kiểu là interface được chỉ định
+để xác nhận kiểu đó triển khai interface này; quan trọng hơn,
+cách này thể hiện kiểu đó được thiết kế để triển khai những interface nào.
+Đôi khi, viết tài liệu bằng code chạy được tốt hơn viết trong comment.
+
+@@@ .line-numbers
+''' go
+package myreader
+
+import "io"
+
+type MyReader uint16
+
+func NewMyReader() *MyReader {
+	var mr MyReader
+	return &mr
+}
+
+func (mr *MyReader) Read(data []byte) (int, error) {
+	switch len(data) {
+	default:
+		*mr = MyReader(data[0]) << 8 | MyReader(data[1])
+		return 2, nil
+	case 2:
+		*mr = MyReader(data[0]) << 8 | MyReader(data[1])
+	case 1:
+		*mr = MyReader(data[0])
+	case 0:
+	}
+	return len(data), io.EOF
+}
+
+// Mỗi dòng trong ba dòng sau bảo đảm rằng
+// kiểu *MyReader triển khai io.Reader.
+var _ io.Reader = NewMyReader()
+var _ io.Reader = (*MyReader)(nil)
+func _() {_ = io.Reader(nil).(*MyReader)}
+'''
+
+@@@ #assert-at-compile-time
+###========== Một số mẹo assertion tại thời điểm biên dịch.
+
+Ngoài cách trên, còn có các mẹo assertion tại thời điểm biên dịch khác.
+
+Một số cách bảo đảm tại thời điểm biên dịch rằng hằng `N` không nhỏ hơn hằng `M`:
+
+@@@ .line-numbers
+''' go
+// Mỗi dòng sau đều bảo đảm N >= M
+func _(x []int) {_ = x[N-M]}
+func _(){_ = []int{N-M: 0}}
+func _([N-M]int){}
+var _ [N-M]int
+const _ uint = N-M
+type _ [N-M]int
+
+// Nếu bảo đảm M và N là số nguyên dương.
+var _ uint = N/M - 1
+'''
+
+Một cách khác được lấy từ __@lukechampine__.
+Cách này tận dụng quy tắc __các key hằng trùng nhau không thể xuất hiện trong cùng composite literal__.
+
+    === @lukechampine :: https://x.com/lukechampine/status/1026695476811390976
+    === duplicate constant keys ... :: container.tmd#value-literals
+
+@@@ .disable-line-numbers111
+''' go
+var _ = map[bool]struct{}{false: struct{}{}, N>=M: struct{}{}}
+'''
+
+Cách trên hơi dài dòng nhưng tổng quát hơn. Có thể dùng để assertion bất kỳ điều kiện nào.
+Cách sau ngắn gọn hơn nhưng cần thêm một chút bộ nhớ (không đáng kể):
+
+@@@ .disable-line-numbers111
+''' go
+var _ = map[bool]int{false: 0, N>=M: 1}
+'''
+
+{ %%
+LƯU Ý: hiện tại, __href="https://github.com/golang/go/issues/28104">gccgo 8.2.0 có bug__ cho phép key hằng trùng lặp trong composite literal.
+Vì vậy, mẹo này hiện không hoạt động với gccgo. Bug này sẽ được sửa trong phiên bản gccgo sau.
+}
+
+Tương tự, có các cách assertion hai hằng số nguyên bằng nhau:
+
+@@@ .line-numbers
+''' go
+var _ [N-M]int; var _ [M-N]int
+type _ [N-M]int; type _ [M-N]int
+const _, _ uint = N-M, M-N
+func _([N-M]int, [M-N]int) {}
+
+var _ = map[bool]int{false: 0, M==N: 1}
+
+var _ = [1]int{M-N: 0} // chỉ số hợp lệ duy nhất là 0
+var _ = [1]int{}[M-N]  // chỉ số hợp lệ duy nhất là 0
+
+var _ [N-M]int = [M-N]int{}
+'''
+
+Các cách assertion một hằng string không rỗng:
+
+@@@ .line-numbers
+''' go
+type _ [len(aStringConstant)-1]int
+var _ = map[bool]int{false: 0, aStringConstant != "": 1}
+var _ = aStringConstant[:1]
+var _ = aStringConstant[0]
+const _ = 1/len(aStringConstant)
+'''
+
+Dòng cuối được lấy từ __ý tưởng thông minh__ của Jan Mercl.
+
+    === clever idea :: https://groups.google.com/d/msg/golang-nuts/w1-JQMaH7c4/qzBFSPImBgAJ
+
+Đôi khi, để tránh biến cấp package chiếm quá nhiều bộ nhớ,
+ta có thể đặt code assertion trong hàm khai báo bằng blank identifier.
+Ví dụ,
+
+@@@ .line-numbers
+''' go
+func _() {
+	var _ = map[bool]int{false: 0, N>=M: 1}
+	var _ [N-M]int
+}
+'''
+
+@@@ #declare-max-int-uint
+###========== Khai báo hằng int và uint lớn nhất như thế nào?
+
+@@@ .line-numbers
+''' go
+const MaxUint = ^uint(0)
+const MaxInt = int(^uint(0) >> 1)
+'''
+
+@@@ #detect-word-size-at-compile-time
+###========== Phát hiện kích thước word gốc khi biên dịch như thế nào?
+
+Mẹo này không liên quan đến Go.
+
+@@@ .line-numbers
+''' go
+const Is64bitArch = ^uint(0) >> 63 == 1
+const Is32bitArch = ^uint(0) >> 63 == 0
+const WordBits = 32 << (^uint(0) >> 63) // 64 hoặc 32
+'''
+
+@@@ #_64bit-alignment-guarantee
+###========== Làm thế nào bảo đảm giá trị 64-bit được thao tác bởi hàm atomic 64-bit luôn căn chỉnh 64-bit trên kiến trúc 32-bit?
+
+Đọc __bố cục bộ nhớ của giá trị Go__ để biết chi tiết.
+
+    === Go value memory layouts :: memory-layout.tmd
+
+@@@ #avoid-boxing-large-size-values
+###========== Tránh boxing giá trị lớn vào interface.
+
+Khi gán giá trị không phải interface cho interface, một bản sao của giá trị đó sẽ được boxing vào interface.
+Chi phí sao chép phụ thuộc vào kích thước giá trị không phải interface. Giá trị càng lớn thì chi phí sao chép càng cao.
+Vì vậy, hãy cố gắng tránh boxing giá trị lớn vào interface.
+
+Trong ví dụ sau, chi phí của hai lời gọi in cuối
+thấp hơn nhiều so với hai lời gọi đầu.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a [1000]int
+
+	// Hai dòng này có chi phí cao.
+	fmt.Println(a)                   // a bị sao chép
+	fmt.Printf("Type of a: %T\n", a) // a bị sao chép
+
+	// Hai dòng này có chi phí thấp.
+	fmt.Printf("%v\n", a[:])
+	fmt.Println("Type of a:", fmt.Sprintf("%T", &a)[1:])
+}
+'''
+
+Về kích thước giá trị của các kiểu khác nhau, đọc __chi phí sao chép giá trị trong Go__.
+
+    === value copy costs in Go :: value-copy-cost.tmd
+
+@@@ #make-use-of-bce
+###========== Tối ưu mã Go bằng cách tận dụng BCE (bounds check elimination).
+
+Đọc __bài viết này__ để biết
+BCE là gì và compiler Go chuẩn hiện hỗ trợ BCE đến mức nào.
+
+    === this article :: https://go101.org/optimizations/5-bce.html
+
+{ %%
+https://github.com/golang/go/issues/30945
+}
+
+
+} // .summaries-items
+
+
+
+""""" //
+
+select{}
+
+try to avoid using large-sized types as
+* map key and element types,
+* interface dynamic types: don't use string or large size values as error
+* channel element types
+
+try to define exported error values (in fact, any exported values) as constants,
+
+import "sync"
+type T struct {
+	_ [0]sync.Mutex
+}
+func main() {
+	var t T
+	_ = t // go vet: assignment copies lock value to _: main.T contains sync.Mutex
+}
+	type noCopy struct{}
+	// Lock is a no-op used by -copylocks checker from `go vet`.
+	func (*noCopy) Lock()   {}
+	func (*noCopy) Unlock() {}
+
+the current standard runtime implementation is not friendly when physics memory are not enough.
+machine will lag and hang and non-interactive.
+Often in developing, buggy bare loop will cause such cases.
+Use "for range [N]struct{}{}" instead, where N is safe max count the real loop steps will not exceed.
+
+
+
+don't use == to compare two reflect.Value values, compare v1.Interface() and v2.Interface() instead (move to reflection article and tips)
+
+don't use == compare two time.Time values, use time.EqualTo instead (move to tips)
+
+
+
+
+
+
+
+how to declare a new type which will not has the same underlying type with any already declared types.
+	type T *T
+
+use named returns, better readability
+
+
+avoid gc too frequently by allocating a large memory block for a global variable.
+- aha, it is really used in practice: https://news.ycombinator.com/item?id=21670110
+  https://blog.twitch.tv/en/2019/04/10/go-memory-ballast-how-i-learnt-to-stop-worrying-and-love-the-heap-26c2462549a2/
+  The memory is even not really allocated.
+* https://github.com/golang/go/issues/23044#issuecomment-513829817
+* https://www.reddit.com/r/golang/comments/bbudyf/go_memory_ballast_how_i_learnt_to_stop_worrying/
+* https://dgraph.io/blog/post/manual-memory-management-golang-jemalloc/
+
+
+
+fmt.Print(v) // values referenced by v escape to heap
+
+sync.Pool, sync.Map
+
+use types without pointer components as container elements would ... the burden of GC.
+
+... GC burdan by reusing values
+
+use {} to shrink scope of identifiers as needed.
+use {} to create a nested block to shadow identifiers declared in outer blocks.
+
+intermediate results should be stored out of the benchmark function (still?)
+
+select may slow: https://x.com/melvinodsa/status/1031434710184939522
+
+try to share Transport for http.Client values. (need a go practice article)
+avoid using the http.Get, ..., functions directly.
+
+  https://stackoverflow.com/questions/17948827/reusing-http-connections-in-golang
+  So if you create a new Transport for each request,
+  it will create new connections each time.
+  In this case the solution is to share the one Transport instance between clients.
+  https://stackoverflow.com/questions/36688633/how-to-release-http-client-in-go
+
+  Request.Close
+  https://craigwickesser.com/2015/01/golang-http-to-many-open-files/
+  https://golang.org/pkg/net/http/#Request
+        // For client requests, setting this field prevents re-use of
+        // TCP connections between requests to the same hosts, as if
+        // Transport.DisableKeepAlives were set.
+
+setting GOMAXPROCS with a value larger than NumCPUs is good for the performance of a program sometimes
+https://news.ycombinator.com/item?id=18350362^
+higher GOMAXPROCS > numCPU might be good for performance sometimes:
+https://groups.google.com/forum/#!msg/golang-nuts/jPb_h3TvlKE/qdoHhxXeAwAJ
+
+simulate subPackages (not work for exported types)
+	package foo / import "a.b/foo"
+	type _SubPkg struct{
+		FakeExportedVariable int
+	}
+	var SubPkg _SubPkg
+	func (SubPkg_) FunctionX()
+	func (SubPkg_) FunctionY()
+
+	package main
+	import "a.b/foo"
+	func main() {
+		foo.SubPkg.FunctionX()
+	}
+
+req.WithContext(context.WithValue(req.Context(), paramsKeyType{}, Params{path, tokens})) is slow
+https://github.com/golang/go/issues/28737
+
+
+@@@ #embed-unexported-alias-of-exported-type
+###========== Embedding an unexported alias of an exported type to avoiding the corresponding anonymous field being modified in user packages.
+	type t = T
+	type X struct {
+		t
+	}
+how to embed an exported type as a non-export field?
+so that package users can't modify the field.
+	type embeddedType = ExportedType
+
+If the types of some results of a function are identical,
+it would be better to use named results for "code as docs".
+
+manually adjust struct field positions to save memory.
+
+how to ignore a struct field in comparisons by using reflect.DeepEqual?
+* https://github.com/golang/go/issues/29934#issuecomment-475880025
+* especially for unexported fields
+
+avoid costly copying: don't range array direct, range its pointer of slices instead.
+
+don't expose package-level data to users.
+* bad: var X = 1, good: const X = 1
+* bad: var A [3]int, good: func A() [3]int {...}
+* bad var S []int, good: func NumElementsOfS() int {} + func ElementOfS(i int) int {}
+
+Go Toolchain 1.14: -trimpath
+https://docs.google.com/presentation/d/1RiZmupILuIQQ1Y-psDb1SzXNjCWh-I_-wagthdcwlq8/edit#slide=id.g604d13147b_0_29
+
+use //line directive: https://golang.org/src/cmd/compile/doc.go
+
+Avoid two many allocations. The following code only makes two allocations.
+	var pkgs = make([]PackageForListing, len(tData.sortedPkgs))
+	var result = make([]*PackageForListing, len(tData.sortedPkgs))
+	for i := range pkgs {
+		d := &pkgs[i]
+		result[i] = d
+	}
+
+allocate map/slice to be capable to contain the max size you know (if it is possible) to avoid several allocations.
+
+code should panic on fsync error (at least at present):
+* https://git.postgresql.org/gitweb/?p=postgresql.git;a=commit;h=9ccdd7f66e3324d2b6d3dec282cfa9ff084083f1
+* https://wiki.postgresql.org/wiki/Fsync_Errors
+* https://lwn.net/Articles/752613/
+* https://lwn.net/Articles/752063/
+* https://news.ycombinator.com/item?id=20491965
+
+
+
+
+
+https://golang.org/doc/go1.14#runtime
+	A consequence of the implementation of preemption is that on Unix systems, 
+	including Linux and macOS systems, programs built with Go 1.14 will receive m
+	ore signals than programs built with earlier releases. This means that programs 
+	that use packages like syscall or golang.org/x/sys/unix will see more 
+	slow system calls fail with EINTR errors. Those programs will have to handle 
+	those errors in some way, most likely looping to try the system call again. 
+	For more information about this see man 7 signal for Linux systems or similar
+	documentation for other systems. 
+	https://man7.org/linux/man-pages/man7/signal.7.html
+
+https://go-review.googlesource.com/c/go/+/216401/
+
+https://github.com/golang/go/issues/27857
+
+https://news.ycombinator.com/item?id=24338758
+use `GODEBUG=netdns=cgo`  on Linux if dns resolving is very frequently.
+https://golang.org/pkg/net/
+
+
+clear most fields of a struct value of T, which has many fields
+	v = T{Keeped1: v.Keeped1, Keeped2: v.Keeped2}
+
+Cleaner log code:
+	package main
+
+	import "fmt"
+
+	func Println(vs ...interface{}) bool {
+		fmt.Println(vs...)
+		return true
+	}
+
+	const Debug = true
+
+	func main() {
+		_ = Debug && Println("foo bar")
+		// is cleaner than
+		if Debug {
+			Println("foo bar")
+		}
+	}
+
+How to check whether or not an interface type is blank.
+https://x.com/cuonglm_/status/1314529472662519808
+	reflect.TypeOf((*interface{})(nil)).Elem().Implements(T)
+	Since Go 1.16, Type.NumMethod will not count non-exported interface methods.
+
+Now (Go Toolchain 1.15), with the standard Go compiler, functions containing for-loops will never be inlined: https://github.com/golang/go/issues/14768
+Now you can rewrite a small for-loop with goto to make such functions inlinable if you do care about the performance gain.
+https://github.com/golang/go/commit/497ea0610ea3757c6171cae3a85627459b572e5d
+
+add "type _ int" to prevent inlining.
+
+exit with a code and also run deferred calls: https://github.com/golang/go/issues/42078#issuecomment-712529616
+
+https://github.com/golang/go/issues/27460#issuecomment-420721371
+	Checked overflow helps in some ways but hurts in others. 
+	You have to be careful to avoid writing len(p) - b + a and instead write len(p) + (a - b).
+
+go clean -modcache
+	https://github.com/golang/go/issues/29282
+
+BCE
+* https://github.com/golang/go/issues/42603#issuecomment-734968392
+* https://github.com/golang/go/issues/28941
+* https://github.com/golang/go/issues/40987
+* https://github.com/golang/go/issues/27585
+
+https://github.com/golang/go/issues/41378
+	GODEBUG=inittrace=1 go test/run/...
+
+  The new __href="/pkg/runtime/metrics/">`runtime/metrics`__ package
+  introduces a stable interface for reading
+  implementation-defined metrics from the Go runtime.
+  It supersedes existing functions like
+  __href="/pkg/runtime/#ReadMemStats">`runtime.ReadMemStats`__
+  and
+  __href="/pkg/runtime/debug/#GCStats">`debug.GCStats`__
+  and is significantly more general and efficient.
+  See the package documentation for more details.
+
+For some cases, named returns are more performant:
+* https://github.com/golang/go/issues/20859
+* https://github.com/golang/go/issues/40638
+* https://github.com/uber/tchannel-go/commit/0b0b3d7371bbc9fc10919b815da0034a20638693
+* https://blog.min.io/golang-internals-part-2-nice-benefits-of-named-return-values-2/
+
+cgo and bit fields
+	https://github.com/golang/go/issues/43261
+
+for functions which prototypes might change later, to keep compatibility,
+sometimes, it is would be good to convert this functions to methods of
+a struct type, as a function collection, future possible parameters can
+be added to the struct type later, to avoid function prototype changes.
+
+https://groups.google.com/g/golang-nuts/c/laNVQ5AokBI
+When the garbage collector finds an unreachable block with an associated finalizer, it clears the association and runs finalizer(obj) in a separate goroutine. This makes obj reachable again, but now without an associated finalizer. Assuming that SetFinalizer is not called again, the next time the garbage collector sees that obj is unreachable, it will free obj.
+	package main
+	import (
+		"runtime"
+		"runtime/metrics"
+	)
+	func m() {
+		runtime.GC()
+		sample := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}}
+		metrics.Read(sample)
+		println(sample[0].Value.Uint64())
+	}
+	type A [1<<20]byte
+	var x *A
+	func f(v *A) {
+		runtime.SetFinalizer(v, f)
+	}
+	func main() {
+		m()
+		m()
+		x = &A{100:99}
+		runtime.SetFinalizer(x, f) // this line makes the A array never collected
+		m()
+		m()
+		x = nil
+		m()
+		m()
+		runtime.KeepAlive(x)
+	}
+
+if map elements are not of basic types, and they are never deleted, and they are modified frequently,
+then make map elements immutable and use a map[Key]int + slice instead.
+	map[string]*T is faster than map[string]T if elements are updated frequently and use byte slices as keys.
+	https://github.com/golang/go/issues/45021
+
+https://groups.google.com/g/golang-nuts/c/h6zyQzc_uuQ/m/RMVUq7CeBQAJ
+
+The design of `sync.Pool` seldom satisfies the needs in practice.
+So try to use custom pool implementations:
+* https://github.com/golang/go/issues/22950
+* https://github.com/golang/go/issues/23199
+* https://github.com/golang/go/issues/23216
+We should try to keep the cached values the same size.
+An unused value will be collected within two GC
+https://go-review.googlesource.com/c/go/+/166961/
+https://github.com/golang/go/issues/4720
+
+
+Stacks shrink in GC: https://groups.google.com/g/golang-dev/c/kJ_R6vYVYHU/m/LjoGriFTYxMJ
+
+
+
+

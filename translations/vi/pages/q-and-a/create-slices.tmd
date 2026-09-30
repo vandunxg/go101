@@ -1,0 +1,44 @@
+### Cách tạo slice?
+
+Giả sử kiểu của slice mới được tạo là `S`,
+và `s0` là literal zero value của `S`.
+
+###==== Cách 1 (dùng composite literal)
+
+''' Go
+	var aSlice = S{} // cả độ dài và dung lượng đều bằng không
+	// hoặc
+	var aSlice = S{Len - 1: s0} // cả độ dài và dung lượng đều bằng Len (một hằng số)
+'''
+
+Dung lượng của slice kết quả không phải lúc nào cũng được căn chỉnh theo kích thước memory class.
+//(Kích thước memory class được đề cập trong __Go Optimizations 101__.)
+
+    === Go Optimizations 101 `` https://go101.org/optimizations/0.3-memory-allocations.html
+
+###==== Cách 2 (dùng hàm dựng sẵn `make`):
+
+''' Go
+	var aSlice = make(S, initialLength, capacity)
+	// hoặc
+	var aSlice = make(S, initialLength) // capacity == initialLength
+'''
+
+Dung lượng của slice kết quả không phải lúc nào cũng được căn chỉnh theo kích thước memory class.
+
+
+###==== Cách 3 (dùng các hàm dựng sẵn `append` + `make`):
+
+''' Go
+	var aSlice = append(S{}, make(S, initialLength)...)
+	// hoặc
+	var aSlice = append(S(nil), make(S, initialLength)...)
+	// hoặc
+	var aSlice = append(S{}, make(S, initialLength, capacity)...)
+	// hoặc
+	var aSlice = append(S(nil), make(S, initialLength, capacity)...)
+'''
+
+Với Go toolchain chính thức, dung lượng của slice kết quả
+được căn chỉnh theo kích thước memory class.
+

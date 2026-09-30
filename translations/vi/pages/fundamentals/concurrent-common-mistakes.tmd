@@ -1,0 +1,620 @@
+### Các lỗi thường gặp khi lập trình đồng thời
+
+Go là ngôn ngữ hỗ trợ lập trình đồng thời tích hợp sẵn.
+Bằng cách dùng từ khóa `go` để tạo goroutine (các luồng nhẹ)
+và __sử dụng__ __channel__ cùng __các kỹ thuật đồng bộ hóa khác__
+do Go cung cấp, việc lập trình đồng thời trở nên dễ dàng, linh hoạt và thú vị.
+
+    === sử dụng :: channel-use-cases.tmd
+    === channel :: channel.tmd
+    === các cơ chế đồng thời khác :: concurrent-atomic-operation.tmd
+    === kỹ thuật đồng bộ hóa :: concurrent-synchronization-more.tmd
+
+Mặt khác, Go không ngăn lập trình viên mắc các lỗi khi lập trình đồng thời,
+do bất cẩn hoặc thiếu kinh nghiệm.
+Phần còn lại của bài viết này nêu một số lỗi thường gặp
+trong lập trình đồng thời bằng Go, giúp bạn tránh mắc phải.
+
+###========== Không đồng bộ hóa khi cần thiết
+
+Các dòng lệnh có thể __không được thực thi theo thứ tự xuất hiện__.
+
+    === không thực thi theo thứ tự xuất hiện :: memory-model.tmd
+
+Chương trình sau có hai lỗi.
+*
+   Thứ nhất, thao tác đọc `b` trong goroutine chính và thao tác ghi
+   `b` trong goroutine mới có thể gây ra data race.
+*
+   Thứ hai, điều kiện `b == true` không đảm bảo
+   rằng `a != nil` trong goroutine chính.
+   Compiler và CPU có thể tối ưu bằng cách
+   __sắp xếp lại các lệnh__
+   trong goroutine mới, khiến phép gán `b` xảy ra
+   trước phép gán `a` khi chạy chương trình.
+   Khi đó, slice `a` vẫn là `nil`
+   lúc các phần tử của `a` bị sửa trong goroutine chính.
+
+    === sắp xếp lại lệnh :: memory-model.tmd
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"time"
+	"runtime"
+)
+
+func main() {
+	var a []int // nil
+	var b bool  // false
+
+	// một goroutine mới
+	go func () {
+		a = make([]int, 3)
+		b = true // ghi b
+	}()
+
+	for !b { // đọc b
+		time.Sleep(time.Second)
+		runtime.Gosched()
+	}
+	a[0], a[1], a[2] = 0, 1, 2 // có thể panic
+}
+'''
+
+Chương trình trên có thể chạy bình thường trên máy tính này nhưng lại panic trên máy khác,
+hoặc chạy bình thường khi được biên dịch bằng compiler này nhưng panic khi dùng compiler khác.
+
+Ta nên dùng channel hoặc các kỹ thuật đồng bộ hóa trong package chuẩn `sync`
+để đảm bảo thứ tự bộ nhớ.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var a []int = nil
+	c := make(chan struct{})
+
+	go func () {
+		a = make([]int, 3)
+		c <- struct{}{}
+	}()
+
+	<-c
+	// Dòng tiếp theo chắc chắn không panic.
+	a[0], a[1], a[2] = 0, 1, 2
+}
+'''
+
+@@@ #sleep
+###========== Dùng `time.Sleep` để đồng bộ hóa
+
+Hãy xem ví dụ đơn giản sau.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	var x = 123
+
+	go func() {
+		x = 789 // ghi x
+	}()
+
+	time.Sleep(time.Second)
+	fmt.Println(x) // đọc x
+}
+'''
+
+Ta kỳ vọng chương trình in ra `789`.
+Thực tế, chương trình gần như luôn in ra `789` khi chạy.
+Nhưng đây có phải chương trình được đồng bộ hóa đúng cách không?
+Không! Lý do là Go runtime không đảm bảo chắc chắn rằng phép ghi `x`
+xảy ra trước phép đọc `x`.
+Trong một số điều kiện, chẳng hạn phần lớn tài nguyên CPU bị các chương trình khác
+đang chạy trên cùng hệ điều hành chiếm dụng,
+phép ghi `x` có thể xảy ra sau phép đọc `x`.
+Vì vậy, không nên dùng `time.Sleep` để đồng bộ hóa trong các dự án thực tế.
+
+{ %%
+https://groups.google.com/forum/#!topic/golang-nuts/J3kXXZivlHA
+}
+
+Hãy xem thêm một ví dụ.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	var n = 123
+
+	c := make(chan int)
+
+	go func() {
+		c <- n + 0
+	}()
+
+	time.Sleep(time.Second)
+	n = 789
+	fmt.Println(<-c)
+}
+'''
+
+Theo bạn, chương trình sẽ in ra `123` hay `789`?
+Thực tế, kết quả phụ thuộc vào compiler.
+Với Go compiler chuẩn 1.25.n,
+chương trình rất có thể in ra `123`.
+Nhưng về lý thuyết, chương trình cũng có thể in ra `789`.
+
+Bây giờ, hãy đổi `c <- n + 0` thành `c <- n`
+rồi chạy lại chương trình; bạn sẽ thấy kết quả là `789`
+(với Go compiler chuẩn 1.25.n).
+Một lần nữa, kết quả phụ thuộc vào compiler.
+
+Chương trình trên có data race.
+Biểu thức `n` có thể được tính trước, sau hoặc đồng thời với lúc
+câu lệnh gán `n = 789` được thực thi.
+Lệnh gọi `time.Sleep` không đảm bảo việc tính `n`
+xảy ra trước khi phép gán được thực thi.
+
+Với ví dụ cụ thể này,
+ta nên lưu giá trị cần gửi vào một biến tạm
+trước khi tạo goroutine mới, rồi gửi giá trị tạm đó
+trong goroutine để loại bỏ data race.
+
+@@@ .line-numbers
+''' go
+...
+	tmp := n
+	go func() {
+		c <- tmp
+	}()
+...
+'''
+
+###========== Để goroutine bị treo
+
+Goroutine bị treo là goroutine ở trạng thái chặn mãi mãi.
+Có nhiều nguyên nhân khiến goroutine bị treo. Ví dụ:
+*
+   goroutine cố nhận giá trị từ một channel mà sẽ không còn goroutine nào gửi giá trị vào đó.
+*
+   goroutine cố gửi giá trị vào channel `nil` hoặc vào channel
+   mà sẽ không còn goroutine nào nhận giá trị từ đó.
+*
+   một goroutine tự rơi vào deadlock.
+*
+   một nhóm goroutine rơi vào deadlock lẫn nhau.
+*
+   goroutine bị chặn khi thực thi khối `select`
+   không có nhánh `default`, và mọi thao tác channel
+   sau các từ khóa `case` trong khối `select`
+   đều bị chặn mãi mãi.
+
+Trừ trường hợp ta cố ý để goroutine chính trong chương trình bị treo
+để ngăn chương trình thoát, hầu hết trường hợp goroutine bị treo đều không mong muốn.
+Go runtime khó xác định một goroutine đang bị chặn là bị treo
+hay chỉ tạm thời ở trạng thái chặn, vì vậy Go runtime sẽ không giải phóng
+tài nguyên mà goroutine bị treo đang sử dụng.
+
+Trong trường hợp sử dụng channel kiểu __first-response-wins__,
+nếu sức chứa của channel dùng làm future không đủ lớn,
+một số goroutine phản hồi chậm hơn sẽ bị treo khi cố gửi kết quả
+vào channel future.
+Ví dụ, nếu gọi hàm sau,
+4 goroutine sẽ bị chặn mãi mãi.
+
+    === first-response-wins :: channel-use-cases.tmd#first-response-wins
+
+@@@ .line-numbers
+''' go
+func request() int {
+	c := make(chan int)
+	for i := 0; i < 5; i++ {
+		go func(n int) {
+			c <- n // 4 goroutine sẽ bị treo ở đây.
+		}(i)
+	}
+	return <-c
+}
+'''
+
+Để bốn goroutine không bị treo, sức chứa của channel `c`
+phải ít nhất là `4`.
+
+Trong __cách thứ hai để triển khai__ trường hợp dùng channel kiểu first-response-wins,
+nếu channel dùng làm future/promise là channel không đệm,
+như đoạn mã sau, receiver có thể bỏ lỡ mọi phản hồi rồi bị treo.
+
+    === cách thứ hai :: channel-use-cases.tmd#first-response-wins-2
+
+@@@ .line-numbers
+''' go
+func request() int {
+	c := make(chan int)
+	for i := 0; i < 5; i++ {
+		go func(n int) {
+			select {
+			case c <- n:
+			default:
+			}
+		}(i)
+	}
+	return <-c // có thể bị treo ở đây
+}
+'''
+
+Lý do goroutine nhận có thể bị treo là: nếu cả năm thao tác thử gửi
+đều xảy ra trước khi thao tác nhận `<-c` sẵn sàng,
+cả năm thao tác thử gửi đều không gửi được giá trị,
+khiến goroutine gọi hàm không bao giờ nhận được giá trị.
+
+Đổi channel `c` thành channel có đệm sẽ đảm bảo
+ít nhất một trong năm thao tác thử gửi thành công,
+do đó goroutine gọi hàm sẽ không bị treo.
+
+###========== Sao chép giá trị thuộc các kiểu trong package chuẩn `sync`
+
+Trong thực tế, không nên sao chép giá trị của các kiểu
+trong package chuẩn `sync` (ngoại trừ giá trị của interface `Locker`).
+Ta chỉ nên sao chép con trỏ đến các giá trị đó.
+
+Ví dụ sau là cách lập trình đồng thời không tốt.
+Khi gọi method `Counter.Value`, giá trị receiver `Counter` sẽ được sao chép.
+Vì là một field của receiver, field `Mutex` tương ứng trong receiver `Counter`
+cũng bị sao chép.
+Việc sao chép không được đồng bộ hóa nên giá trị `Mutex` đã sao chép có thể bị hỏng.
+Ngay cả khi không bị hỏng, nó cũng bảo vệ việc sử dụng field `n` đã sao chép,
+điều này thường không có ý nghĩa.
+
+@@@ .line-numbers
+''' go
+import "sync"
+
+type Counter struct {
+	sync.Mutex
+	n int64
+}
+
+// Method này ổn.
+func (c *Counter) Increase(d int64) (r int64) {
+	c.Lock()
+	c.n += d
+	r = c.n
+	c.Unlock()
+	return
+}
+
+// Method này không tốt. Khi được gọi,
+// giá trị receiver Counter sẽ bị sao chép.
+func (c Counter) Value() (r int64) {
+	c.Lock()
+	r = c.n
+	c.Unlock()
+	return
+}
+'''
+
+Ta nên đổi kiểu receiver của method `Value` thành kiểu con trỏ `*Counter`
+để tránh sao chép giá trị `sync.Mutex`.
+
+Lệnh `go vet` trong Go Toolchain sẽ báo các trường hợp có khả năng
+sao chép giá trị không an toàn.
+
+###========== Gọi method `sync.WaitGroup.Add` sai chỗ
+
+Mỗi giá trị `sync.WaitGroup` duy trì một bộ đếm bên trong.
+Giá trị ban đầu của bộ đếm là 0.
+Nếu bộ đếm của một giá trị `WaitGroup` bằng 0,
+lệnh gọi method `Wait` trên giá trị đó sẽ không chặn;
+nếu không, lệnh gọi sẽ chặn cho đến khi bộ đếm về 0.
+
+Để việc dùng giá trị `WaitGroup` có ý nghĩa,
+khi bộ đếm của một giá trị `WaitGroup` bằng 0,
+lệnh gọi method `Add` tiếp theo trên giá trị đó
+phải xảy ra trước lệnh gọi method `Wait` tiếp theo
+trên cùng giá trị `WaitGroup`.
+
+Ví dụ, trong chương trình sau, method `Add`
+được gọi sai chỗ, khiến số cuối cùng được in ra không phải lúc nào cũng là `100`.
+Thực tế, số cuối cùng có thể là một số bất kỳ trong khoảng `[0, 100)`.
+Lý do là không lệnh gọi method `Add` nào được đảm bảo
+xảy ra trước lệnh gọi method `Wait`, do đó cũng không có lệnh gọi method `Done` nào
+được đảm bảo xảy ra trước khi lệnh gọi `Wait` trả về.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"sync"
+	"sync/atomic"
+)
+
+func main() {
+	var wg sync.WaitGroup
+	var x int32 = 0
+	for i := 0; i < 100; i++ {
+		go func() {
+			wg.Add(1)
+			atomic.AddInt32(&x, 1)
+			wg.Done()
+		}()
+	}
+
+	fmt.Println("Wait ...")
+	wg.Wait()
+	fmt.Println(atomic.LoadInt32(&x))
+}
+'''
+
+Để chương trình hoạt động như mong đợi, ta nên chuyển các lệnh gọi method `Add`
+ra khỏi những goroutine mới được tạo trong vòng lặp `for`,
+như đoạn mã sau.
+
+@@@ .line-numbers
+''' go
+...
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			atomic.AddInt32(&x, 1)
+			wg.Done()
+		}()
+	}
+...
+'''
+
+###========== Dùng channel làm future/promise không đúng cách
+
+Từ bài viết __các trường hợp sử dụng channel__,
+ta biết một số hàm trả về __channel làm future__.
+Giả sử `fa` và `fb` là hai hàm như vậy,
+thì lời gọi sau dùng các đối số future không đúng cách.
+
+    === các trường hợp sử dụng channel :: channel-use-cases.tmd
+    === channel làm future :: channel-use-cases.tmd#future-promise
+
+@@@ .line-numbers
+''' go
+doSomethingWithFutureArguments(<-fa(), <-fb())
+'''
+
+Trong dòng mã trên, hai đối số được tạo lần lượt thay vì đồng thời.
+
+Ta nên sửa thành như sau để xử lý chúng đồng thời.
+
+@@@ .line-numbers
+''' go
+ca, cb := fa(), fb()
+doSomethingWithFutureArguments(<-ca, <-cb)
+'''
+
+###========== Đóng channel không phải từ goroutine gửi cuối cùng còn hoạt động
+
+Một lỗi thường gặp của lập trình viên Go là đóng channel
+trong khi vẫn còn goroutine khác có khả năng gửi giá trị vào channel sau đó.
+Nếu thao tác gửi như vậy (vào channel đã đóng) thực sự xảy ra,
+chương trình có thể panic.
+
+Lỗi này từng xuất hiện trong một số dự án Go nổi tiếng, chẳng hạn
+__lỗi này`` https://github.com/kubernetes/kubernetes/pull/45291/files?diff=split__
+và
+__lỗi này`` https://github.com/kubernetes/kubernetes/pull/39479/files?diff=split__
+trong dự án kubernetes.
+
+Hãy đọc __bài viết này__ để biết cách đóng channel an toàn và đúng cách.
+
+    === bài viết này :: channel-closing.tmd
+
+###========== Thực hiện thao tác atomic 64-bit trên giá trị không được đảm bảo căn chỉnh 8 byte
+
+Địa chỉ của giá trị tham gia vào thao tác atomic 64-bit không phải method
+phải được căn chỉnh theo ranh giới 8 byte.
+Nếu không đáp ứng điều kiện này, goroutine hiện tại có thể panic.
+Với Go compiler chuẩn, trường hợp này chỉ có thể
+__xảy ra trên kiến trúc 32-bit__.
+Từ Go 1.19, ta có thể dùng các thao tác atomic 64-bit dạng method để tránh hạn chế này.
+Hãy đọc __bố cục bộ nhớ__ để biết cách
+đảm bảo địa chỉ của word 64-bit được căn chỉnh 8 byte trên hệ điều hành 32-bit.
+
+    === xảy ra trên kiến trúc 32-bit :: https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+    === bố cục bộ nhớ :: memory-layout.tmd
+
+###========== Không chú ý đến việc gọi hàm `time.After` tiêu tốn quá nhiều tài nguyên
+
+Hàm `After` trong package chuẩn `time`
+trả về __channel thông báo sau một khoảng trễ__.
+Hàm này tiện dụng, nhưng mỗi lần gọi sẽ tạo một giá trị mới kiểu `time.Timer`.
+Trước Go 1.23, giá trị `Timer` mới tạo sẽ tồn tại trong suốt khoảng thời gian
+được chỉ định bởi đối số truyền vào hàm `After`.
+Nếu hàm được gọi nhiều lần trong một khoảng thời gian nhất định,
+sẽ có nhiều giá trị `Timer` còn tồn tại cùng lúc,
+tiêu tốn nhiều bộ nhớ và năng lực tính toán.
+
+    === channel thông báo sau một khoảng trễ :: channel-use-cases.tmd#timer
+
+Ví dụ, (trước Go 1.23), nếu hàm `longRunning` sau được gọi
+và có hàng triệu thông điệp đến trong một phút,
+sẽ có hàng triệu giá trị `Timer` cùng tồn tại trong một khoảng thời gian ngắn
+(vài giây), ngay cả khi phần lớn các giá trị `Timer` đó đã không còn cần thiết.
+
+@@@ .line-numbers
+''' go
+import (
+	"fmt"
+	"time"
+)
+
+// Hàm sẽ trả về nếu khoảng cách giữa hai thông điệp
+// liên tiếp dài hơn một phút.
+func longRunning(messages <-chan string) {
+	for {
+		select {
+		case <-time.After(time.Minute):
+			return
+		case msg := <-messages:
+			fmt.Println(msg)
+		}
+	}
+}
+'''
+
+Lưu ý: từ Go 1.23, vấn đề này đã được khắc phục.
+Từ Go 1.23, giá trị `Timer` có thể được garbage collection
+mà không cần đợi hết hạn hoặc gọi `Stop`.
+
+Trước Go 1.23, để tránh tạo quá nhiều giá trị `Timer`
+trong đoạn mã trên, ta nên dùng (và tái sử dụng) một giá trị `Timer` duy nhất
+để thực hiện cùng công việc.
+
+@@@ .line-numbers
+''' go
+func longRunning(messages <-chan string) {
+	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C: // hết hạn (timeout)
+			return
+		case msg := <-messages:
+			fmt.Println(msg)
+
+			// Khối "if" này rất quan trọng.
+			if !timer.Stop() {
+				<-timer.C
+			}
+		}
+
+		// Đặt lại để tái sử dụng.
+		timer.Reset(time.Minute)
+	}
+}
+'''
+
+Lưu ý, khối `if` dùng để loại bỏ/rút hết thông báo timer có thể đang chờ,
+được gửi trong khoảng thời gian ngắn khi thực thi nhánh thứ hai
+(từ Go 1.23, việc này không còn cần thiết).
+
+Lưu ý: từ Go 1.23, method `Timer.Reset` tự động loại bỏ/rút hết
+thông báo timer cũ có thể đang chờ.
+Vì vậy, đoạn mã trên có thể được rút gọn như sau:
+
+@@@ .line-numbers
+''' go
+func longRunning(messages <-chan string) {
+	timer := time.NewTimer(time.Minute)
+	// defer timer.Stop() // không còn cần thiết từ Go 1.23
+
+	for {
+		select {
+		case <-timer.C:
+			return
+		case msg := <-messages:
+			fmt.Println(msg)
+		}
+
+		timer.Reset(time.Minute)
+	}
+}
+'''
+
+###========== Dùng giá trị `time.Timer` không đúng cách
+
+//
+(Lưu ý: các vấn đề được mô tả trong mục này chỉ tồn tại trước Go 1.23.
+Từ Go 1.23, chúng đã được khắc phục.)
+
+Ví dụ sử dụng giá trị `time.Timer` theo cách idiomatic đã được trình bày
+ở mục trước. Một số giải thích:
+*
+   method `Stop` của giá trị `*Timer` trả về `false`
+   nếu `Timer` tương ứng đã hết hạn hoặc đã bị dừng.
+   Nếu ta biết `Timer` chưa bị dừng mà method `Stop` trả về `false`,
+   thì `Timer` hẳn đã hết hạn.
+*
+   Trước Go 1.23, sau khi một giá trị `Timer` bị dừng,
+   field channel `C` của nó chỉ có thể chứa tối đa một thông báo timeout.
+*
+   Trước Go 1.23, sau khi dừng một giá trị `Timer` timeout
+   và trước khi đặt lại rồi tái sử dụng nó,
+   ta nên lấy thông báo timeout ra khỏi channel nếu thông báo đó chưa được lấy.
+   Đây là ý nghĩa của khối `if` trong ví dụ ở mục trước.
+
+Phải gọi method `Reset` của giá trị `*Timer`
+khi `Timer` tương ứng đã hết hạn hoặc đã bị dừng; nếu không,
+có thể xảy ra data race giữa lệnh gọi `Reset` và
+thao tác gửi thông báo có thể xảy ra vào field channel `C` của `Timer`
+(trước Go 1.23).
+
+Nếu nhánh `case` đầu tiên của khối `select` được chọn,
+điều đó có nghĩa là `Timer` đã hết hạn, nên ta không cần dừng nó
+vì thông báo đã được lấy ra.
+Tuy nhiên, ta phải dừng timer trong nhánh thứ hai để kiểm tra xem có thông báo timeout hay không.
+Nếu có, ta nên rút thông báo đó ra trước khi dùng lại timer;
+nếu không, thông báo sẽ được phát ngay ở vòng lặp kế tiếp.
+
+Ví dụ, chương trình sau rất có thể thoát sau khoảng một giây,
+thay vì mười giây. Quan trọng hơn, chương trình không tránh được data race.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	start := time.Now()
+	timer := time.NewTimer(time.Second/2)
+	select {
+	case <-timer.C:
+	default:
+		// Phần lớn khả năng sẽ chạy vào đây.
+		time.Sleep(time.Second)
+	}
+	// Dòng tiếp theo có thể gây data race.
+	timer.Reset(time.Second * 10)
+	<-timer.C
+	fmt.Println(time.Since(start)) // about 1s
+}
+'''
+
+Có thể để giá trị `time.Timer` ở trạng thái chưa dừng
+khi không còn dùng đến, nhưng nên dừng nó khi kết thúc.
+
+Không nên dùng chung một giá trị `time.Timer` giữa nhiều goroutine
+vì dễ gây lỗi.
+
+Không nên dựa vào giá trị trả về của lệnh gọi method `Reset`.
+Kết quả trả về của method `Reset` chỉ tồn tại để đảm bảo tương thích.
+
+{ %%
+Lỗi lập trình đồng thời trong Go: kết hợp mutex và atomic
+Không trộn lẫn truy cập atomic và không atomic trên cùng một memory word:
+*  https://groups.google.com/forum/#!topic/golang-dev/vVkH_9fl1D8
+
+https://github.com/golang/go/issues/34889
+
+}
+

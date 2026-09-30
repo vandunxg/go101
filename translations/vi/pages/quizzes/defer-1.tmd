@@ -1,0 +1,94 @@
+
+##### defer 1
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+type Foo struct {
+	v int
+}
+
+func MakeFoo(n *int) Foo {
+	print(*n)
+	return Foo{}
+}
+
+func (Foo) Bar(n *int) {
+	print(*n)
+}
+
+func main() {
+	var x = 1
+	var p = &x
+	defer MakeFoo(p).Bar(p) // line 19
+	x = 2
+	p = new(int) // line 21
+	MakeFoo(p)
+}
+'''
+}
+
+
+Các lựa chọn:
+
+""" go101-quiz
+100
+102
+022
+011
+"""
+
+
+@@@ #answer
+{
+Đáp án: 102
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/WfuL8NQ4HKA __.
+
+Các điểm chính:
+*
+   Khi một lời gọi hàm được đưa vào hàng đợi lời gọi `defer`, giá trị hàm được gọi và tất cả đối số của nó đều được đánh giá.
+   Các giá trị đã đánh giá sẽ được dùng khi lời gọi được thực thi sau đó
+   trong giai đoạn kết thúc của hàm gọi nó.
+*
+   Vì vậy, tại dòng 19, khi lời gọi `Bar` được đưa vào hàng đợi lời gọi `defer`,
+   các đối số `MakeFoo(p)` (làm đối số receiver) và `p` được đánh giá.
+   Khi đánh giá `MakeFoo(p)`, chương trình in ra `1`.
+*
+   Thay đổi sau đó tại dòng 21 không ảnh hưởng đến kết quả đánh giá ở dòng 19,
+   nghĩa là đối số truyền cho lời gọi hàm `Bar` vẫn là con trỏ đến biến `x`.
+
+
+
+Một câu đố tương tự:
+
+
+@@@ .line-numbers
+''' go
+package main
+
+type T int
+
+func (t T) M(n int) T {
+	print(n)
+	return t
+}
+
+func main() {
+	var t T
+	defer t.M(1).M(2)
+	t.M(3).M(4)
+}
+'''
+
+
+Chương trình câu đố trên in ra `1342`.
+
+
+}
+

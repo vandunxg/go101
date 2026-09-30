@@ -1,0 +1,866 @@
+### Nhúng kiểu
+
+Từ bài viết __structs in Go__,
+ta biết một kiểu struct có thể có nhiều field.
+Mỗi field gồm một tên field và một kiểu field.
+Trên thực tế, đôi khi một field của struct chỉ gồm kiểu field.
+Cách khai báo field struct này được gọi là nhúng kiểu.
+
+    === structs in Go :: struct.tmd
+
+Bài viết này giải thích mục đích của việc nhúng kiểu và mọi chi tiết về nhúng kiểu.
+
+###========== Nhúng kiểu trông như thế nào?
+
+Sau đây là ví dụ minh họa việc nhúng kiểu:
+@@@ .line-numbers
+''' go
+package main
+
+import "net/http"
+
+func main() {
+	type P = *bool
+	type M = map[int]int
+	var x struct {
+		string // kiểu không phải con trỏ có tên
+		error  // kiểu interface có tên
+		*int   // kiểu con trỏ không tên
+		P      // alias của một kiểu con trỏ không tên
+		M      // alias của một kiểu không tên
+
+		http.Header // kiểu map có tên
+	}
+	x.string = "Go"
+	x.error = nil
+	x.int = new(int)
+	x.P = new(bool)
+	x.M = make(M)
+	x.Header = http.Header{}
+}
+'''
+
+Trong ví dụ trên, có sáu kiểu được nhúng vào kiểu struct.
+Mỗi lần nhúng kiểu tạo thành một embedded field.
+
+Embedded field còn được gọi là anonymous field.
+Tuy vậy, mỗi embedded field đều có một tên được xác định ngầm.
+Tên kiểu __không đủ định danh__
+của embedded field đóng vai trò là tên field.
+Ví dụ, tên của sáu embedded field trong ví dụ trên lần lượt là
+`string`, `error`, `int`, `P`, `M` và `Header`.
+
+    === unqualified :: https://golang.org/ref/spec#Qualified_identifiers
+
+@@@ #embeddable-types
+###========== Có thể nhúng những kiểu nào?
+
+Đặc tả Go hiện tại (phiên bản 1.25) __nêu__ rằng:
+
+>  Embedded field phải được chỉ định dưới dạng tên kiểu `T`
+   hoặc con trỏ tới một tên kiểu không phải interface `*T`,
+   và bản thân `T` không được là kiểu con trỏ.
+
+    === says :: https://golang.org/ref/spec#Struct_types
+
+Mô tả trên chính xác trước Go 1.9.
+Tuy nhiên, từ khi type alias được giới thiệu trong Go 1.9,
+mô tả này __đã trở nên hơi lỗi thời và không chính xác__.
+Ví dụ, mô tả không bao gồm trường hợp field `P`
+trong ví dụ ở phần trước.
+
+    === ... inaccurate :: https://github.com/golang/go/issues/22005
+
+Ở đây, bài viết cố gắng đưa ra mô tả chính xác hơn.
+*
+   Có thể nhúng tên kiểu `T` làm embedded field,
+   trừ khi `T` biểu thị một kiểu con trỏ có tên hoặc một kiểu con trỏ
+   có kiểu cơ sở là kiểu con trỏ hoặc kiểu interface.
+*
+   Có thể nhúng kiểu con trỏ `*T`, trong đó `T` là tên kiểu biểu thị
+   kiểu cơ sở của kiểu con trỏ, làm embedded field,
+   trừ khi tên kiểu `T` biểu thị kiểu con trỏ hoặc kiểu interface.
+
+
+{ %%
+Ở đây, bài viết cố gắng đưa ra mô tả chính xác hơn.
+*
+   Có thể nhúng tên kiểu `T` làm embedded field,
+   trừ khi `T` biểu thị một kiểu con trỏ có kiểu cơ sở
+   là kiểu con trỏ hoặc kiểu interface.
+*
+   Có thể nhúng kiểu con trỏ `*T`, trong đó `T` là tên kiểu biểu thị
+   kiểu cơ sở của kiểu con trỏ, làm embedded field
+   chỉ khi tên kiểu `T` không biểu thị kiểu con trỏ hoặc kiểu interface.
+
+
+Hoặc có thể chỉnh sửa đôi chút mô tả trong đặc tả Go:
+
+>
+   Embedded field phải có dạng `T` hoặc `*T`,
+   trong đó T là tên kiểu và kiểu được nhúng không được là
+   kiểu con trỏ có kiểu cơ sở là kiểu con trỏ hoặc kiểu interface.
+
+}
+
+{ %%
+Các quy tắc trên về những kiểu có thể được nhúng bị hạn chế quá mức và phức tạp không cần thiết,
+khiến việc mô tả chúng ngắn gọn trở nên hơi khó.
+Có vẻ chúng được đặt ra để tránh nhúng các kiểu không có method.
+Tuy nhiên, đồng thời, chúng vẫn cho phép nhúng nhiều kiểu không có method,
+chẳng hạn như các kiểu cơ bản dựng sẵn và alias của nhiều kiểu không có tên.
+Có __một đề xuất__ nhằm đơn giản hóa quy tắc này nhưng đã bị từ chối.
+Quy tắc trong đề xuất khá đơn giản và không gây hại:
+**nếu một kiểu có thể cung cấp một tên không đủ định danh thì có thể nhúng kiểu đó**.
+
+    === a proposal :: https://github.com/golang/go/issues/24062
+}
+
+Danh sách sau đưa ra một số ví dụ về kiểu có thể và không thể được nhúng:
+@@@ .line-numbers
+''' go
+type Encoder interface {Encode([]byte) []byte}
+type Person struct {name string; age int}
+type Alias = struct {name string; age int}
+type AliasPtr = *struct {name string; age int}
+type IntPtr *int
+type AliasPP = *IntPtr
+
+// Có thể nhúng các kiểu và alias này.
+Encoder
+Person
+*Person
+Alias
+*Alias
+AliasPtr
+int
+*int
+
+// Không thể nhúng các kiểu và alias này.
+AliasPP          // kiểu cơ sở là kiểu con trỏ
+*Encoder         // kiểu cơ sở là kiểu interface
+*AliasPtr        // kiểu cơ sở là kiểu con trỏ
+IntPtr           // kiểu con trỏ có tên
+*IntPtr          // kiểu cơ sở là kiểu con trỏ
+*chan int        // kiểu cơ sở là kiểu không tên
+struct {age int} // kiểu không phải con trỏ không tên
+map[string]int   // kiểu không phải con trỏ không tên
+[]int64          // kiểu không phải con trỏ không tên
+func()           // kiểu không phải con trỏ không tên
+'''
+
+Trong một struct không được có hai field cùng tên;
+field anonymous trong struct cũng không ngoại lệ.
+Theo quy tắc đặt tên embedded field,
+không thể nhúng một kiểu con trỏ không tên cùng với kiểu cơ sở của nó
+trong cùng một kiểu struct.
+Ví dụ, không thể nhúng cả `int` và `*int` trong cùng một kiểu struct.
+
+Một kiểu struct không thể đệ quy nhúng chính nó hoặc các alias của nó.
+
+Nói chung, chỉ có ý nghĩa khi nhúng các kiểu có field hoặc method
+(các phần sau sẽ giải thích lý do),
+dù cũng có thể nhúng một số kiểu không có field hay method.
+
+###========== Nhúng kiểu có ý nghĩa gì?
+
+Mục đích chính của việc nhúng kiểu là mở rộng chức năng của các kiểu được nhúng
+cho kiểu bao ngoài, để ta không cần triển khai lại
+các chức năng ấy cho kiểu bao ngoài.
+
+Nhiều ngôn ngữ lập trình hướng đối tượng khác dùng tính kế thừa
+để đạt được mục tiêu tương tự như nhúng kiểu.
+Cả hai cơ chế đều có __ưu điểm và nhược điểm__ riêng.
+Bài viết này sẽ không bàn cơ chế nào tốt hơn.
+Ta chỉ cần biết Go chọn cơ chế nhúng kiểu,
+và hai cơ chế này có khác biệt lớn:
+*
+   Nếu một kiểu `T` kế thừa một kiểu khác,
+   thì kiểu `T` nhận được các khả năng của kiểu kia.
+   Đồng thời, mỗi giá trị thuộc kiểu `T` cũng có thể được
+   xem như một giá trị thuộc kiểu kia.
+*
+   Nếu một kiểu `T` nhúng một kiểu khác,
+   thì kiểu kia trở thành một phần của kiểu `T`,
+   và kiểu `T` nhận được các khả năng của kiểu kia,
+   nhưng không giá trị nào thuộc kiểu `T` có thể được xem như giá trị thuộc kiểu kia.
+
+    === benefits and drawbacks :: https://en.wikipedia.org/wiki/Composition_over_inheritance
+
+Ví dụ sau cho thấy kiểu bao ngoài mở rộng
+chức năng của kiểu được nhúng như thế nào.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type Person struct {
+	Name string
+	Age  int
+}
+func (p Person) PrintName() {
+	fmt.Println("Name:", p.Name)
+}
+func (p *Person) SetAge(age int) {
+	p.Age = age
+}
+
+type Singer struct {
+	Person // mở rộng Person bằng cách nhúng nó
+	works  []string
+}
+
+func main() {
+	var gaga = Singer{Person: Person{"Gaga", 30}}
+	gaga.PrintName() // Name: Gaga
+	gaga.Name = "Lady Gaga"
+	(&gaga).SetAge(31)
+	(&gaga).PrintName()   // Name: Lady Gaga
+	fmt.Println(gaga.Age) // 31
+}
+'''
+
+Qua ví dụ trên, có vẻ sau khi nhúng kiểu `Person`,
+kiểu `Singer` nhận được mọi method và field của kiểu `Person`,
+còn kiểu `*Singer` nhận được mọi method của kiểu `*Person`.
+Kết luận này có đúng không? Các phần sau sẽ trả lời câu hỏi đó.
+
+Lưu ý rằng một giá trị `Singer` không phải là giá trị `Person`,
+nên đoạn code sau không biên dịch được:
+@@@ .line-numbers
+''' go
+var gaga = Singer{}
+var _ Person = gaga
+'''
+
+###========== Kiểu bao ngoài có nhận được field và method của kiểu được nhúng không?
+
+Hãy dùng __các chức năng reflection__
+trong package chuẩn `reflect` để liệt kê mọi field và method của kiểu `Singer`,
+cùng các method của kiểu `*Singer`
+được dùng trong ví dụ trước.
+
+    === the reflection functionalities :: reflection.tmd
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+... // các kiểu được khai báo trong ví dụ trước
+
+func main() {
+	t := reflect.TypeOf(Singer{}) // kiểu Singer
+	fmt.Println(t, "has", t.NumField(), "fields:")
+	for i := 0; i < t.NumField(); i++ {
+		fmt.Print(" field#", i, ": ", t.Field(i).Name, "\n")
+	}
+	fmt.Println(t, "has", t.NumMethod(), "methods:")
+	for i := 0; i < t.NumMethod(); i++ {
+		fmt.Print(" method#", i, ": ", t.Method(i).Name, "\n")
+	}
+
+	pt := reflect.TypeOf(&Singer{}) // kiểu *Singer
+	fmt.Println(pt, "has", pt.NumMethod(), "methods:")
+	for i := 0; i < pt.NumMethod(); i++ {
+		fmt.Print(" method#", i, ": ", pt.Method(i).Name, "\n")
+	}
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+main.Singer has 2 fields:
+ field#0: Person
+ field#1: works
+main.Singer has 1 methods:
+ method#0: PrintName
+*main.Singer has 2 methods:
+ method#0: PrintName
+ method#1: SetAge
+'''
+
+Từ kết quả, ta biết kiểu `Singer` thực sự sở hữu
+method `PrintName`, còn kiểu `*Singer` thực sự
+sở hữu hai method `PrintName` và `SetAge`.
+Nhưng kiểu `Singer` không sở hữu field `Name`.
+Vậy tại sao selector expression `gaga.Name`
+lại hợp lệ với giá trị `Singer` `gaga`?
+Hãy đọc phần tiếp theo để biết lý do.
+
+@@@ #shorten-form
+###========== Dạng viết tắt của selector
+
+Từ các bài __structs in Go__ và __methods in Go__, ta đã biết rằng,
+với một giá trị `x`, `x.y` được gọi là selector,
+trong đó `y` là tên field hoặc tên method.
+Nếu `y` là tên field,
+thì `x` phải là giá trị struct hoặc giá trị con trỏ struct.
+Selector là một expression, biểu thị một giá trị.
+Nếu selector `x.y` biểu thị một field,
+thì field đó cũng có thể có các field (nếu `x.y` là giá trị struct) và method riêng.
+Chẳng hạn như `x.y.z`,
+trong đó `z` cũng có thể là tên field hoặc tên method.
+
+    === structs in Go :: struct.tmd
+    === methods in Go :: method.tmd
+
+Trong Go (chưa xét trường hợp selector xung đột hoặc che khuất
+được giải thích ở phần sau), **// nếu một tên ở giữa selector
+tương ứng với một embedded field thì có thể lược bỏ tên đó khỏi selector //**.
+Đây là lý do embedded field còn được gọi là anonymous field.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+type A struct {
+	FieldX int
+}
+
+func (a A) MethodA() {}
+
+type B struct {
+	*A
+}
+
+type C struct {
+	B
+}
+
+func main() {
+	var c = &C{B: B{A: &A{FieldX: 5}}}
+
+	// Bốn dòng sau tương đương nhau.
+	_ = c.B.A.FieldX
+	_ = c.B.FieldX
+	_ = c.A.FieldX // A là field được promotion của C
+	_ = c.FieldX   // FieldX là field được promotion
+
+	// Bốn dòng sau tương đương nhau.
+	c.B.A.MethodA()
+	c.B.MethodA()
+	c.A.MethodA()
+	c.MethodA() // MethodA là method được promotion của C
+}
+'''
+
+Đây là lý do expression `gaga.Name` hợp lệ trong ví dụ ở phần trước.
+Nó chỉ là dạng viết tắt của `gaga.Person.Name`.
+
+Tương tự, selector `gaga.PrintName` có thể được xem là
+dạng viết tắt của `gaga.Person.PrintName`.
+Nhưng ta cũng có thể xem đó không phải dạng viết tắt.
+Sau cùng, kiểu `Singer` thực sự có method `PrintName`,
+dù method này được khai báo ngầm (xem phần sau nữa để biết chi tiết).
+Vì lý do tương tự, selector `(&gaga).PrintName`
+và `(&gaga).SetAge` cũng có thể được xem, hoặc không,
+là dạng viết tắt của `(&gaga.Person).PrintName` và
+`(&gaga.Person).SetAge`.
+
+`Name` được gọi là field được promotion của kiểu `Singer`.
+`PrintName` được gọi là method được promotion của kiểu `Singer`.
+
+Lưu ý, ta cũng có thể dùng selector `gaga.SetAge`, nhưng chỉ khi
+`gaga` là một giá trị kiểu `Singer` có thể lấy địa chỉ.
+Đây chỉ là cú pháp đường cho `(&gaga).SetAge`.
+Hãy đọc __method calls__ để biết chi tiết.
+
+    === method calls :: method.tmd#call
+
+Trong các ví dụ trên, `c.B.A.FieldX` được gọi là dạng đầy đủ
+của các selector `c.FieldX`, `c.B.FieldX` và `c.A.FieldX`.
+Tương tự, `c.B.A.MethodA` được gọi là dạng đầy đủ của các selector
+`c.MethodA`, `c.B.MethodA` và `c.A.MethodA`.
+
+Nếu mọi tên ở giữa trong dạng đầy đủ của selector đều tương ứng với
+embedded field, thì số lượng tên ở giữa selector được gọi là độ sâu của selector.
+Ví dụ, selector `c.MethodA` trong ví dụ trên có độ sâu là // 2 //,
+vì dạng đầy đủ của selector là `c.B.A.MethodA`.
+
+@@@ #selector-shadow-and-collide
+###========== Selector bị che khuất và xung đột
+
+Với một giá trị `x` (ta luôn giả định nó có thể lấy địa chỉ, kể cả khi thực tế không thể),
+có thể có nhiều selector dạng đầy đủ
+có cùng phần tử cuối `y`,
+và mọi tên ở giữa các selector này đều biểu thị embedded field.
+Trong trường hợp đó:
+*
+   chỉ selector dạng đầy đủ có độ sâu nhỏ nhất (giả sử là duy nhất) có thể rút gọn thành `x.y`.
+   Nói cách khác, `x.y` biểu thị selector dạng đầy đủ có độ sâu nhỏ nhất.
+   Các selector dạng đầy đủ khác bị selector có độ sâu nhỏ nhất **che khuất**.
+*
+   nếu có nhiều selector dạng đầy đủ cùng có độ sâu nhỏ nhất,
+   thì không selector nào trong số đó có thể rút gọn thành `x.y`.
+   Ta nói các selector dạng đầy đủ có độ sâu nhỏ nhất **xung đột** với nhau.
+
+Nếu một method selector bị method selector khác che khuất,
+và hai method tương ứng có signature giống hệt nhau,
+ta nói method thứ nhất bị method còn lại ghi đè.
+
+Ví dụ, giả sử `A`, `B` và `C` là ba __defined type__.
+
+    === defined types :: type-system-overview.tmd#type-definition
+
+@@@ .line-numbers
+''' go
+type A struct {
+	x string
+}
+func (A) y(int) bool {
+	return false
+}
+
+type B struct {
+	y bool
+}
+func (B) x(string) {}
+
+type C struct {
+	B
+}
+'''
+
+Đoạn code sau không biên dịch được.
+Nguyên nhân là độ sâu của selector `v1.A.x` và `v1.B.x`
+bằng nhau, nên hai selector xung đột với nhau và
+không selector nào có thể rút gọn thành `v1.x`.
+Tình huống tương tự xảy ra với selector `v1.A.y` và `v1.B.y`.
+
+@@@ .line-numbers
+''' go
+var v1 struct {
+	A
+	B
+}
+
+func f1() {
+	_ = v1.x // lỗi: selector v1.x không rõ ràng
+	_ = v1.y // lỗi: selector v1.y không rõ ràng
+}
+'''
+
+Đoạn code sau biên dịch bình thường.
+Selector `v2.C.B.x` bị `v2.A.x` che khuất, nên
+selector `v2.x` thực chất là dạng rút gọn của `v2.A.x`.
+Tương tự, selector `v2.y` là dạng rút gọn của `v2.A.y`,
+không phải `v2.C.B.y`.
+
+@@@ .line-numbers
+''' go
+var v2 struct {
+	A
+	C
+}
+
+func f2() {
+	fmt.Printf("%T \n", v2.x) // string
+	fmt.Printf("%T \n", v2.y) // func(int) bool
+}
+'''
+
+Selector bị xung đột hoặc che khuất không ngăn các selector sâu hơn được promotion.
+Ví dụ, các selector `.M` và `.z` vẫn được promotion trong ví dụ sau.
+
+@@@ .line-numbers
+''' go
+package main
+
+type x string
+func (x) M() {}
+
+type y struct {
+	z byte
+}
+
+type A struct {
+	x
+}
+func (A) y(int) bool {
+	return false
+}
+
+type B struct {
+	y
+}
+func (B) x(string) {}
+
+func main() {
+	var v struct {
+		A
+		B
+	}
+	//_ = v.x // lỗi: selector v.x không rõ ràng
+	//_ = v.y // lỗi: selector v.y không rõ ràng
+	_ = v.M // hợp lệ. <=> v.A.x.M
+	_ = v.z // hợp lệ. <=> v.B.y.z
+}
+'''
+
+Một chi tiết khác thường cần lưu ý là hai method (hoặc field) không export từ hai package khác nhau
+luôn được xem là hai identifier khác nhau, kể cả khi chúng có tên giống nhau.
+Vì vậy, chúng sẽ không bao giờ xung đột hoặc che khuất nhau khi kiểu sở hữu chúng cùng được nhúng trong một kiểu struct.
+Ví dụ, chương trình gồm hai package như sau sẽ biên dịch và chạy bình thường.
+Nhưng nếu thay tất cả các chỗ `m()` bằng `M()`, chương trình sẽ không biên dịch được,
+vì `A.M` và `B.M` xung đột với nhau, khiến `c.M` không phải selector hợp lệ.
+
+@@@ .line-numbers
+''' go
+package foo // import "x.y/foo"
+
+import "fmt"
+
+type A struct {
+	n int
+}
+
+func (a A) m() {
+	fmt.Println("A", a.n)
+}
+
+type I interface {
+	m()
+}
+
+func Bar(i I) {
+	i.m()
+}
+'''
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "x.y/foo"
+
+type B struct {
+	n bool
+}
+
+func (b B) m() {
+	fmt.Println("B", b.n)
+}
+
+type C struct{
+	foo.A
+	B
+}
+
+func main() {
+	var c C
+	c.m()      // B false
+	foo.Bar(c) // A 0
+}
+'''
+
+###========== Method ngầm định cho kiểu nhúng
+
+Như đã đề cập ở trên, cả kiểu `Singer` và
+kiểu `*Singer` đều có một method `PrintName`,
+đồng thời kiểu `*Singer` cũng có method `SetAge`.
+Tuy nhiên, ta chưa từng khai báo tường minh các method này
+cho hai kiểu đó. Vậy các method này đến từ đâu?
+
+Trên thực tế, giả sử kiểu struct `S` nhúng một kiểu (hoặc type alias) `T`
+và việc nhúng đó hợp lệ:
+*
+   với mỗi method của kiểu được nhúng `T`,
+   nếu các selector dẫn đến method đó không xung đột hoặc bị che khuất
+   bởi selector khác, compiler sẽ khai báo ngầm
+   một method tương ứng có cùng đặc tả
+   cho kiểu struct nhúng `S`.
+   Do đó, compiler cũng sẽ
+   __khai báo ngầm một method tương ứng__ cho kiểu con trỏ `*S`.
+*
+   với mỗi method của kiểu con trỏ `*T`,
+   nếu các selector dẫn đến method đó không xung đột hoặc bị che khuất
+   bởi selector khác, compiler sẽ khai báo ngầm
+   một method tương ứng có cùng đặc tả cho kiểu con trỏ `*S`.
+
+    === implicitly ... :: method.tmd#implicit-pointer-methods
+
+Nói đơn giản:
+*
+   kiểu `struct{Embedded}` và kiểu `*struct{Embedded}` (nếu hợp lệ)
+   đều nhận được mọi method của kiểu mà `Embedded` biểu thị.
+*
+   các kiểu `*struct{Embedded}`, `struct{*Embedded}`
+   và `*struct{*Embedded}` (nếu hợp lệ)
+   đều nhận được mọi method của kiểu `*Embedded`.
+
+
+Các method (được promotion) sau được compiler khai báo ngầm
+cho kiểu `Singer` và kiểu `*Singer`.
+
+@@@ .line-numbers
+''' go
+// Lưu ý: các khai báo này không phải cú pháp Go hợp lệ.
+// Chúng được đưa ra chỉ để giải thích.
+// Chúng minh họa cách đánh giá các method value ngầm định
+// (xem thêm ở phần tiếp theo).
+func (s Singer) PrintName = s.Person.PrintName
+func (s *Singer) PrintName = (*s).Person.PrintName
+func (s *Singer) SetAge = (&(*s).Person).SetAge
+'''
+
+Các vế bên phải là những selector dạng đầy đủ tương ứng.
+
+Từ bài __methods in Go__,
+ta biết rằng không thể khai báo tường minh method cho kiểu struct không tên
+và kiểu con trỏ không tên có kiểu cơ sở là kiểu struct không tên.
+Nhưng thông qua việc nhúng kiểu, các kiểu không tên như vậy cũng có thể sở hữu method.
+
+    === methods in Go :: method.tmd
+
+{ %%
+Đây là một ví dụ khác minh họa các method ngầm định nào được khai báo.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+type F func(int) bool
+func (f F) Validate(n int) bool {
+	return f(n)
+}
+func (f *F) Modify(f2 F) {
+	*f = f2
+}
+
+type B bool
+func (b B) IsTrue() bool {
+	return bool(b)
+}
+func (pb *B) Invert() {
+	*pb = !*pb
+}
+
+type I interface {
+	Load()
+	Save()
+}
+
+func PrintTypeMethods(t reflect.Type) {
+	fmt.Println(t, "has", t.NumMethod(), "methods:")
+	for i := 0; i < t.NumMethod(); i++ {
+		fmt.Print(" method#", i, ": ",
+				t.Method(i).Name, "\n")
+	}
+}
+
+func main() {
+	var s struct {
+		F
+		*B
+		I
+	}
+
+	PrintTypeMethods(reflect.TypeOf(s))
+	fmt.Println()
+	PrintTypeMethods(reflect.TypeOf(&s))
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+struct { main.F; *main.B; main.I } has 5 methods:
+ method#0: Invert
+ method#1: IsTrue
+ method#2: Load
+ method#3: Save
+ method#4: Validate
+
+*struct { main.F; *main.B; main.I } has 6 methods:
+ method#0: Invert
+ method#1: IsTrue
+ method#2: Load
+ method#3: Modify
+ method#4: Save
+ method#5: Validate
+'''
+
+Nếu một kiểu struct nhúng một kiểu có triển khai một kiểu interface
+(kiểu được nhúng có thể chính là kiểu interface đó),
+thì nhìn chung kiểu struct cũng triển khai kiểu interface,
+ngoại trừ trường hợp có method do kiểu interface chỉ định
+bị method hoặc field khác che khuất hay xung đột.
+Ví dụ, trong chương trình trên, cả kiểu struct nhúng và
+kiểu con trỏ có kiểu cơ sở là kiểu struct nhúng đều triển khai kiểu interface `I`.
+
+Lưu ý, một kiểu chỉ nhận được các method của những kiểu mà nó nhúng trực tiếp hoặc gián tiếp.
+Nói cách khác, method set của một kiểu gồm các method được khai báo trực tiếp
+(tường minh hoặc ngầm định) cho kiểu đó và method set của kiểu nền của nó.
+Ví dụ, trong đoạn code sau:
+*
+   kiểu `Age` không có method nào vì nó không nhúng kiểu nào.
+*
+   kiểu `X` có hai method `IsOdd` và `Double`.
+   Nó nhận được `IsOdd` thông qua việc nhúng kiểu `MyInt`.
+*
+   kiểu `Y` không có method nào vì kiểu `Age` được nó nhúng không có method.
+*
+   kiểu `Z` chỉ có một method `IsOdd`,
+   nhận được thông qua việc nhúng kiểu `MyInt`.
+   Nó không nhận được method `Double` từ kiểu `X`
+   vì nó không nhúng kiểu `X`.
+
+@@@ .line-numbers
+''' go
+type MyInt int
+func (mi MyInt) IsOdd() bool {
+	return mi%2 == 1
+}
+
+type Age MyInt
+
+type X struct {
+	MyInt
+}
+func (x X) Double() MyInt {
+	return x.MyInt + x.MyInt
+}
+
+type Y struct {
+	Age
+}
+
+type Z X
+'''
+
+@@@ #method-value-evaluation
+###========== Chuẩn hóa và đánh giá method value được promotion
+
+Giả sử `v.m` là một method value expression được promotion hợp lệ,
+compiler sẽ chuẩn hóa nó bằng cách đổi thao tác lấy địa chỉ ngầm định
+và bỏ tham chiếu ngầm định thành tường minh
+trong selector dạng đầy đủ tương ứng của `v.m`.
+
+Giống như khi đánh giá mọi __method value__ khác,
+với method value expression `v.m` đã chuẩn hóa,
+trong thời gian chạy, khi đánh giá method value `v.m`,
+đối số receiver `v` được đánh giá, rồi bản sao của kết quả đánh giá được lưu lại
+và dùng trong các lần gọi method value sau đó.
+
+    === method value evaluation :: method.tmd#method-value-evaluation
+
+Ví dụ, trong đoạn code sau:
+*
+   selector dạng đầy đủ của method expression được promotion `s.M1`
+   là `s.T.X.M1`. Sau khi đổi các thao tác lấy địa chỉ ngầm định
+   và bỏ tham chiếu ngầm định trong selector này, ta được `(*s.T).X.M1`.
+   Trong thời gian chạy, đối số receiver `(*s.T).X` được đánh giá,
+   rồi bản sao của kết quả đánh giá được lưu lại và dùng
+   trong các lần gọi method value được promotion sau đó.
+   Kết quả đánh giá là `1`,
+   vì vậy lời gọi `f()` luôn in ra `1`.
+*
+   selector dạng đầy đủ của method expression được promotion `s.M2`
+   là `s.T.X.M2`. Sau khi đổi các thao tác lấy địa chỉ ngầm định
+   và bỏ tham chiếu ngầm định trong selector này, ta được `(&(*s.T).X).M2`.
+   Trong thời gian chạy, đối số receiver `&(*s.T).X` được đánh giá,
+   rồi bản sao của kết quả đánh giá được lưu lại và dùng
+   trong các lần gọi method value được promotion sau đó.
+   Kết quả đánh giá là địa chỉ của field `s.X` (còn gọi là `(*s.T).X`).
+   Mọi thay đổi đối với giá trị `s.X` sẽ được phản ánh khi bỏ tham chiếu địa chỉ đó,
+   nhưng thay đổi đối với giá trị `s.T` không ảnh hưởng đến kết quả đánh giá.
+   Vì vậy, cả hai lời gọi `g()` đều in ra `2`.
+
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+type X int
+
+func (x X) M1() {
+	fmt.Println(x)
+}
+
+func (x *X) M2() {
+	fmt.Println(*x)
+}
+
+type T struct { X }
+
+type S struct { *T }
+
+func main() {
+	var t = &T{X: 1}
+	var s = S{T: t}
+	var f = s.M1 // <=> (*s.T).X.M1
+	var g = s.M2 // <=> (&(*s.T).X).M2
+	s.X = 2
+	f() // 1
+	g() // 2
+	s.T = &T{X: 3}
+	f() // 1
+	g() // 2
+}
+'''
+
+
+
+###========== Kiểu interface nhúng mọi loại kiểu
+
+Kiểu interface có thể nhúng mọi loại kiểu.
+Hãy đọc __interfaces in Go__ để biết chi tiết.
+
+    === interfaces in Go :: interface.tmd
+
+{ %%
+
+###========== Hai kiểu nhúng hai kiểu cùng biểu thị một kiểu nhưng có tên khác nhau là hai kiểu riêng biệt
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+
+'''
+
+}
+
+@@@ #dead-loop-example
+###========== Một ví dụ nhúng kiểu thú vị
+
+Cuối cùng, hãy xem một ví dụ thú vị.
+Chương trình ví dụ sẽ lặp vô hạn và tràn stack.
+Nếu bạn đã hiểu nội dung ở trên cùng với
+__polymorphism__ và nhúng kiểu,
+thì sẽ dễ hiểu tại sao chương trình lại lặp vô hạn.
+
+    === polymorphism :: interface.tmd#polymorphism
+
+@@@ .line-numbers
+''' go
+package main
+
+type I interface {
+	m()
+}
+
+type T struct {
+	I
+}
+
+func main() {
+	var t T
+	var i = &t
+	t.I = i
+	i.m() // sẽ gọi t.m(), rồi lại gọi i.m(), ...
+}
+'''

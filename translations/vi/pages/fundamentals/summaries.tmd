@@ -1,0 +1,580 @@
+### Một số tóm tắt đơn giản
+
+Mục lục:
+
+@@@ #summaries.html .summaries
+*  __Các kiểu có giá trị có thể chứa những phần nền tảng gián tiếp`` #type-with-underlyings__.
+*  __Các kiểu có giá trị có thể dùng làm đối số cho hàm dựng sẵn `len`
+   (và các hàm `cap`, `close`, `delete`, `make`)`` #have-length-types__.
+*  __So sánh các kiểu container dựng sẵn`` #container-types__.
+*  __Các kiểu có giá trị có thể biểu diễn bằng composite literal (`T{...}`)`` #composite-literals-types__.
+*  __Kích thước giá trị của mọi loại kiểu`` #type-sizes__.
+*  __Các kiểu có zero value biểu diễn được bằng `nil``` #nil-zero-value-types__.
+*  __Các kiểu có thể cài đặt method`` #types-can-have-methods__.
+*  __Các kiểu có thể được embed trong kiểu struct`` #types-can-be-embedded__.
+*  __Các hàm có lời gọi sẽ/có thể được đánh giá tại thời điểm biên dịch`` #compile-time-evaluation__.
+*  __Các giá trị không thể lấy địa chỉ`` #not-addressable__.
+*  __Các kiểu không hỗ trợ phép so sánh`` #not-comparable__.
+*  __Những phần tử mã nào được phép khai báo nhưng không sử dụng`` #declared-but-unused__.
+*  __Các phần tử mã nguồn có tên có thể khai báo cùng nhau bên trong `()``` #groupable-elements__.
+*  __Các phần tử mã nguồn có tên có thể khai báo bên trong hàm và bên ngoài mọi hàm`` #declaration-places__.
+*  __Các biểu thức có kết quả đánh giá có thể chứa thêm giá trị tùy chọn`` #additional-return__.
+*  __Các cách dùng channel để chặn goroutine hiện tại mãi mãi`` #block-forever__.
+*  __Các cách nối chuỗi`` #concatenate-strings__.
+*  __Các tối ưu hóa do Go compiler tiêu chuẩn thực hiện`` #compiler-optimizations__.
+*  __Các trường hợp panic và crash khi chạy`` #panic-cases__.
+
+
+@@@ .summaries-items
+{
+
+@@@ #type-with-underlyings
+###==========
+    Các kiểu có giá trị có thể chứa những phần nền tảng gián tiếp
+
+Các kiểu có giá trị có thể chứa những phần nền tảng gián tiếp:
+*  kiểu string
+*  kiểu function
+*  kiểu slice
+*  kiểu map
+*  kiểu channel
+*  kiểu interface
+
+Câu trả lời này dựa trên cách triển khai của Go compiler/runtime tiêu chuẩn.
+Trên thực tế, rất khó chứng minh liệu giá trị function có thể chứa phần nền tảng gián tiếp hay không;
+và về mặt logic, nên xem giá trị string cùng giá trị interface là những giá trị không có phần nền tảng gián tiếp.
+Hãy đọc __các phần của giá trị__ để biết chi tiết.
+
+    === các phần của giá trị :: value-part.tmd
+
+@@@ #have-length-types
+###==========
+    Các kiểu có giá trị có thể dùng làm đối số cho hàm dựng sẵn `len`
+    (và các hàm `cap`, `close`, `delete`, `make`)
+
+#  ###
+   ### len
+   ### cap
+   ### close
+   ### delete
+   ### make
+   -----
+   ### string
+   ;;; Có
+   ;;;
+   ;;;
+   ;;;
+   ;;;
+   -----
+   ### array
+       \\ (và con trỏ tới array)
+   ;;; Có
+   ;;; Có
+   ;;;
+   ;;;
+   ;;;
+   -----
+   ### slice
+   ;;; Có
+   ;;; Có
+   ;;;
+   ;;;
+   ;;; Có
+   -----
+   ### map
+   ;;; Có
+   ;;;
+   ;;;
+   ;;; Có
+   ;;; Có
+   -----
+   ### channel
+   ;;; Có
+   ;;; Có
+   ;;; Có
+   ;;;
+   ;;; Có
+
+Giá trị của các kiểu trên cũng có thể được duyệt trong vòng lặp for-range.
+
+Các kiểu có giá trị dùng được làm đối số cho hàm dựng sẵn `len`
+có thể được gọi chung là kiểu container theo nghĩa rộng.
+
+@@@ #container-types
+###==========
+    So sánh các kiểu container dựng sẵn
+
+#  ### Kiểu
+   ### Có thể thêm phần tử mới vào giá trị không?
+   ### Có thể thay thế các phần tử của giá trị không?
+   ### Có thể lấy địa chỉ các phần tử của giá trị không?
+   ### Truy cập phần tử có làm thay đổi độ dài giá trị không?
+   ### Giá trị có thể có phần nền tảng không?
+   -----
+   ### string
+   ;;; Không
+   ;;; Không
+   ;;; Không
+   ;;; Không
+   ;;; Có^$$(1)$$
+   -----
+   ### array
+   ;;; Không
+   ;;; Có^$$(2)$$
+   ;;; Có^$$(2)$$
+   ;;; Không
+   ;;; Không
+   -----
+   ### slice
+   ;;; Không^$$(3)$$
+   ;;; Có
+   ;;; Có
+   ;;; Không
+   ;;; Có
+   -----
+   ### map
+   ;;; Có
+   ;;; Có
+   ;;; Không
+   ;;; Không
+   ;;; Có
+   -----
+   ### channel
+   ;;; Có^$$(4)$$
+   ;;; Không
+   ;;; Không
+   ;;; Có
+   ;;; Có
+
+
+
+
+^$$(1)$$ Với Go compiler/runtime tiêu chuẩn.
+\\
+^$$(2)$$ Chỉ áp dụng cho giá trị array có thể lấy địa chỉ.
+\\
+^$$(3)$$ Thông thường, giá trị slice được thay đổi bằng cách gán một giá trị slice khác lên nó.
+Ở đây, các trường hợp như vậy không được xem là “thêm phần tử mới”.
+Trên thực tế, cũng có thể thay đổi riêng độ dài slice bằng cách gọi hàm `reflect.SetLen`.
+Tăng độ dài slice theo cách này cũng có thể xem là thêm phần tử mới vào slice.
+Tuy nhiên, hàm `reflect.SetLen` chậm nên hiếm khi được dùng.
+\\
+^$$(4)$$ Áp dụng cho channel có buffer nhưng chưa đầy.
+
+@@@ #composite-literals-types
+###==========
+    Các kiểu có giá trị có thể biểu diễn bằng composite literal (`T{...}`)
+
+Giá trị thuộc bốn loại kiểu sau có thể được biểu diễn bằng composite literal:
+
+#  ### Kiểu (`T`)
+   ### `T{}` có phải zero value của `T` không?
+   -----
+   ### struct
+   ;;; Có
+   -----
+   ### array
+   ;;; Có
+   -----
+   ### slice
+   ;;; Không
+       \\ (zero value là `nil`)
+   -----
+   ### map
+   ;;; Không
+       \\ (zero value là `nil`)
+
+@@@ #type-sizes
+###==========
+    Kích thước giá trị của mọi loại kiểu
+
+Hãy đọc __chi phí sao chép giá trị__ để biết chi tiết.
+
+    === chi phí sao chép giá trị :: value-copy-cost.tmd
+
+@@@ #nil-zero-value-types
+###==========
+    Các kiểu có zero value biểu diễn được bằng `nil`
+
+Zero value của các kiểu sau có thể biểu diễn bằng `nil`.
+
+#  ### Kiểu (`T`)
+   ### Kích thước của `T(nil)`
+   -----
+   ### pointer
+   ;;; 1 word
+   -----
+   ### slice
+   ;;; 3 words
+   -----
+   ### map
+   ;;; 1 word
+   -----
+   ### channel
+   ;;; 1 word
+   -----
+   ### function
+   ;;; 1 word
+   -----
+   ### interface
+   ;;; 2 words
+
+Các kích thước liệt kê ở trên áp dụng cho Go compiler tiêu chuẩn.
+Một word tương ứng 4 byte trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+và __các phần nền tảng gián tiếp__
+của một giá trị không được tính vào kích thước của giá trị đó.
+
+    === các phần nền tảng gián tiếp :: value-part.tmd
+
+Kích thước zero value của một kiểu giống với kích thước của mọi giá trị khác cùng kiểu.
+
+@@@ #types-can-have-methods
+###==========
+    Các kiểu có thể cài đặt method
+
+Hãy đọc __method trong Go__ để biết chi tiết.
+
+    === method trong Go :: method.tmd
+
+@@@ #types-can-be-embedded
+###==========
+    Các kiểu có thể được embed trong kiểu struct
+
+Hãy đọc __những kiểu có thể được embed__ để biết chi tiết.
+
+    === những kiểu có thể được embed :: type-embedding.tmd#embeddable-types
+
+@@@ #compile-time-evaluation
+###==========
+    Các hàm có lời gọi sẽ/có thể được đánh giá tại thời điểm biên dịch
+
+Nếu lời gọi hàm được đánh giá tại thời điểm biên dịch,
+các giá trị trả về của nó phải là hằng số.
+
+#  ### Hàm
+   ### Kiểu trả về
+   ### Lời gọi luôn được đánh giá tại thời điểm biên dịch không?
+   -----
+   ### unsafe.Sizeof
+   { >< :3
+   `uintptr`
+   }
+   { :3
+   { ><
+   Có, luôn luôn.
+   }
+
+   //
+   Tuy nhiên, lưu ý rằng kết quả của lời gọi như vậy không được xem là
+   hằng số nếu kiểu đối số của lời gọi là __type parameter__.
+
+       === type parameter :: https://go101.org/generics/555-type-constraints-and-parameters.html
+   }
+   -----
+   ### unsafe.Alignof
+   -----
+   ### unsafe.Offsetof
+   -----
+   ### len
+   { >< :2
+   `int`
+   }
+   { :2
+   { ><
+   Không phải lúc nào cũng vậy.
+   }
+
+   Theo __Go specification__:
+   *
+      biểu thức `len(s)` là hằng số nếu `s` là một hằng string.
+   *
+      các biểu thức `len(s)` và `cap(s)` là hằng số
+      nếu kiểu của `s` là array hoặc con trỏ tới array
+      và biểu thức `s` không chứa thao tác nhận từ channel hoặc lời gọi hàm (không phải hằng số).
+
+   //
+   Lưu ý rằng, ngay cả khi lời gọi hàm như vậy được đánh giá tại thời điểm biên dịch,
+   kết quả đánh giá cũng không được xem là hằng số nếu kiểu đối số của lời gọi là
+   __type parameter__.
+
+       === Go specification :: https://golang.org/ref/spec#Length_and_capacity
+       === type parameter :: https://go101.org/generics/555-type-constraints-and-parameters.html
+   }
+   -----
+   ### cap
+   -----
+   ### real
+   { >< :2
+   Kết quả là một giá trị chưa định kiểu. Kiểu mặc định của nó là `float64`.
+   }
+   { :2
+   { ><
+   Không phải lúc nào cũng vậy.
+   }
+
+   Theo __Go spec__:
+   các biểu thức `real(s)` và `imag(s)` là hằng số
+   nếu `s` là một hằng số phức.
+
+       === Go spec :: https://golang.org/ref/spec#Constants
+   }
+   -----
+   ### imag
+   -----
+   ### complex
+   ;;; Kết quả là một giá trị chưa định kiểu. Kiểu mặc định của nó là `complex128`.
+   {
+   { ><
+   Không phải lúc nào cũng vậy.
+   }
+
+   Theo __Go spec__:
+   biểu thức `complex(sr, si)` là hằng số
+   nếu cả `sr` và `si` đều là hằng số số học.
+   }
+
+@@@ #not-addressable
+###==========
+    Giá trị có thể và không thể lấy địa chỉ
+
+Hãy đọc __mục FAQ này__ để biết giá trị nào có thể hoặc không thể lấy địa chỉ.
+
+    === mục FAQ này :: unofficial-faq.tmd#unaddressable-values
+
+@@@ #not-comparable
+###==========
+    Các kiểu không hỗ trợ phép so sánh
+
+Hãy đọc __mục FAQ này__ để biết những giá trị nào có thể lấy địa chỉ hoặc không thể lấy địa chỉ.
+
+    === mục FAQ này :: unofficial-faq.tmd#incomparable-types
+
+@@@ #declared-but-unused
+###==========
+    Những phần tử mã nào được phép khai báo nhưng không sử dụng
+
+#  ###
+   ### Được phép khai báo nhưng không sử dụng?
+   -----
+   ### import
+   ;;; Không
+   -----
+   ### type
+   ;;; Có
+   -----
+   ### variable
+   ;;; Có đối với biến cấp package.
+       \\ Không đối với biến cục bộ (với compiler tiêu chuẩn).
+   -----
+   ### constant
+   ;;; Có
+   -----
+   ### function
+   ;;; Có
+   -----
+   ### label
+   ;;; Không
+
+@@@ #groupable-elements
+###==========
+    Các phần tử mã nguồn có tên có thể khai báo cùng nhau bên trong `()`
+
+Các phần tử mã nguồn sau đây (cùng loại) có thể được khai báo cùng nhau bên trong `()`:
+*  import
+*  type
+*  variable
+*  constant
+
+Không thể khai báo nhiều function cùng nhau bên trong `()`. Label cũng vậy.
+
+@@@ #declaration-places
+###==========
+    Các phần tử mã nguồn có tên có thể khai báo bên trong hàm và bên ngoài mọi hàm
+
+Các phần tử mã nguồn có tên sau đây có thể được khai báo cả bên trong hàm lẫn bên ngoài mọi hàm:
+*  type
+*  variable
+*  constant
+
+Import phải được khai báo trước các phần tử khác (và sau mệnh đề package).
+Chỉ có thể khai báo function bên ngoài mọi hàm.
+Có thể định nghĩa hàm vô danh bên trong thân hàm khác,
+nhưng những định nghĩa như vậy không phải là khai báo function.
+Label phải được khai báo bên trong hàm.
+
+@@@ #additional-return
+###==========
+    Các biểu thức có kết quả đánh giá có thể chứa thêm giá trị tùy chọn
+
+Kết quả đánh giá của các biểu thức sau có thể chứa thêm giá trị tùy chọn:
+
+#  ###
+   ### Cú pháp
+   ### Ý nghĩa của giá trị tùy chọn (`ok` trong ví dụ cú pháp)
+   ### Bỏ qua kết quả tùy chọn có làm thay đổi hành vi chương trình không?
+   -----
+   ### truy cập phần tử map
+   ;;; `e, ok = aMap[key]`
+   ;;; liệu key được truy cập có tồn tại trong map hay không
+   ;;; Không
+   -----
+   ### nhận giá trị từ channel
+   ;;; `e, ok = <- aChannel`
+   ;;; liệu giá trị nhận được đã được gửi trước khi channel đóng hay chưa
+   ;;; Không
+   -----
+   ### type assertion
+   ;;; `v, ok = anInterface.(T)`
+   ;;; liệu dynamic type của giá trị interface có khớp với kiểu được assertion hay không
+   ;;; Có
+       \\ (khi bỏ qua kết quả bool tùy chọn,
+       chương trình sẽ panic nếu assertion thất bại.)
+
+@@@ #block-forever
+###==========
+    Các cách dùng channel để chặn goroutine hiện tại mãi mãi
+
+Không cần import package nào, ta có thể dùng các cách sau để khiến goroutine hiện tại ‎đi vào (và luôn ở trong) trạng thái bị chặn:
+
+*. gửi một giá trị vào channel mà không có nơi nào nhận giá trị từ đó
+   @@@ .disable-line-numbers111
+   ''' go
+make(chan struct{}) <- struct{}{}
+// or
+make(chan<- struct{}) <- struct{}{}
+   '''
+
+*. nhận giá trị từ channel chưa bao giờ đóng và chưa từng, cũng sẽ không bao giờ, được gửi giá trị
+   @@@ .disable-line-numbers111
+   ''' go
+<-make(chan struct{})
+// or
+<-make(<-chan struct{})
+// or
+for range make(<-chan struct{}) {}
+   '''
+
+*. nhận giá trị từ (hoặc gửi giá trị vào) một channel nil
+   @@@ .disable-line-numbers111
+   ''' go
+chan struct{}(nil) <- struct{}{}
+// or
+<-chan struct{}(nil)
+// or
+for range chan struct{}(nil) {}
+   '''
+
+*. dùng một khối select trần
+   @@@ .disable-line-numbers111
+   ''' go
+select{}
+   '''
+
+@@@ #concatenate-strings
+###==========
+    Các cách nối chuỗi
+
+Hãy đọc __string trong Go__ để biết chi tiết.
+
+    === string trong Go :: string.tmd#string-concatenation
+
+@@@ #compiler-optimizations
+###==========
+    Các tối ưu hóa do Go compiler tiêu chuẩn thực hiện
+
+Hãy đọc sách __Go Optimizations 101__.
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+@@@ #panic-cases
+###==========
+    Các trường hợp panic và crash khi chạy
+
+Hãy đọc __bài viết trên Go 101 wiki__ để xem phần tóm tắt này.
+
+    === bài viết trên Go 101 wiki :: https://github.com/go101/go101/wiki/Panic-and-crash-cases
+
+}
+
+""""" //
+
+Các lỗi nghiêm trọng có thể recover:
+* https://play.golang.org/p/bYrfLTzXpc_o lời gọi Mutex.Unlock không hợp lệ: mở khóa mutex chưa khóa
+* tạo goroutine với function nil
+* cấp phát bộ nhớ thất bại, hết bộ nhớ, kích thước cấp phát quá lớn
+* tràn stack
+* thao tác dữ liệu map có data race
+  * vừa duyệt map vừa ghi đồng thời
+  * vừa đọc map vừa ghi đồng thời
+  * nhiều thao tác ghi map đồng thời
+* callback cgo trước lời gọi cgo
+* cạn thread
+	package main
+	import "runtime/debug"
+	import "runtime"
+	func main() {
+		debug.SetMaxThreads(10)
+		c := make(chan int)
+		for i := 0; i < 100; i++ {
+			go func() {
+				runtime.LockOSThread()
+				c <- 0
+				select {}
+			}()
+			<-c
+		}
+	}
+* nạp Go plugin lỗi
+* tất cả goroutine đều bị chặn.
+* nối chuỗi quá dài
+
+
+so sánh khai báo biến ngắn và khai báo biến tiêu chuẩn
+
+khác biệt giữa hàm dựng sẵn và hàm tự định nghĩa.
+  * generic
+  * không thể bỏ qua giá trị trả về của hàm dựng sẵn
+  * không thể dùng hàm dựng sẵn làm giá trị; chúng không có kiểu.
+  * không cần import hàm dựng sẵn trước khi dùng, kể cả khi identifier của chúng bắt đầu bằng chữ thường..
+  *
+
+danh sách hàm dựng sẵn
+
+	"append":  predeclaredFunction,
+	"cap":     predeclaredFunction,
+	"close":   predeclaredFunction,
+	"complex": predeclaredFunction,
+	"copy":    predeclaredFunction,
+	"delete":  predeclaredFunction,
+	"imag":    predeclaredFunction,
+	"len":     predeclaredFunction,
+	"make":    predeclaredFunction,
+	"new":     predeclaredFunction,
+	"panic":   predeclaredFunction,
+	"print":   predeclaredFunction,
+	"println": predeclaredFunction,
+	"real":    predeclaredFunction,
+	"recover": predeclaredFunction,
+
+
+#returns-discardable
+Kết quả trả về của các lời gọi tới những hàm dựng sẵn nào có thể bị bỏ qua.
+
+Giá trị thuộc những loại kiểu nào có thể được duyệt bằng for-range.
+
+Các cách trả về một function: return thông thường, từ khóa return, panic, runtime.Goexit().
+
+Dạng `v[k]` có thể được dùng để truy cập phần tử của giá trị thuộc những loại kiểu nào?
+
+
+} // .summaries-items
+
+""""" //
+cần làm:
+các loại khối luồng điều khiển
+các câu lệnh điều khiển luồng
+return, break, fallthrough, continue, goto
+các câu lệnh điều khiển luồng nào có thể theo sau bởi một label.
+các câu lệnh điều khiển luồng nào có thể xuất hiện trong loại khối luồng điều khiển nào
+
+

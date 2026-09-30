@@ -9,7 +9,7 @@
 
 ## Đã dịch
 
-Đã dịch và đối chiếu cấu trúc 30 trang trong `pages/fundamentals/`. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`.
+Đã dịch và đối chiếu cấu trúc 86 trang trên nhiều nhóm tài liệu. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`.
 
 - `pages/fundamentals/101.tmd`
 - `pages/fundamentals/introduction.tmd`
@@ -41,6 +41,63 @@
 - `pages/fundamentals/interface.tmd`
 - `pages/fundamentals/channel.tmd`
 - `pages/fundamentals/channel-closing.tmd`
+
+- `pages/fundamentals/memory-model.tmd`
+- `pages/fundamentals/memory-layout.tmd`
+- `pages/fundamentals/memory-block.tmd`
+- `pages/fundamentals/concurrent-synchronization-overview.tmd`
+- `pages/fundamentals/memory-leaking.tmd`
+- `pages/fundamentals/concurrent-synchronization-more.tmd`
+- `pages/fundamentals/concurrent-common-mistakes.tmd`
+- `pages/fundamentals/concurrent-atomic-operation.tmd`
+- `pages/fundamentals/channel-use-cases.tmd`
+- `pages/fundamentals/evaluation-orders.tmd`
+- `pages/fundamentals/summaries.tmd`
+- `pages/fundamentals/type-embedding.tmd`
+- `pages/fundamentals/reflection.tmd`
+- `pages/fundamentals/details.tmd`
+- `pages/fundamentals/unsafe.tmd`
+- `pages/fundamentals/value-copy-cost.tmd`
+- `pages/fundamentals/tips.tmd`
+- `pages/fundamentals/more.tmd`
+- `pages/fundamentals/unofficial-faq.tmd`
+- `pages/fundamentals/101-about.tmd`
+- `pages/fundamentals/acknowledgements.tmd`
+- `pages/fundamentals/blocks-and-scopes.tmd`
+- `pages/fundamentals/bounds-check-elimination-old.tmd`
+- `pages/fundamentals/generic.tmd`
+- `pages/fundamentals/go-sdk.tmd`
+- `pages/fundamentals/panic-and-recover-more-newer.tmd`
+- `pages/fundamentals/panic-and-recover-more-old.tmd`
+- `pages/fundamentals/quizzes.tmd`
+- `pages/fundamentals/bounds-check-elimination.tmd`
+- `pages/fundamentals/100-updates.tmd`
+- `pages/fundamentals/tools.tmd`
+- `pages/fundamentals/tool-gold.tmd`
+- `pages/fundamentals/tool-golds.tmd`
+- `pages/generics/100-updates.tmd`
+- `pages/generics/111-acknowledgements.html`
+- `pages/optimizations/0.1-introduction.html`
+- `pages/q-and-a/canonicalize-strings.tmd`
+- `pages/q-and-a/clone-slices.tmd`
+- `pages/q-and-a/create-slices.tmd`
+- `pages/q-and-a/delete-contiguous-slice-elements.tmd`
+- `pages/quizzes/const-1.tmd`
+- `pages/q-and-a/iterate-bytes-in-a-string.tmd`
+- `pages/q-and-a/iterate-runes-in-a-string.tmd`
+- `pages/quizzes/const-2.tmd`
+- `pages/q-and-a/make-dirty-byte-slices.tmd`
+- `pages/quizzes/defer-1.tmd`
+- `pages/q-and-a/take-string-byte-addresses.tmd`
+- `pages/quizzes/call-1.tmd`
+- `pages/quizzes/channel-1.tmd`
+- `pages/quizzes/defer-2.tmd`
+- `pages/quizzes/const-3.tmd`
+- `pages/q-and-a/101.tmd`
+- `pages/quizzes/const-4.tmd`
+- `pages/bugs/go-build-directive-not-work.tmd`
+- `pages/quizzes/loop-1.tmd`
+- `pages/quizzes/slice-1.tmd`
 
 ## Tiếp tục
 

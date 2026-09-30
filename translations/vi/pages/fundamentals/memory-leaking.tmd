@@ -1,0 +1,256 @@
+### Các tình huống rò rỉ bộ nhớ
+
+Khi lập trình bằng một ngôn ngữ hỗ trợ garbage collection tự động,
+thông thường chúng ta không cần lo về vấn đề rò rỉ bộ nhớ,
+vì runtime sẽ định kỳ thu gom bộ nhớ không còn được sử dụng.
+Tuy nhiên, có một số tình huống đặc biệt mà ta cần lưu ý,
+vì chúng có thể gây ra dạng rò rỉ bộ nhớ gần giống hoặc rò rỉ thực sự.
+Phần còn lại của bài viết này sẽ liệt kê một số tình huống như vậy.
+
+@@@ #substring
+###========== Rò rỉ bộ nhớ dạng gần giống do substring
+
+Đặc tả Go không quy định liệu string kết quả
+và string cơ sở trong một biểu thức substring có phải dùng chung
+một __khối bộ nhớ__ để chứa __các dãy byte bên dưới__ của hai string hay không.
+Go compiler/runtime tiêu chuẩn cho chúng dùng chung một khối bộ nhớ.
+Đây là một thiết kế tốt xét cả về mức tiêu thụ bộ nhớ lẫn CPU.
+Nhưng đôi khi nó có thể gây rò rỉ bộ nhớ dạng gần giống.
+
+    === khối bộ nhớ :: memory-block.tmd
+    === các dãy byte bên dưới :: string.tmd
+
+Ví dụ, sau khi hàm `demo` bên dưới được gọi,
+khoảng 1 MB bộ nhớ sẽ bị rò rỉ dạng gần giống,
+cho đến khi biến cấp package `s0` được thay đổi ở nơi khác.
+
+@@@ .line-numbers
+''' go
+var s0 string // biến cấp package
+
+// Hàm minh họa.
+func f(s1 string) {
+	s0 = s1[:50]
+	// Lúc này, s0 dùng chung khối bộ nhớ bên dưới với s1.
+	// Dù s1 không còn tồn tại, s0 vẫn tồn tại nên khối bộ nhớ
+	// dùng chung không thể được thu gom, mặc dù chỉ có 50 byte
+	// được sử dụng và toàn bộ phần byte còn lại trong khối
+	// trở nên không thể sử dụng.
+}
+
+func demo() {
+	s := createStringWithLengthOnHeap(1 << 20) // 1 MB
+	f(s)
+}
+'''
+
+Để tránh dạng rò rỉ bộ nhớ gần giống này, ta có thể chuyển substring thành
+giá trị `[]byte`, rồi chuyển giá trị `[]byte` đó trở lại thành `string`.
+
+@@@ .line-numbers
+''' go
+func f(s1 string) {
+	s0 = string([]byte(s1[:50]))
+}
+'''
+
+Điểm bất lợi của cách trên là trong quá trình chuyển đổi sẽ tạo ra hai bản sao,
+mỗi bản 50 byte, trong đó có một bản sao không cần thiết.
+
+Ta có thể tận dụng một trong __các tối ưu hóa__ của Go compiler tiêu chuẩn
+để tránh bản sao không cần thiết,
+đổi lại phải tốn thêm một byte bộ nhớ.
+
+    === các tối ưu hóa :: string.tmd#conversion-optimizations
+
+@@@ .line-numbers
+''' go
+func f(s1 string) {
+	s0 = (" " + s1[:50])[1:]
+}
+'''
+
+Nhược điểm của cách trên là tối ưu hóa của compiler có thể bị loại bỏ về sau,
+đồng thời có thể không có ở các compiler khác.
+
+Cách thứ ba để tránh dạng rò rỉ bộ nhớ gần giống là sử dụng
+`strings.Builder`, được hỗ trợ từ Go 1.10.
+
+@@@ .line-numbers
+''' go
+import "strings"
+
+func f(s1 string) {
+	var b strings.Builder
+	b.Grow(50)
+	b.WriteString(s1[:50])
+	s0 = b.String()
+}
+'''
+
+Nhược điểm của cách thứ ba là mã hơi dài dòng (so với hai cách đầu).
+Tin tốt là từ Go 1.12,
+ta có thể gọi hàm `Repeat` trong package chuẩn `strings`
+với đối số `count` bằng `1` để sao chép một string.
+Từ Go 1.12, phần cài đặt bên dưới của `strings.Repeat` sử dụng `strings.Builder`,
+nhờ đó tránh được một bản sao không cần thiết.
+
+Từ Go 1.18, hàm `Clone` được thêm vào package chuẩn `strings`.
+Đây là cách tốt nhất để thực hiện việc này.
+
+@@@ #subslice
+###========== Rò rỉ bộ nhớ dạng gần giống do subslice
+
+Tương tự substring, subslice cũng có thể gây rò rỉ bộ nhớ dạng gần giống.
+Trong đoạn mã sau, sau khi hàm `g` được gọi,
+phần lớn bộ nhớ của khối chứa các phần tử của `s1`
+sẽ bị bỏ phí (nếu không còn giá trị nào tham chiếu đến khối bộ nhớ đó).
+
+@@@ .line-numbers
+''' go
+var s0 []int
+
+func g(s1 []int) {
+	// Giả sử độ dài của s1 lớn hơn 30 rất nhiều.
+	s0 = s1[len(s1)-30:]
+}
+'''
+
+Nếu muốn tránh dạng rò rỉ bộ nhớ gần giống này, ta phải sao chép
+30 phần tử cho `s0`, để `s0` còn tồn tại
+không ngăn khối bộ nhớ chứa các phần tử của `s1` được thu gom.
+
+@@@ .line-numbers
+''' go
+func g(s1 []int) {
+	s0 = make([]int, 30)
+	copy(s0, s1[len(s1)-30:])
+	// Lúc này, khối bộ nhớ chứa các phần tử
+	// của s1 có thể được thu gom nếu không còn giá trị nào khác
+	// tham chiếu đến khối bộ nhớ đó.
+}
+'''
+
+@@@ #dead-slice-elements
+###========== Rò rỉ bộ nhớ dạng gần giống do không đặt lại pointer trong các phần tử slice bị loại bỏ
+
+Trong đoạn mã sau, sau khi hàm `h` được gọi,
+khối bộ nhớ cấp phát cho phần tử đầu tiên và cuối cùng của slice `s`
+sẽ bị giữ lại.
+
+@@@ .line-numbers
+''' go
+func h() []*int {
+	s := []*int{new(int), new(int), new(int), new(int)}
+	// Thực hiện một số thao tác với s ...
+
+	return s[1:3:3]
+}
+'''
+
+Chừng nào slice được trả về còn tồn tại, nó sẽ ngăn mọi phần tử của `s`
+được thu gom; do đó, hai khối bộ nhớ được cấp phát cho hai giá trị `int`
+được phần tử đầu tiên và cuối cùng của `s` tham chiếu cũng không thể được thu gom.
+
+Nếu muốn tránh dạng rò rỉ bộ nhớ gần giống này,
+ta phải đặt lại các pointer được lưu trong những phần tử bị loại bỏ.
+
+@@@ .line-numbers
+''' go
+func h() []*int {
+	s := []*int{new(int), new(int), new(int), new(int)}
+	// Thực hiện một số thao tác với s ...
+
+	// Đặt lại các giá trị pointer.
+	s[0], s[len(s)-1] = nil, nil
+	return s[1:3:3]
+}
+'''
+
+Ta thường cần đặt lại pointer trong một số phần tử cũ của slice
+__khi xóa phần tử khỏi slice__.
+
+    === khi xóa phần tử khỏi slice :: container.tmd#slice-manipulations
+
+@@@ #hanging-goroutine
+###========== Rò rỉ bộ nhớ thực sự do goroutine bị treo
+
+Đôi khi, một số goroutine trong chương trình Go có thể ở trạng thái chặn mãi mãi.
+Những goroutine như vậy được gọi là goroutine bị treo.
+Go runtime sẽ không dừng goroutine bị treo, vì vậy các tài nguyên được cấp phát
+cho chúng (và các khối bộ nhớ mà chúng tham chiếu) sẽ không bao giờ được garbage collection thu gom.
+
+Có hai lý do khiến Go runtime không dừng goroutine bị treo.
+Một là đôi khi Go runtime khó xác định liệu một goroutine đang bị chặn
+có bị chặn mãi mãi hay không.
+Hai là đôi khi ta chủ ý để một goroutine bị treo.
+Ví dụ, đôi khi ta để goroutine chính của chương trình Go bị treo để chương trình không thoát.
+
+Ta nên tránh các goroutine bị treo do lỗi logic trong thiết kế mã.
+
+###========== Rò rỉ bộ nhớ thực sự do không dừng các giá trị `time.Ticker` không còn được sử dụng
+
+Khi một giá trị `time.Timer` không còn được sử dụng,
+nó sẽ được garbage collection thu gom sau một thời gian.
+Điều này không đúng với giá trị `time.Ticker`.
+Ta nên dừng một giá trị `time.Ticker` khi không còn sử dụng nó.
+
+###========== Rò rỉ bộ nhớ thực sự do sử dụng finalizer không đúng cách
+
+Gắn finalizer cho một giá trị là thành viên của một nhóm tham chiếu vòng
+có thể __ngăn mọi khối bộ nhớ được cấp phát
+cho nhóm tham chiếu vòng đó được thu gom__.
+Đây là rò rỉ bộ nhớ thực sự, không phải dạng gần giống.
+
+    === ngăn ... :: https://golang.org/pkg/runtime/#SetFinalizer
+
+Ví dụ, sau khi hàm sau được gọi và kết thúc,
+các khối bộ nhớ cấp phát cho `x` và `y` không được đảm bảo
+sẽ được garbage collection thu gom trong tương lai.
+
+@@@ .line-numbers
+''' go
+func memoryLeaking() {
+	type T struct {
+		v [1<<20]int
+		t *T
+	}
+
+	var finalizer = func(t *T) {
+		 fmt.Println("finalizer called")
+	}
+
+	var x, y T
+
+	// Lời gọi SetFinalizer khiến x thoát lên heap.
+	runtime.SetFinalizer(&x, finalizer)
+
+	// Dòng sau tạo thành một nhóm tham chiếu vòng
+	// gồm hai thành viên là x và y.
+	// Vì vậy, x và y không thể được thu gom.
+	x.t, y.t = &y, &x // y cũng thoát lên heap.
+}
+'''
+
+Vì vậy, hãy tránh gắn finalizer cho các giá trị thuộc một nhóm tham chiếu vòng.
+
+Ngoài ra, __không nên dùng finalizer làm hàm hủy đối tượng__.
+
+    === không nên ... :: unofficial-faq.tmd#finalizers
+
+###========== Rò rỉ tài nguyên dạng gần giống do trì hoãn lời gọi hàm
+
+
+Hãy đọc __bài viết này__ để biết chi tiết.
+
+    === bài viết này :: defer-more.tmd#kind-of-resource-leaking
+
+
+{ %%
+các stream bị quên đóng
+
+dung lượng của array bên dưới một map sẽ không bao giờ thu nhỏ.
+
+defer trong vòng lặp vô hạn/dài
+}
+

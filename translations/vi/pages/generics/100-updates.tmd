@@ -1,0 +1,34 @@
+
+##### Lịch sử cập nhật Go Generics 101
+
+###========== v1.25.a (2025/Jun/08)
+
+*  bỏ thuật ngữ "core type".
+
+###========== v1.24.a (2024/Dec/23)
+
+*  đề cập rằng generic type alias được hỗ trợ từ Go 1.24.
+
+###========== v1.21.a (2023/Oct/11)
+
+*  thêm ví dụ về các cải tiến trong type inference của Go 1.21.
+
+###========== v1.20.d (2023/Feb/23)
+
+*  kể từ Go 1.20, các khai báo kiểu cục bộ được phép bên trong thân generic function.
+   Vì vậy, giới hạn này được gỡ bỏ khỏi chương "Tình trạng hiện tại của custom generics trong Go".
+
+###========== v1.20.a (2023/Feb/01)
+
+*  thêm các mục __ comparable và strictly comparable`` 555-type-constraints-and-parameters.html#strictly-comparable__ và
+   __ triển khai kiểu và thỏa mãn kiểu`` 555-type-constraints-and-parameters.html#implementation-vs-satisfaction__ vào chương
+   __ constraints và type parameters`` 555-type-constraints-and-parameters.html__.
+
+###========== v1.19 (2022/Aug/29)
+
+*  xóa mục "Bí danh cho các kiểu interface không cơ bản hiện chưa được hỗ trợ" khỏi chương __ Tình trạng hiện tại của custom generics trong Go`` https://go101.org/generics/888-the-status-quo-of-go-custom-generics.html__, vì giới hạn này đã được gỡ bỏ trong Go 1.19.
+
+###========== v1.18 (2022/Apr/06)
+
+*  xuất bản.
+

@@ -1,0 +1,60 @@
+
+##### slice 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := [...]int{0, 1, 2, 3}
+	x := a[:1]
+	y := a[2:]
+	x = append(x, y...)
+	x = append(x, y...)
+	fmt.Println(a, x)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+[0 1 2 3] [0 2 3 3 3]
+[0 2 3 3] [0 2 3 3 3]
+[0 1 2 3] [0 2 3 2 3]
+[0 2 3 3] [0 2 3 2 3]
+"""
+
+@@@ #answer
+{
+Đáp án: [0 2 3 3] [0 2 3 3 3]
+
+Chạy thử trên __ Go playground`` https://go.dev/play/p/vDEJUchPeWu __.
+
+Điểm chính:
+*
+   Ban đầu, slice `y` là `[2 3]`,
+   còn slice `x` là `[0]` với ba vị trí phần tử còn trống (nói cách khác, capacity của nó là 4),
+*
+   Lần gọi `append` thứ nhất đổi slice `x` thành `[0 2 3]` với một vị trí phần tử còn trống.
+   Vì slice `x` và mảng `a` dùng chung các phần tử (trước dòng 10),
+   mảng `a` đổi thành `[0 2 3 3]`.
+   Slice `y` cũng dùng chung các phần tử với mảng `a`,
+   nên slice `y` đổi thành `[3 3]`.
+*
+   Vì slice `x` không còn đủ capacity trống,
+   lần gọi `append` thứ hai cấp phát một backing array mới cho slice `x`.
+   Do đó, lời gọi này không sửa đổi mảng `a`.
+   Slice `x` đổi thành `[0 2 3 3 3]`.
+
+
+}
+
+

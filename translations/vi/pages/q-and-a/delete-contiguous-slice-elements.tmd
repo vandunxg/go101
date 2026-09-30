@@ -1,0 +1,83 @@
+
+### Làm thế nào xóa hiệu quả các phần tử liên tiếp của một slice mà vẫn giữ nguyên thứ tự phần tử?
+
+Giả sử:
+*. slice liên quan là `s` và kiểu của nó là `[]E`, trong đó `E` là kiểu phần tử của slice.
+*. ta muốn xóa các phần tử trong subslice `s[from:to]` và `from <= to`.
+
+###=== Cách 1: dùng hàm dựng sẵn `copy`
+
+''' Go
+	s = s[:from + copy(s[from:], s[to:])]
+'''
+
+###=== Cách 2: dùng hàm dựng sẵn `append`
+
+''' Go
+	s = append(s[from:], s[to:]...)
+'''
+
+###=== Cách 3: dùng hàm `slices.Delete` (từ Go 1.21)
+
+''' Go
+import "slices"
+
+	s = slices.Delete(s, from, to)
+'''
+
+###=== Một số lưu ý
+
+###========== Lưu ý 1
+
+Có một chi tiết cần chú ý:
+*  khi `from < to`, hai cách đầu có hiệu năng tương đương nhau.
+*  khi `from == to`, __cách thứ nhất gần như không làm gì,
+   nhưng cách thứ hai thì không__.
+
+    === ... không `` https://github.com/golang/go/issues/57759
+
+Vì vậy, nên ưu tiên cách thứ nhất hơn cách thứ hai.
+
+Lưu ý rằng trong Go 1.21, cách triển khai hàm `slices.Delete`
+giống với cách 2. Do đó, hàm này cũng kém hiệu quả khi `from == to`.
+Từ Go 1.22, __vấn đề này đã được khắc phục__.
+
+:: // (Chi tiết này được trình bày trong sách __Go Optimizations 101__.)
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+    === ... đã xóa `` https://github.com/golang/go/pull/63411/files
+
+###========== Lưu ý 2
+
+Nếu cần rút ngắn thời gian tồn tại của các giá trị khác
+được tham chiếu bởi những phần tử đã được giải phóng (các phần tử này chứa con trỏ),
+thì cần làm thêm việc sau (cho cả cách 1 và cách 2):
+xóa các phần tử đã được giải phóng bằng một trong hai cách dưới đây:
+
+Cách 1 (từ Go 1.21):
+
+''' Go
+	// Hàm dựng sẵn "clear" được giới thiệu trong Go 1.21.
+	clear(s[len(s):len(s)+to-from])
+'''
+
+Cách 2 (giả sử literal zero value của `E` là `zeroE`):
+
+''' Go
+	{
+		temp := s[len(s):len(s)+to-from]
+		for i := range temp {
+			temp[i] = zeroE
+		}
+	}
+'''
+
+Nếu dùng Go toolchain 1.21, ta cũng cần tự xóa các phần tử đã được giải phóng
+sau khi gọi hàm `slices.Delete` (bằng một trong hai cách trên).
+Từ Go 1.22, hàm `slices.Delete` sẽ tự động xóa các phần tử đã được giải phóng.
+
+
+
+
+
+

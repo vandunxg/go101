@@ -1,0 +1,396 @@
+### Bố cục bộ nhớ
+
+{ %%
+https://groups.google.com/forum/#!topic/golang-nuts/XDfQUn4U_g8
+https://groups.google.com/forum/#!topic/golang-nuts/YSxEBt9kzuc
+https://groups.google.com/forum/#!topic/golang-nuts/HaxJMtSngOo
+}
+
+Bài viết này giới thiệu về căn chỉnh kiểu và các đảm bảo về kích thước trong Go.
+Việc nắm được các đảm bảo này rất cần thiết để ước tính kích thước của các kiểu struct
+và sử dụng đúng các hàm 64-bit trong package chuẩn `sync/atomic`.
+
+Go thuộc họ ngôn ngữ C, vì vậy nhiều khái niệm được đề cập trong bài viết này cũng có trong ngôn ngữ C.
+
+@@@ #alignment-guarantee
+###========== Các đảm bảo về căn chỉnh kiểu trong Go
+
+Để tận dụng đầy đủ các chỉ thị CPU và đạt hiệu năng tốt nhất,
+địa chỉ (bắt đầu) của các khối bộ nhớ được cấp phát cho giá trị
+của một kiểu nhất định phải là bội số của một số nguyên N.
+Khi đó, N được gọi là đảm bảo căn chỉnh địa chỉ giá trị của kiểu, hay gọi ngắn gọn là đảm bảo căn chỉnh của kiểu.
+Ta cũng có thể nói địa chỉ của các giá trị có thể lấy địa chỉ thuộc kiểu đó được đảm bảo căn chỉnh theo N byte.
+
+Thực tế, mỗi kiểu có hai đảm bảo căn chỉnh: một loại áp dụng khi kiểu đó được dùng làm kiểu trường của kiểu khác (kiểu struct),
+loại còn lại áp dụng trong các trường hợp khác (khi kiểu đó được dùng trong khai báo biến, làm kiểu phần tử mảng, v.v.).
+Ta gọi loại thứ nhất là đảm bảo căn chỉnh trường của kiểu,
+và loại thứ hai là đảm bảo căn chỉnh tổng quát của kiểu.
+
+Với kiểu `T`, ta có thể gọi `unsafe.Alignof(t)` để
+lấy đảm bảo căn chỉnh tổng quát, trong đó `t` là một giá trị kiểu `T` không phải trường,
+và gọi `unsafe.Alignof(x.t)` để
+lấy đảm bảo căn chỉnh trường, trong đó `x` là một giá trị struct
+còn `t` là một trường có kiểu `T`.
+
+Các lời gọi đến hàm trong package mã chuẩn `unsafe` luôn được tính tại thời điểm biên dịch.
+
+Khi chương trình đang chạy, với giá trị `t` kiểu `T`,
+ta có thể gọi `reflect.TypeOf(t).Align()` để lấy đảm bảo căn chỉnh tổng quát
+của kiểu `T`, và gọi `reflect.TypeOf(t).FieldAlign()` để lấy
+đảm bảo căn chỉnh trường của kiểu `T`.
+
+Với trình biên dịch Go chuẩn hiện tại (v1.25.n), đảm bảo căn chỉnh trường và đảm bảo căn chỉnh tổng quát
+của một kiểu luôn bằng nhau. Với trình biên dịch gccgo, nhận định này không đúng.
+
+Đặc tả Go chỉ đề cập __một chút về các đảm bảo căn chỉnh kiểu__:
+>
+   Các thuộc tính căn chỉnh tối thiểu sau được đảm bảo:
+   \\ 1. Với biến `x` thuộc bất kỳ kiểu nào: `unsafe.Alignof(x)` ít nhất bằng `1`.
+   \\ 2. Với biến `x` thuộc kiểu struct: `unsafe.Alignof(x)` bằng giá trị lớn nhất trong các giá trị `unsafe.Alignof(x.f)` của từng trường `f` thuộc `x`, nhưng ít nhất bằng `1`.
+   \\ 3. Với biến `x` thuộc kiểu mảng: `unsafe.Alignof(x)` bằng căn chỉnh của một biến có kiểu phần tử của mảng.
+
+    === một chút về các đảm bảo căn chỉnh kiểu :: https://golang.org/ref/spec#Size_and_alignment_guarantees
+
+Vì vậy, đặc tả Go không quy định chính xác đảm bảo căn chỉnh cho bất kỳ kiểu nào.
+Đặc tả chỉ nêu một số yêu cầu tối thiểu.
+
+Với cùng một trình biên dịch, đảm bảo căn chỉnh chính xác của kiểu có thể khác nhau
+giữa các kiến trúc và giữa các phiên bản trình biên dịch.
+Các đảm bảo căn chỉnh trong phiên bản hiện tại (v1.25.n) của trình biên dịch Go chuẩn
+được liệt kê dưới đây.
+
+@@@ .fixed-width
+''' go
+kiểu                      đảm bảo căn chỉnh
+------                    ------
+bool, uint8, int8         1
+uint16, int16             2
+uint32, int32             4
+float32, complex64        4
+mảng                      phụ thuộc vào kiểu phần tử
+struct                    phụ thuộc vào kiểu trường
+các kiểu khác             kích thước của machine word
+'''
+
+Ở đây, kích thước của machine word (hay từ máy) là 4 byte
+trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+
+{ %%
+todo: khẳng định phía trên có thể không đúng với một số kiến trúc?
+}
+
+Điều này có nghĩa là, với phiên bản hiện tại của trình biên dịch Go chuẩn,
+đảm bảo căn chỉnh của các kiểu khác có thể là `4` hoặc `8`,
+tùy theo kiến trúc mục tiêu khi build.
+Điều này cũng đúng với gccgo.
+
+Thông thường, khi lập trình Go, ta không cần quan tâm đến căn chỉnh địa chỉ giá trị,
+trừ khi muốn tối ưu mức tiêu thụ bộ nhớ hoặc viết chương trình portable
+có dùng các hàm 64-bit trong package `sync/atomic`.
+Hãy đọc hai phần tiếp theo để biết chi tiết.
+
+@@@ #size-and-padding
+###========== Kích thước kiểu và phần đệm của struct
+
+Đặc tả Go chỉ đưa ra các __đảm bảo về kích thước kiểu__ sau:
+@@@ .fixed-width
+''' go
+kiểu                    kích thước tính bằng byte
+------                  ------
+uint8, int8             1
+uint16, int16           2
+uint32, int32, float32  4
+uint64, int64           8
+float64, complex64      8
+complex128              16
+uint, int               phụ thuộc vào cách triển khai,
+                        thường là 4 trên kiến trúc 32-bit
+                        và 8 trên kiến trúc 64-bit.
+uintptr                 phụ thuộc vào cách triển khai,
+                        đủ lớn để lưu các bit
+                        chưa được diễn giải của một giá trị con trỏ.
+'''
+
+Đặc tả Go không đảm bảo kích thước giá trị cho các loại kiểu khác.
+Danh sách đầy đủ kích thước của các kiểu do trình biên dịch Go chuẩn quy định
+được nêu trong phần __chi phí sao chép giá trị__.
+
+    === các đảm bảo về kích thước kiểu :: https://golang.org/ref/spec#Size_and_alignment_guarantees
+    === chi phí sao chép giá trị :: value-copy-cost.tmd#value-sizes
+
+Trình biên dịch Go chuẩn (và gccgo) đảm bảo kích thước giá trị của một kiểu
+là bội số của đảm bảo căn chỉnh của kiểu đó.
+
+Để đáp ứng các quy tắc đảm bảo căn chỉnh kiểu đã nêu,
+trình biên dịch Go có thể chèn một số byte đệm giữa các trường của giá trị struct.
+Vì vậy, kích thước giá trị của một kiểu struct có thể không bằng
+tổng đơn giản kích thước của tất cả các trường thuộc kiểu đó.
+
+Ví dụ dưới đây cho thấy byte đệm được chèn giữa các trường struct như thế nào.
+Ta đã biết rằng
+*
+   đảm bảo căn chỉnh và kích thước của kiểu dựng sẵn `int8` đều là một byte.
+*
+   đảm bảo căn chỉnh và kích thước của kiểu dựng sẵn `int16` đều là hai byte.
+*
+   kích thước của kiểu dựng sẵn `int64` là 8 byte; đảm bảo căn chỉnh
+   của kiểu `int64` là 4 byte trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+*
+   đảm bảo căn chỉnh của các kiểu `T1` và `T2`
+   lần lượt bằng đảm bảo căn chỉnh lớn nhất của các trường, tức đảm bảo căn chỉnh của trường `int64`.
+   Do đó, đảm bảo căn chỉnh của cả hai kiểu đều là 4 byte trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+*
+   kích thước của các kiểu `T1` và `T2` phải là bội số của đảm bảo căn chỉnh tương ứng,
+   tức là 4N byte trên kiến trúc 32-bit và 8N byte trên kiến trúc 64-bit.
+
+@@@ .line-numbers
+''' go
+type T1 struct {
+	a int8
+
+	// Trên kiến trúc 64-bit, cần chèn 7 byte
+	// ở đây để căn chỉnh trường b theo 8 byte.
+	// Trên kiến trúc 32-bit, cần chèn 3 byte
+	// để căn chỉnh trường b theo 4 byte.
+
+	b int64
+	c int16
+
+	// Để kích thước của kiểu T1 là bội số
+	// của đảm bảo căn chỉnh của T1, trên kiến trúc
+	// 64-bit cần chèn 6 byte ở đây, còn trên kiến trúc
+	// 32-bit cần chèn 2 byte.
+}
+// Kích thước T1 trên kiến trúc 64-bit là 24 (= 1 + 7 + 8 + 2 + 6)
+// byte; trên kiến trúc 32-bit là 16 (= 1 + 3 + 8 + 2 + 2) byte.
+
+type T2 struct {
+	a int8
+
+	// Trên cả kiến trúc 64-bit lẫn 32-bit, cần
+	// chèn một byte ở đây để căn chỉnh trường c theo 2 byte.
+
+	c int16
+
+	// Trên kiến trúc 64-bit, cần chèn 4 byte
+	// ở đây để căn chỉnh trường b theo 8 byte.
+	// Trên kiến trúc 32-bit, trường b đã được
+	// căn chỉnh theo 4 byte nên không cần chèn byte nào.
+
+	b int64
+}
+// Kích thước T2 trên kiến trúc 64-bit là 16 (= 1 + 1 + 2 + 4 + 8)
+// byte; trên kiến trúc 32-bit là 12 (= 1 + 1 + 2 + 8) byte.
+'''
+
+Mặc dù `T1` và `T2` có cùng tập trường, kích thước của chúng khác nhau.
+
+Một điểm thú vị ở trình biên dịch Go chuẩn là đôi khi các trường có kích thước bằng không vẫn ảnh hưởng đến phần đệm của struct.
+Hãy đọc __câu hỏi này trong FAQ Go không chính thức__ để biết chi tiết.
+
+    === câu hỏi này trong FAQ Go không chính thức :: unofficial-faq.tmd#final-zero-size-field
+
+@@@ #64bit-atomic-operation
+###========== Yêu cầu căn chỉnh cho các phép toán atomic trên word 64-bit
+
+**// word 64-bit //** là giá trị thuộc kiểu có kiểu nền là `int64` hoặc `uint64`.
+
+Bài viết __các phép toán atomic__ đề cập đến việc
+các phép toán atomic 64-bit trên word 64-bit yêu cầu địa chỉ của word 64-bit phải được căn chỉnh theo 8 byte.
+Điều này không thành vấn đề trên các kiến trúc 64-bit hiện được trình biên dịch Go chuẩn hỗ trợ,
+vì word 64-bit trên các kiến trúc này luôn được căn chỉnh theo 8 byte.
+
+    === các phép toán atomic :: concurrent-atomic-operation.tmd
+
+Tuy nhiên, trên kiến trúc 32-bit, trình biên dịch Go chuẩn chỉ đảm bảo căn chỉnh word 64-bit theo 4 byte.
+Các phép toán atomic 64-bit trên word 64-bit không được căn chỉnh theo 8 byte sẽ gây panic khi chạy.
+Tệ hơn, các kiến trúc CPU rất cũ không hỗ trợ hàm atomic 64-bit.
+
+Ở cuối __tài liệu `sync/atomic`__, có đề cập:
+>
+   Trên x86-32, các hàm 64-bit dùng những lệnh không có trước Pentium MMX.
+   \\
+   \\ Trên ARM không chạy Linux, các hàm 64-bit dùng những lệnh không có trước lõi ARMv6k.
+   \\
+   \\ Trên cả ARM và x86-32, bên gọi có trách nhiệm
+   bảo đảm word 64-bit được căn chỉnh theo 64-bit khi truy cập atomic.
+   Có thể tin cậy rằng word đầu tiên trong một biến hoặc trong struct,
+   mảng hay slice được cấp phát sẽ được căn chỉnh theo 64-bit.
+
+    === tài liệu `sync/atomic` :: https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+
+{ %%
+//
+(Lưu ý: dù đoạn trích phía trên xuất hiện trong vùng bug của tài liệu đó,
+những điều được mô tả không phải là bug.)
+
+}
+
+Như vậy, tình hình không quá tệ vì hai lý do.
+*.
+   Ngày nay, các kiến trúc CPU rất cũ không còn phổ biến.
+   Nếu chương trình cần đồng bộ các word 64-bit trên những kiến trúc này,
+   vẫn có __các kỹ thuật đồng bộ khác__ để dùng.
+*.
+   Trên các kiến trúc 32-bit không quá cũ khác,
+   có một số cách để bảo đảm một số word 64-bit được căn chỉnh theo 64-bit.
+
+    === các kỹ thuật đồng bộ khác :: concurrent-synchronization-more.tmd
+
+Các cách đó được mô tả là
+**word 64-bit đầu tiên trong một biến hoặc trong struct,
+mảng hay slice được cấp phát có thể được tin cậy là đã căn chỉnh theo 64-bit**.
+Ở đây, từ **// được cấp phát //** có nghĩa là gì?
+Ta có thể xem một **// giá trị được cấp phát //** là một biến **// được khai báo //**,
+một giá trị do hàm dựng sẵn `make` trả về,
+hoặc giá trị được tham chiếu bởi một giá trị do hàm dựng sẵn `new` trả về.
+Nếu một giá trị slice được tạo từ một mảng đã cấp phát và
+phần tử đầu tiên của slice cũng là phần tử đầu tiên của mảng,
+thì giá trị slice đó cũng có thể được xem là giá trị đã cấp phát.
+
+Mô tả về những word 64-bit có thể được tin cậy là căn chỉnh theo 64-bit
+trên kiến trúc 32-bit có phần thận trọng.
+Còn có nhiều word 64-bit khác có thể được tin cậy là căn chỉnh theo 8 byte.
+Thực tế, nếu phần tử đầu tiên của một mảng hoặc slice có kiểu phần tử
+là kiểu word 64-bit có thể được tin cậy là căn chỉnh theo 64-bit,
+thì mọi phần tử trong mảng/slice đều có thể được truy cập atomic.
+Việc mô tả đơn giản, rõ ràng tất cả các word 64-bit có thể được tin cậy là căn chỉnh theo 64-bit trên kiến trúc 32-bit
+sẽ khá tinh tế và dài dòng, nên tài liệu chính thức chỉ đưa ra mô tả thận trọng.
+
+{ %%
+Và **// có thể tin cậy là căn chỉnh theo 8 byte //** không có nghĩa địa chỉ của
+word 64-bit đầu tiên trong biến global hoặc trong struct hay mảng được cấp phát
+luôn được căn chỉnh theo 8 byte trên kiến trúc 32-bit.
+Điều đó chỉ có nghĩa là nếu word 64-bit đầu tiên trong một giá trị như vậy được truy cập atomic,
+thì trình biên dịch phải bảo đảm địa chỉ bộ nhớ của giá trị đó được căn chỉnh theo 8 byte khi chạy.
+Nếu nó không bao giờ được truy cập atomic, địa chỉ của nó không được đảm bảo căn chỉnh theo 8 byte.
+
+Còn có những word 64-bit khác cũng có thể được truy cập atomic.
+Việc đưa ra định nghĩa ngắn gọn, rõ ràng bằng câu chữ khá tinh tế và dài dòng,
+nên tài liệu chính thức chỉ đưa ra các đảm bảo thận trọng.
+}
+
+Dưới đây là ví dụ liệt kê một số word 64-bit an toàn hoặc không an toàn
+khi truy cập atomic trên cả kiến trúc 64-bit và 32-bit.
+
+@@@ .line-numbers
+''' go
+type (
+	T1 struct {
+		v uint64
+	}
+
+	T2 struct {
+		_ int16
+		x T1
+		y *T1
+	}
+
+	T3 struct {
+		_ int16
+		x [6]int64
+		y *[6]int64
+	}
+)
+
+var a int64    // a an toàn
+var b T1       // b.v an toàn
+var c [6]int64 // c[0] an toàn
+
+var d T2 // d.x.v không an toàn
+var e T3 // e.x[0] không an toàn
+
+func f() {
+	var f int64           // f an toàn
+	var g = []int64{5: 0} // g[0] an toàn
+
+	var h = e.x[:] // h[0] không an toàn
+
+	// Ở đây, cả d.y.v và e.y[0] đều an toàn,
+	// vì *d.y và *e.y đều được cấp phát.
+	d.y = new(T1)
+	e.y = &[6]int64{}
+
+	_, _, _ = f, g, h
+}
+
+// Thực tế, mọi phần tử trong c, g và e.y.v đều
+// an toàn khi truy cập atomic, dù tài liệu Go
+// chính thức không hề đưa ra các đảm bảo này.
+'''
+
+Nếu một trường word 64-bit (thường là trường đầu tiên) của kiểu struct
+sẽ được truy cập atomic trong code, ta nên luôn dùng giá trị đã cấp phát của kiểu struct
+để bảo đảm các trường được truy cập atomic luôn có thể
+được tin cậy là căn chỉnh theo 8 byte trên kiến trúc 32-bit.
+Khi dùng kiểu struct này làm kiểu trường của một kiểu struct khác,
+ta nên đặt trường đó ở vị trí đầu tiên trong kiểu struct còn lại,
+đồng thời luôn dùng các giá trị đã cấp phát của kiểu struct còn lại.
+
+Đôi khi, nếu không thể xác định một word 64-bit có được truy cập atomic hay không,
+ta có thể dùng giá trị kiểu `[15]byte` để xác định
+địa chỉ của word 64-bit khi chạy. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package mylib
+
+import (
+	"unsafe"
+	"sync/atomic"
+)
+
+type Counter struct {
+	x [15]byte // thay cho "x uint64"
+}
+
+func (c *Counter) xAddr() *uint64 {
+	// Giá trị trả về phải được căn chỉnh theo 8 byte.
+	return (*uint64)(unsafe.Pointer(
+		(uintptr(unsafe.Pointer(&c.x)) + 7)/8*8))
+}
+
+func (c *Counter) Add(delta uint64) {
+	p := c.xAddr()
+	atomic.AddUint64(p, delta)
+}
+
+func (c *Counter) Value() uint64 {
+	return atomic.LoadUint64(c.xAddr())
+}
+'''
+
+Với cách này, kiểu `Counter` có thể được nhúng tự do và an toàn vào các kiểu khác do người dùng định nghĩa,
+kể cả trên kiến trúc 32-bit.
+Nhược điểm là mỗi giá trị kiểu `Counter` lãng phí bảy byte
+và sử dụng con trỏ `unsafe`.
+{ %%
+Package chuẩn `sync` dùng
+__href="https://github.com/golang/go/blob/master/src/sync/waitgroup.go#L23">giá trị `[3]uint32` để thực hiện mẹo này__.
+Mẹo này giả định rằng đảm bảo căn chỉnh của kiểu `uint32` là bội số của 4 byte.
+Giả định đó đúng với cả trình biên dịch Go chuẩn lẫn gccgo.
+Tuy nhiên, giả định này có thể __href="https://github.com/golang/go/issues/27577">không đúng với một trình biên dịch Go bên thứ ba khác__.
+}
+
+{ %%
+https://github.com/golang/go/issues/36606
+}
+
+    === một số kiểu atomic :: concurrent-atomic-operation.tmd#overview-1.19
+
+Go 1.19 giới thiệu một cách tinh tế hơn để bảo đảm căn chỉnh theo 8 byte cho một số giá trị.
+Go 1.19 bổ sung __một số kiểu atomic__
+trong package chuẩn `sync/atomic`.
+Các kiểu này bao gồm `atomic.Int64` và `atomic.Uint64`,
+các giá trị thuộc những kiểu này được đảm bảo căn chỉnh theo 8 byte, kể cả trên kiến trúc 32-bit.
+Ta có thể tận dụng điều này để luôn căn chỉnh một số word 64-bit theo 8 byte trên kiến trúc 32-bit.
+Ví dụ, trong đoạn code dưới đây, trường `x` của mọi giá trị thuộc kiểu `T`
+luôn được căn chỉnh theo 8 byte trong mọi tình huống, trên cả kiến trúc 64-bit lẫn 32-bit.
+
+@@@ .line-numbers
+''' go
+type T struct {
+	_ [0]atomic.Int64
+	x int64
+}
+'''

@@ -1,0 +1,55 @@
+
+##### hằng số 3
+
+@@@ #question
+{
+Chương trình sau in ra gì (nếu chạy trên hệ điều hành 64-bit)?
+
+@@@ .line-numbers
+''' go
+package main
+
+const X = '\x61' // 'a'
+const Y = 0x62
+const A = Y - X // 1
+const B int64 = 1
+
+var n = 32
+
+func main() {
+	if A == B {
+		println(A << n >> n, B << n >> n)
+	}
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+0 0
+0 1
+1 1
+(Không in gì)
+"""
+
+
+@@@ #answer
+{
+Đáp án: 0 1
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/3cRh94zYsHV __.
+
+Các điểm chính:
+*
+   `X` là hằng số rune chưa định kiểu (nói cách khác, kiểu mặc định của nó là `rune`, còn gọi là `int32`, một kiểu số nguyên 32-bit).
+   `Y` là hằng số `int` chưa định kiểu (nói cách khác, kiểu mặc định của nó là `int`, một kiểu số nguyên 64-bit trên hệ điều hành 64-bit).
+*
+   Khi chạy, biểu thức `A << n` bị tràn số nên được tính thành 0;
+   trong khi đó, biểu thức `B << n` không bị tràn số.
+
+
+
+}
+
+

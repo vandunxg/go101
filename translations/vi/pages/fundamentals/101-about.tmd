@@ -1,0 +1,155 @@
+
+### Giới thiệu về Go 101
+
+Tôi thấy khó có thể mô tả nội dung bài viết này theo cách khái quát thông thường.
+Vì vậy, bài viết sẽ trình bày dưới hình thức phỏng vấn.
+
+###========== Chào Tapir, bạn dự định viết cuốn sách này khi nào và vì sao?
+
+Khoảng tháng 7 năm 2016, sau hai năm sử dụng Go (không quá thường xuyên),
+tôi cảm thấy Go là một ngôn ngữ đơn giản và mình đã nắm vững lập trình Go.
+Khi đó, tôi đã ghi chép được nhiều chi tiết về lập trình Go.
+Tôi nghĩ mình có thể tập hợp những chi tiết đó thành một cuốn sách.
+Tôi nghĩ đây sẽ là một việc dễ dàng.
+
+Tôi đã nhầm. Tôi quá tự tin.
+Khi cố gắng giải thích một số chi tiết,
+tôi nhận ra mình không thể giải thích chúng một cách rõ ràng.
+Càng tích lũy nhiều điều chưa hiểu,
+tôi càng thấy kiến thức Go của mình hạn hẹp và mình vẫn chỉ là một lập trình viên Go mới.
+
+Tôi đã từ bỏ việc viết cuốn sách đó.
+
+###========== Từ bỏ ư? Vậy cuốn sách này đã hoàn thành rồi còn gì?
+
+Đó là cuốn sách kia bị hủy, chứ không phải cuốn **// Go 101 //**.
+Cuối cùng, tôi đã giải đáp gần như mọi điều chưa rõ bằng cách đọc nhiều tài liệu Go chính thức
+cùng đủ loại bài viết về Go trên Internet,
+đồng thời tìm câu trả lời trên các diễn đàn Go và trình theo dõi vấn đề của dự án Go.
+
+Tôi dành khoảng một năm để giải đáp những điều đó.
+Trong thời gian ấy, thỉnh thoảng,
+khi đã làm rõ phần lớn những điều còn vướng mắc về một chủ đề
+và lấy lại sự tự tin để giải thích chủ đề đó,
+tôi viết một bài blog về nó.
+Cuối cùng, tôi đã viết khoảng hai mươi bài về Go.
+Tôi cũng tích lũy được nhiều kiến thức chi tiết về Go hơn trước.
+Đó là lúc tôi có thể bắt đầu lại kế hoạch viết sách Go.
+
+Tôi viết thêm mười bài hướng dẫn cơ bản và hai mươi bài nữa
+về nhiều chủ đề Go khác nhau.
+Vì vậy, hiện nay // Go 101 // có khoảng 50 bài viết.
+
+###========== Trước đây bạn từng chưa hiểu rõ những điều gì?
+
+Một số điều chưa rõ liên quan đến vài chi tiết trong thiết kế cú pháp và ngữ nghĩa,
+một số liên quan đến giá trị thuộc một số kiểu nhất định
+(chủ yếu là slice, interface và channel),
+còn một vài điều liên quan đến API của các package chuẩn.
+
+###========== Theo bạn, nguyên nhân của những điều chưa rõ trước đây là gì?
+
+Cho rằng Go dễ nắm vững là một suy nghĩ có hại.
+Suy nghĩ như vậy (cho rằng Go dễ nắm vững) khiến bạn hiểu Go một cách hời hợt và cản trở việc làm chủ ngôn ngữ này.
+
+Go là một ngôn ngữ giàu tính năng.
+Tập cú pháp của Go chắc chắn không lớn, nhưng cũng không thể nói là nhỏ.
+Một số thiết kế cú pháp và ngữ nghĩa trong Go khá trực quan,
+còn một số hơi trái với trực giác hoặc không nhất quán với những thiết kế khác.
+Thiết kế cú pháp và ngữ nghĩa của Go có một số đánh đổi.
+Lập trình viên cần có kinh nghiệm lập trình Go nhất định mới hiểu được những đánh đổi đó.
+
+Go cung cấp một số kiểu không thiết yếu nhưng được hỗ trợ như kiểu hạng nhất.
+Khi triển khai các kiểu này, một số chi tiết được đóng gói
+để ẩn cấu trúc bên trong của chúng.
+Một mặt, việc đóng gói giúp lập trình Go thuận tiện hơn nhiều.
+Mặt khác, nó cũng tạo ra một số trở ngại khi muốn
+hiểu sâu hơn hành vi của giá trị thuộc các kiểu này.
+
+Nhiều hướng dẫn Go chính thức lẫn không chính thức khá đơn giản
+và chỉ đề cập các trường hợp sử dụng phổ biến, bỏ qua nhiều chi tiết.
+Điều này có thể khuyến khích người mới học và sử dụng Go.
+Mặt khác, nó cũng khiến nhiều lập trình viên Go quá tự tin
+về mức độ hiểu biết của mình.
+
+Một số hàm và kiểu được khai báo trong các package chuẩn
+không có phần giải thích chi tiết. Điều này cũng dễ hiểu,
+vì nhiều chi tiết tinh vi đến mức khó tìm được cách diễn đạt phù hợp
+để giải thích chúng rõ ràng.
+Nói ít nhưng chính xác còn tốt hơn nói nhiều mà thiếu chính xác.
+Tuy vậy, điều này thực sự khiến người dùng package còn nhiều điều chưa rõ.
+
+###========== Vậy theo bạn, sự đơn giản không phải là điểm hấp dẫn của Go sao?
+
+Theo tôi, ít nhất thì sự đơn giản không phải là điểm hấp dẫn chính của Go.
+Xét cho cùng, có nhiều ngôn ngữ khác đơn giản hơn Go.
+Mặt khác, Go là ngôn ngữ giàu tính năng nhưng cũng không phức tạp.
+Một người mới học Go với thái độ đúng đắn có thể làm chủ lập trình Go trong một năm.
+
+###========== Theo bạn, những điểm hấp dẫn của Go là gì?
+
+Theo quan điểm cá nhân, điểm hấp dẫn chính của Go là sự linh hoạt,
+ngang với nhiều ngôn ngữ kịch bản động, dù Go là ngôn ngữ tĩnh.
+
+Tiết kiệm bộ nhớ, khởi động chương trình nhanh, thực thi mã nhanh và biên dịch nhanh khi kết hợp với nhau
+cũng là một điểm hấp dẫn chính của Go.
+Đây cũng là điểm mạnh phổ biến của nhiều ngôn ngữ thuộc họ C.
+Nhưng trong lĩnh vực phát triển web, hiếm ngôn ngữ nào có đồng thời cả bốn đặc tính này.
+Thực tế, đây là lý do chính khiến tôi chuyển từ Java sang Go để phát triển web.
+
+Hỗ trợ lập trình đồng thời tích hợp sẵn cũng là một điểm hấp dẫn của Go,
+dù cá nhân tôi không cho rằng đây là điểm hấp dẫn chính.
+
+Khả năng đọc mã tốt cũng là một điểm mạnh quan trọng.
+Theo tôi, khả năng đọc hiểu là yếu tố quan trọng nhất khi thiết kế Go.
+
+Hỗ trợ đa nền tảng tốt cũng là một điểm mạnh của Go,
+dù ngày nay điểm mạnh này không còn quá khác biệt.
+
+Một nhóm phát triển nòng cốt ổn định cùng cộng đồng năng động
+cũng có thể được xem là một điểm hấp dẫn của Go.
+
+###========== Go 101 làm gì để giải đáp những điều chưa rõ này?
+
+// Go 101 // cố gắng giải đáp nhiều điều chưa rõ bằng những cách sau.
+*.
+   Nhấn mạnh các khái niệm và thuật ngữ cơ bản.
+   Nếu chưa hiểu những khái niệm và thuật ngữ cơ bản này,
+   bạn sẽ khó nắm đầy đủ nhiều quy tắc và khái niệm cấp cao.
+*.
+   Bổ sung thuật ngữ **// value part //** và dành riêng một bài viết
+   để giải thích về value part. Bài viết này làm rõ cấu trúc nền tảng
+   của một số kiểu, giúp lập trình viên Go hiểu sâu hơn
+   về các giá trị Go thuộc những kiểu đó.
+   Theo tôi, biết một chút về cách triển khai bên dưới
+   rất hữu ích để giải đáp những điều chưa rõ về đủ loại giá trị Go.
+*.
+   Giải thích chi tiết về memory block. Hiểu mối liên hệ giữa
+   giá trị Go và memory block rất hữu ích để nắm được
+   cách garbage collector hoạt động và cách tránh rò rỉ bộ nhớ.
+*.
+   Xem interface value như những chiếc hộp chứa các giá trị không phải interface.
+   Tôi nhận thấy cách hình dung interface value như hộp chứa giá trị
+   rất hữu ích để giải đáp nhiều điều chưa rõ liên quan đến interface.
+*.
+   Làm rõ một số điểm chưa rõ trong đặc tả Go,
+   chẳng hạn như quy tắc embedding, cách Go đánh giá value của promoted method,
+   và cơ chế panic/recover.
+*.
+   Tổng hợp nhiều điểm kiến thức và chi tiết thành một số bài viết tổng kết
+   cùng các bài viết chuyên đề, giúp lập trình viên Go tiết kiệm nhiều thời gian học.
+
+###========== Còn điều gì khác đáng nhắc đến không?
+
+Cuốn sách này không đi sâu vào custom generics.
+Hãy đọc sách __Go Generics 101__ để tìm hiểu về custom generics.
+
+    === Go Generics 101 :: https://go101.org/generics/101.html
+
+Ngoài ra, các kiểu type parameter (thường dùng trong custom generics) được cố ý bỏ qua
+khi mô tả các quy tắc conversion, assignability và comparison.
+Nói cách khác, cuốn sách này không xét đến các tình huống có sử dụng custom generics.
+
+
+
+

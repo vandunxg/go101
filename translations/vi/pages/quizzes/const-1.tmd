@@ -1,0 +1,65 @@
+##### const 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+const (
+	_    = 6
+	A, _ = iota, iota + 10
+	_, _
+	_, B
+)
+
+func main() {
+	println(A, B)
+}
+'''
+}
+
+Lựa chọn:
+
+""" go101-quiz
+0 15
+1 15
+0 13
+1 13
+"""
+
+
+
+@@@ #answer
+{
+Đáp án: 1 13
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/J1dRQckPsvz __.
+
+Điểm chính:
+* 
+	Đặc tả Go nêu: // Trong danh sách khai báo const đặt trong ngoặc đơn, có thể lược bỏ danh sách biểu thức ở mọi ConstSpec trừ ConstSpec đầu tiên.
+	Danh sách rỗng như vậy tương đương với việc thay bằng văn bản danh sách biểu thức không rỗng gần nhất đứng trước nó cùng với kiểu của danh sách đó, nếu có.
+* 
+	Giá trị của `iota` được khai báo sẵn là chỉ số thứ tự của đặc tả hằng số (bắt đầu từ 0) trong một khai báo hằng số.
+
+
+
+Khai báo hằng số trong mã của câu đố có 4 đặc tả hằng số.
+Theo các quy tắc vừa nêu, khai báo đó tương đương với khai báo sau:
+
+
+@@@ .line-numbers
+''' go
+const (
+	_    = 6
+	A, _ = 1, 1 + 10
+	_, _ = 2, 2 + 10
+	_, B = 3, 3 + 10
+)
+'''
+
+}

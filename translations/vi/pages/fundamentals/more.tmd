@@ -1,0 +1,146 @@
+
+### Các chủ đề Go khác
+
+Các bài viết Go 101 chủ yếu tập trung vào cú pháp và ngữ nghĩa của Go.
+Go 101 không đề cập đến một số chủ đề khác liên quan đến Go.
+Phần còn lại của bài viết này sẽ giới thiệu sơ lược
+những chủ đề đó và cung cấp một số liên kết để bạn tìm hiểu thêm.
+
+###========== Profiling, Benchmark và kiểm thử đơn vị/fuzz
+
+Ta có thể dùng lệnh `go test` trong Go Toolchain để chạy các bài kiểm thử và benchmark.
+Tên tệp mã nguồn kiểm thử phải kết thúc bằng `_test.go`.
+Go Toolchain cũng hỗ trợ profiling chương trình Go.
+Hãy đọc các bài viết sau để biết thêm chi tiết.
+*
+   __Profiling chương trình Go`` https://go.dev/wiki/Performance__.
+*
+   __Package testing tiêu chuẩn`` https://golang.org/pkg/testing/__.
+*
+   __Viết các ví dụ có thể kiểm thử`` https://blog.golang.org/examples__.
+*
+   __Sử dụng subtest và sub-benchmark`` https://blog.golang.org/subtests__.
+*
+   __Các tùy chọn của lệnh `go test` `` https://golang.org/cmd/go/#hdr-Test_packages__.
+*
+   __Go Fuzzing`` https://go.dev/doc/fuzz/__.
+
+###========== gccgo
+
+__gccgo__ là một trình biên dịch Go khác do nhóm nòng cốt Go duy trì.
+Trình biên dịch này chủ yếu được dùng để xác minh tính chính xác của trình biên dịch Go tiêu chuẩn (gc).
+Ta có thể dùng tùy chọn build `-compiler=gccgo` trong một số lệnh của Go Toolchain
+để dùng trình biên dịch gccgo thay cho trình biên dịch gc.
+Ví dụ: `go run -compiler=gccgo main.go`.
+Tùy chọn này yêu cầu đã cài đặt chương trình gccgo.
+Sau khi cài đặt gccgo,
+ta cũng có thể __dùng trực tiếp lệnh `gccgo` để biên dịch mã Go__.
+
+    === gccgo :: https://github.com/golang/gofrontend
+    === dùng `gccgo` ... :: https://golang.org/doc/install/gccgo#Using_gccgo
+
+###========== Các package chuẩn `go/*`
+
+Các package chuẩn `go/*` cung cấp chức năng phân tích cú pháp các tệp mã nguồn Go,
+rất hữu ích khi viết các công cụ Go tùy chỉnh.
+Hãy đọc __`go/types`: Trình kiểm tra kiểu của Go__
+và __tài liệu package__ để biết cách sử dụng các package này.
+
+    === `go/types`: Trình kiểm tra kiểu của Go :: https://github.com/golang/example/tree/master/gotypes
+    === tài liệu package :: https://golang.org/pkg/go/
+
+###========== System call
+
+Ta có thể thực hiện system call bằng cách gọi các hàm do
+package chuẩn `syscall` export.
+Lưu ý rằng, khác với các package chuẩn khác,
+các hàm trong package chuẩn `syscall` phụ thuộc vào hệ điều hành.
+
+###========== Go Assembly
+
+Các hàm Go có thể được triển khai bằng ngôn ngữ assembly của Go.
+Go Assembly là một ngôn ngữ assembly đa kiến trúc (dù chưa hoàn toàn).
+Go Assembly thường được dùng để triển khai một số hàm
+có ảnh hưởng lớn đến hiệu năng thực thi chương trình Go.
+
+Để biết thêm chi tiết, hãy xem các liên kết sau.
+*
+   __Hướng dẫn nhanh về assembler của Go`` https://golang.org/doc/asm__
+*
+   __Thiết kế của Go assembler`` https://talks.golang.org/2016/asm.slide__
+
+###========== cgo
+
+Ta có thể gọi mã C từ mã Go và ngược lại thông qua cơ chế cgo.
+Hãy xem các liên kết sau để biết chi tiết.
+*
+   __Tài liệu chính thức về cgo`` https://golang.org/cmd/cgo/__
+*
+   __C? Go? Cgo!`` https://blog.golang.org/c-go-cgo__
+*
+   __cgo trên Go wiki`` https://go.dev/wiki/cgo__
+
+Có thể sử dụng các thư viện C++ thông qua cgo bằng cách bọc chúng thành các hàm C.
+
+Lưu ý rằng dùng cgo trong mã nguồn có thể khiến việc duy trì khả năng tương thích đa nền tảng của chương trình Go trở nên khó khăn.
+Các lời gọi giữa mã C và Go cũng kém hiệu quả hơn so với giữa Go với Go hoặc C với C.
+
+@@@ #cross-platform-compiling
+###========== Biên dịch đa nền tảng
+
+Trình biên dịch Go tiêu chuẩn hỗ trợ biên dịch đa nền tảng.
+Bằng cách thiết lập các biến môi trường `GOOS` và `GOARCH`
+trước khi chạy lệnh `go build`,
+ta có thể build tệp thực thi Windows trên máy Linux và ngược lại.
+Hãy đọc các bài viết sau để biết chi tiết.
+*
+   __Build chương trình Go cho Windows trên Linux`` https://go.dev/wiki/WindowsCrossCompiling__.
+*
+   __Các hệ điều hành đích và kiến trúc biên dịch hiện được hỗ trợ`` https://golang.org/doc/install/source#environment__.
+
+Đặc biệt, từ Go 1.11, Go Toolchain bắt đầu hỗ trợ WebAssembly như một loại GOARCH mới.
+Hãy đọc __bài viết trên wiki này__ để biết chi tiết.
+
+    === bài viết trên wiki này :: https://go.dev/wiki/WebAssembly
+
+###========== Compiler directive
+
+Trình biên dịch Go tiêu chuẩn hỗ trợ một số
+__compiler directive__.
+Directive xuất hiện dưới dạng một dòng comment như `//go:DirectiveName args`.
+Ví dụ, ta có thể dùng directive __go:generate__
+để tạo mã và dùng directive __go:embed__
+(được giới thiệu trong Go 1.16) để nhúng một số tệp dữ liệu vào mã nguồn.
+
+    === compiler directive :: https://golang.org/cmd/compile/#hdr-Compiler_Directives
+    === go:generate :: https://blog.golang.org/generate
+    === go:embed :: https://golang.org/pkg/embed/
+
+###========== Build constraint (tag)
+
+Ta có thể dùng __build constraint__
+để yêu cầu compiler chỉ build một số tệp mã nguồn nhất định (hay bỏ qua một số tệp).
+Build constraint còn được gọi là build tag.
+Build constraint có thể xuất hiện dưới dạng một dòng comment như `// +build constraints`
+hoặc là hậu tố trong tên cơ sở của tệp mã nguồn.
+Lưu ý: directive __`//go:build`__ mới,
+__được giới thiệu trong Go 1.17__, cuối cùng sẽ thay thế các dòng constraint `// +build` cũ.
+
+    === build constraints :: https://golang.org/pkg/go/build/
+    === directive `//go:build` :: https://go.googlesource.com/proposal/+/master/design/draft-gobuild.md
+    === được giới thiệu trong Go 1.17 :: https://github.com/golang/go/issues/41184
+
+###========== Các build mode khác
+
+Lệnh `go build` trong Go Toolchain hỗ trợ một số build mode.
+Chạy `go help buildmode` để xem các build mode hiện có
+hoặc đọc phần giải thích về __tùy chọn -buildmode__.
+Ngoài build mode **mặc định**, build mode được dùng nhiều nhất có thể là **plugin**.
+Ta có thể dùng các hàm trong __package chuẩn `plugin`__
+để tải và sử dụng các tệp Go plugin được tạo bằng build mode **plugin**.
+
+    === tùy chọn -buildmode :: https://golang.org/cmd/go/#hdr-Build_modes
+    === package chuẩn `plugin` :: https://golang.org/pkg/plugin/
+
+
+

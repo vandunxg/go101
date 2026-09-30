@@ -1,0 +1,98 @@
+### Các chỉ thị chú thích `//go:build go1.mn` không hoạt động với các phiên bản Go toolchain v1.22.x
+    khi không có tệp `go.mod`
+
+Go 1.22 đã thay đổi ngữ nghĩa của vòng lặp `for-range` và vòng lặp `for;;` truyền thống.
+Vì những thay đổi ngữ nghĩa này làm thay đổi hành vi của mã hiện có được viết
+theo ngữ nghĩa trước đây, chúng phá vỡ tính tương thích ngược.
+
+Hành vi của các vòng lặp `for-range` cũ hầu như không bị ảnh hưởng,
+nhưng một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do thay đổi này__.
+
+    === có hành vi bất ngờ ... `` https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+Để tiếp tục dùng ngữ nghĩa cũ trước Go 1.22 trong các phiên bản Go 1.22 trở lên,
+ta phải chỉ định phiên bản Go cho từng tệp mã nguồn Go.
+Một cách là thêm chỉ thị chú thích `//go:build go1.21`
+ở đầu tệp mã nguồn Go chứa mã cũ.
+
+Dù cách này được tài liệu chính thức ghi nhận, do __một lỗi đã biết__,
+nó hiện không hoạt động với các phiên bản Go toolchain 1.22.x.
+
+    === lỗi đã biết ... `` https://github.com/golang/go/issues/66092
+
+Ở đây, tôi chỉ mô tả lỗi này: với một tệp mã nguồn Go mà phiên bản Go
+không được chỉ định trong tệp `go.mod`, chỉ thị chú thích `//go:build go1.mn`
+trong tệp đó không chỉ định được phiên bản Go cho tệp.
+
+Ví dụ:
+
+.  ### main.go
+   ''' Go
+//go:build go1.21
+package main
+
+import "fmt"
+
+func filter(n int) bool {
+	return n&0xF == 0
+}
+
+// Tìm các giá trị và trả về chúng mà không làm đảo thứ tự.
+func search(start, end int) (r []int) {
+	var count = 0
+	for i, index := start, 0; i <= end; i++ {
+		if filter(i) {
+			count++
+			defer func(value int) {
+				r[index] = value
+				index++
+			}(i)
+		}
+	}
+
+	r = make([]int, count)
+	return
+}
+
+func main() {
+    fmt.Println(search(10, 36))
+}
+   '''
+
+Khi chạy tệp Go như một script bằng lệnh `go run`
+(không dùng tệp `go.mod`), chương trình ví dụ in ra
+`[16 0]` với các phiên bản Go toolchain 1.22.x,
+do ngữ nghĩa từ Go 1.22 trở lên được áp dụng — đây là kết quả sai.
+Kết quả đúng phải là `[32 16]`, như trên các phiên bản toolchain cũ hơn (1.21 trở về trước)
+và mới hơn (1.23 trở lên). __#gotv__
+
+'''
+$ gotv 1.21 run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.13/bin/go run main.go
+[32 16]
+$ gotv 1.22 run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.12/bin/go run main.go
+[16 0]
+$ gotv 1.23 run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.23.9/bin/go run main.go
+[32 16]
+'''
+
+Nhóm Go core đã cố ý __từ chối sửa lỗi này cho các phiên bản 1.22.x__.
+Vì vậy, khi dùng các phiên bản này để phát triển dự án Go, bạn cần lưu ý rằng lỗi sẽ luôn tồn tại
+trong các phiên bản 1.22.x.
+
+    === đã từ chối ... `` https://github.com/golang/go/issues/66092#issuecomment-2192570381
+
+Còn một cách khác để chỉ định phiên bản Go cho các tệp mã nguồn Go.
+__ Cách đó cũng không hoạt động với một số phiên bản Go toolchain __.
+
+    === Cách đó ... `` go-version-in-mod-file-not-work.tmd
+
+---
+
+{ %%
+@@@ #gotv
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ giúp cài đặt và sử dụng đồng thời
+nhiều bản Go toolchain một cách thuận tiện.
+}

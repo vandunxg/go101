@@ -1,0 +1,214 @@
+### Chi phí sao chép giá trị trong Go
+
+Việc sao chép giá trị diễn ra thường xuyên trong lập trình Go.
+Phép gán giá trị, truyền đối số và gửi giá trị qua channel
+đều có liên quan đến việc sao chép giá trị.
+Bài viết này sẽ bàn về chi phí sao chép giá trị thuộc mọi loại kiểu.
+
+@@@ #value-sizes
+###========== Kích thước giá trị
+
+Kích thước của một giá trị là số byte mà
+__phần trực tiếp__ của giá trị chiếm trong bộ nhớ.
+Các phần nền tảng gián tiếp của giá trị không được tính vào kích thước của giá trị.
+
+    === phần trực tiếp :: value-part.tmd
+
+Trong Go, nếu kiểu của hai giá trị thuộc cùng một __loại__,
+và loại kiểu đó không phải loại string,
+loại interface, loại array hay loại struct,
+thì kích thước của hai giá trị luôn bằng nhau.
+
+    === loại :: type-system-overview.tmd#type-kinds
+
+Trên thực tế, với compiler/runtime Go tiêu chuẩn,
+kích thước của hai giá trị string cũng luôn bằng nhau.
+Điều tương tự cũng đúng với kích thước của hai giá trị interface.
+
+Tính đến hiện tại (Go Toolchain 1.25.n), với Go compiler tiêu chuẩn (và gccgo),
+các giá trị có cùng một kiểu xác định luôn có cùng kích thước giá trị.
+Vì vậy, ta thường gọi kích thước của một giá trị là kích thước của kiểu của giá trị đó.
+
+Kích thước của một kiểu array phụ thuộc vào kích thước kiểu của phần tử và độ dài
+của kiểu array. Kích thước kiểu array bằng tích của kích thước kiểu
+của phần tử array với độ dài array.
+
+Kích thước của một kiểu struct phụ thuộc vào kích thước và thứ tự của tất cả các field.
+Do có thể có một số __byte đệm__ được chèn
+giữa hai field struct liền kề để bảo đảm các yêu cầu căn chỉnh địa chỉ bộ nhớ của các field này,
+nên kích thước kiểu struct không thể nhỏ hơn (và thường lớn hơn) tổng kích thước kiểu tương ứng
+của các field.
+
+    === byte đệm :: memory-layout.tmd#size-and-padding
+
+Bảng sau liệt kê kích thước giá trị của mọi loại kiểu
+(với Go compiler tiêu chuẩn v1.25.n).
+Trong bảng, một word có nghĩa là một word gốc của kiến trúc,
+tương ứng 4 byte trên kiến trúc 32-bit và 8 byte trên kiến trúc 64-bit.
+
+    === Bắt buộc :: https://golang.org/ref/spec#Size_and_alignment_guarantees
+    === Đặc tả Go :: https://golang.org/ref/spec#Numeric_types
+
+#  ### Các loại kiểu
+   ### Kích thước giá trị
+   ### __Bắt buộc__ theo __Đặc tả Go__
+   -----
+   ### bool
+   ;;; 1 byte
+   ;;; không quy định
+   -----
+   ### int8, uint8 (byte)
+   ;;; 1 byte
+   ;;; 1 byte
+   -----
+   ### int16, uint16
+   ;;; 2 byte
+   ;;; 2 byte
+   -----
+   ### int32 (rune), uint32, float32
+   ;;; 4 byte
+   ;;; 4 byte
+   -----
+   ### int64, uint64, float64, complex64
+   ;;; 8 byte
+   ;;; 8 byte
+   -----
+   ### complex128
+   ;;; 16 byte
+   ;;; 16 byte
+   -----
+   ### int, uint
+   ;;; 1 word
+   ;;; phụ thuộc kiến trúc, 4 byte trên kiến trúc 32-bit và 8 byte
+       trên kiến trúc 64-bit
+   -----
+   ### uintptr
+   ;;; 1 word
+   ;;; đủ lớn để lưu các bit không diễn giải của một giá trị pointer
+   -----
+   ### string
+   ;;; 2 word
+   ;;; không quy định
+   -----
+   ### pointer (an toàn hoặc không an toàn)
+   ;;; 1 word
+   ;;; không quy định
+   -----
+   ### slice
+   ;;; 3 word
+   ;;; không quy định
+   -----
+   ### map
+   ;;; 1 word
+   ;;; không quy định
+   -----
+   ### channel
+   ;;; 1 word
+   ;;; không quy định
+   -----
+   ### function
+   ;;; 1 word
+   ;;; không quy định
+   -----
+   ### interface
+   ;;; 2 word
+   ;;; không quy định
+   -----
+   ### struct
+   ;;; (tổng kích thước của tất cả field) + (số
+       __byte đệm__)
+   ;;; kích thước của một kiểu **struct** bằng 0 nếu nó không chứa field nào
+       có kích thước lớn hơn 0
+   -----
+   ### array
+   ;;; (kích thước giá trị của phần tử) * (độ dài array)
+   ;;; kích thước của một kiểu **array** bằng 0 nếu phần tử của nó có kích thước bằng 0
+
+@@@ #copy-costs
+###========== Chi phí sao chép giá trị
+
+Nói chung, chi phí sao chép một giá trị tỷ lệ thuận với kích thước của giá trị đó.
+Tuy nhiên, kích thước giá trị không phải là yếu tố duy nhất quyết định chi phí sao chép giá trị.
+Các mẫu CPU và phiên bản compiler khác nhau có thể tối ưu riêng việc sao chép giá trị có kích thước cụ thể.
+
+Trong thực tế, ta có thể xem các giá trị struct có ít hơn 5 field và kích thước không lớn hơn
+bốn word gốc của kiến trúc là giá trị kích thước nhỏ. Chi phí sao chép các giá trị kích thước nhỏ thấp.
+
+Với Go compiler tiêu chuẩn,
+ngoại trừ giá trị thuộc các kiểu struct và array kích thước lớn,
+các kiểu khác trong Go đều là kiểu kích thước nhỏ.
+
+Để tránh chi phí sao chép giá trị lớn khi truyền đối số và gửi
+hoặc nhận giá trị qua channel, ta nên cố gắng tránh dùng các kiểu struct và array kích thước lớn làm kiểu
+tham số cho function và method (bao gồm cả kiểu receiver của method) cũng như kiểu phần tử channel.
+Trong những trường hợp đó, ta có thể dùng các kiểu pointer có kiểu nền tảng kích thước lớn.
+
+Mặt khác, ta cũng cần cân nhắc rằng quá nhiều pointer
+sẽ làm tăng áp lực lên garbage collector khi chương trình chạy.
+Vì vậy, nên dùng các kiểu struct và array kích thước lớn hay các kiểu pointer tương ứng
+còn tùy vào từng trường hợp cụ thể.
+
+Nói chung, trong thực tế, ta hiếm khi dùng các kiểu pointer có kiểu nền tảng là kiểu
+slice, map, channel, function, string và interface.
+Chi phí sao chép giá trị của các kiểu nền tảng giả định này rất thấp.
+
+Ta cũng nên tránh dùng dạng lặp có hai biến lặp để
+lặp qua các phần tử array và slice nếu kiểu phần tử có kích thước lớn,
+vì trong quá trình lặp, mỗi giá trị phần tử sẽ được sao chép vào biến lặp thứ hai.
+
+Sau đây là ví dụ benchmark các cách lặp khác nhau qua phần tử slice.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "testing"
+
+type S [12]int64
+var sX = make([]S, 1000)
+var sY = make([]S, 1000)
+var sZ = make([]S, 1000)
+var sumX, sumY, sumZ int64
+
+func Benchmark_Loop(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		sumX = 0
+		for j := 0; j < len(sX); j++ {
+			sumX += sX[j][0]
+		}
+	}
+}
+
+func Benchmark_Range_OneIterVar(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		sumY = 0
+		for j := range sY {
+			sumY += sY[j][0]
+		}
+	}
+}
+
+func Benchmark_Range_TwoIterVar(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		sumZ = 0
+		for _, v := range sZ {
+			sumZ += v[0]
+		}
+	}
+}
+'''
+
+Chạy benchmark trong thư mục chứa file test,
+ta sẽ nhận được kết quả tương tự như sau:
+
+@@@ .output
+'''
+Benchmark_Loop-4             424342 2708 ns/op
+Benchmark_Range_OneIterVar-4 407905 2808 ns/op
+Benchmark_Range_TwoIterVar-4 214860 3915 ns/op
+'''
+
+Ta có thể thấy hiệu suất của dạng có hai biến lặp thấp hơn nhiều so với hai dạng còn lại.
+Tuy nhiên, lưu ý rằng một số compiler có thể thực hiện tối ưu hóa đặc biệt
+để loại bỏ chênh lệch hiệu suất giữa các dạng này.
+Kết quả benchmark ở trên dựa trên Go compiler tiêu chuẩn v1.25.n.

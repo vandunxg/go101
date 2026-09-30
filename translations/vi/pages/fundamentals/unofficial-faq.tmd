@@ -1,0 +1,1281 @@
+### Go FAQ 101
+
+//
+(Đây là trang hỏi đáp Go không chính thức. Trang chính thức ở __đây__.)
+
+    === đây :: https://golang.org/doc/faq
+
+Mục lục:
+
+@@@ #unofficial-faq.html .summaries
+*  compiler và runtime
+   @@@ .index
+   -  __Thông báo lỗi biên dịch `non-name **	- on left side of :=` có nghĩa là gì?`` #error-non-name__
+   -  __Thông báo lỗi biên dịch `unexpected newline, expecting { after if clause` có nghĩa là gì?`` #error-missing-left-brace__
+   -  __Thông báo lỗi compiler `declared and not used` có nghĩa là gì?`` #error-declared-not-used__
+   -  __Go runtime có duy trì thứ tự duyệt map không?`` #map-iteration-order__
+   -  __Go compiler có chèn padding để bảo đảm căn chỉnh field của struct không?`` #compiler-field-padding__
+   -  __Vì sao field cuối có kiểu kích thước 0 trong struct đôi khi vẫn làm tăng kích thước struct?`` #final-zero-size-field__
+   -  __`new(T)` có phải cú pháp rút gọn của `var t T; (&t)` không?`` #new-function__
+   -  __Thông báo lỗi runtime `all goroutines are asleep - deadlock` có nghĩa là gì?`` #fatal-error-deadlock__
+   -  __Số nguyên 64-bit có được bảo đảm căn chỉnh 64-bit
+      để có thể truy cập nguyên tử không?`` #_64-bit-alignment__
+   -  __Phép gán giá trị có phải thao tác nguyên tử không?`` #atomical-assignment__
+   -  __Mọi zero value có đều gồm một chuỗi byte 0 trong bộ nhớ không?`` #zero-values-zero-bytes__
+   -  __Go compiler chuẩn có hỗ trợ inline function không?`` #function-inline__
+   -  __Có thể dùng finalizer làm hàm hủy đối tượng không?`` #finalizers__
+
+*  các package chuẩn
+   @@@ .index
+   -  __Làm thế nào lấy số ngày của một tháng bằng ít dòng code nhất?`` #get-days-of-month__
+   -  __Khác biệt giữa lời gọi hàm `time.Sleep(d)` và thao tác nhận từ channel `<-time.After(d)`?`` #time-sleep-after__
+   -  __Các lời gọi hàm `TrimLeft` và `TrimRight` trong `strings` và `bytes`
+      các package chuẩn thường trả kết quả ngoài dự kiến; cách cài đặt các hàm này có lỗi không?`` #trim__
+   -  __Khác biệt giữa các hàm `fmt.Print` và `fmt.Println` là gì?`` #fmt-print-println__
+   -  __Các hàm `log.Print` và `log.Println` có khác nhau không?`` #log-print-println__
+   -  __Các hàm `fmt.Print`, `fmt.Println` và `fmt.Printf` có đồng bộ hóa không?`` #fmt-print-synced__
+   -  __Khác biệt giữa các hàm dựng sẵn `print`/`println` và các hàm in tương ứng trong package chuẩn `fmt`, `log` là gì?`` #print-builtin-fmt-log__
+   -  __Số ngẫu nhiên do `math/rand` và package chuẩn `crypto/rand` tạo ra khác nhau thế nào?`` #math-crypto-rand__
+   -  __Vì sao không có hàm `math.Round`?`` #math-round__
+
+*  hệ thống kiểu
+   @@@ .index
+   -  __Những kiểu nào không hỗ trợ so sánh?`` #incomparable-types__
+   -  __Vì sao đôi khi hai giá trị `nil` không bằng nhau?`` #nil-equality__
+   -  __Vì sao kiểu `[]T1` và `[]T2` không có cùng underlying type
+      dù hai kiểu `T1` và `T2` có cùng underlying type?`` #slice-conversion__
+   -  __Giá trị nào có thể và không thể lấy địa chỉ?`` #unaddressable-values__
+   -  __Vì sao phần tử map không thể lấy địa chỉ?`` #map-elements-are-unaddressable__
+   -  __Vì sao phần tử của slice khác nil luôn có thể lấy địa chỉ, dù bản thân slice không thể lấy địa chỉ?`` #slice-elements-always-addressable__
+   -  __Với mọi kiểu `T` không phải pointer hay interface,
+      vì sao method set của `*T` luôn bao hàm method set của `T`,
+      nhưng chiều ngược lại không đúng?`` #method-set-relation__
+   -  __Có thể định nghĩa method cho kiểu nào?`` #types-can-have-methods__
+   -  __Khai báo giá trị bất biến trong Go như thế nào?`` #declare-immutables__
+   -  __Vì sao Go không có kiểu container `set` dựng sẵn?`` #set-container-type__
+   -  __byte là gì? rune là gì?
+      Chuyển `[]byte` và `[]rune` sang string như thế nào?`` #byte-rune-slice-string__
+   -  __Thao tác nguyên tử với giá trị pointer như thế nào?`` #pointer-atomic__
+
+*  khác
+   @@@ .index
+   -  __`iota` có nghĩa là gì?`` #about-iota__
+   -  __Vì sao không có hàm dựng sẵn `closed` để kiểm tra channel đã đóng chưa?`` #check-if-channels-closed__
+   -  __Hàm trả pointer tới biến cục bộ có an toàn không?`` #return-local-pointers__
+   -  __Từ **// gopher //** có nghĩa gì trong cộng đồng Go?`` #gopher__
+
+
+
+@@@ .summaries-items
+{
+
+// compiler và runtime
+
+@@@ #error-non-name
+###==========
+    Thông báo lỗi biên dịch `non-name *** on left side of :=` có nghĩa là gì?
+
+Cho đến hiện tại (Go 1.25), có __một quy tắc bắt buộc__
+đối với khai báo biến ngắn:
+@@@ .alert;alert-success
+{
+Mọi thành phần ở vế trái của `:=` phải là
+__identifier__ thuần túy và ít nhất một trong số đó phải là tên biến mới.
+}
+
+    === quy tắc bắt buộc :: https://golang.org/ref/spec#Short_variable_declarations
+    === identifier :: https://golang.org/ref/spec#Identifiers
+
+Điều này có nghĩa phần tử container (`x[i]`),
+field struct (`x.f`), phép giải tham chiếu pointer (`*p`)
+và identifier có tên package (`aPackage.Value`)
+không thể xuất hiện ở vế trái của `:=`.
+
+Hiện có __issue đang mở__
+(đã gộp với __một issue liên quan hơn__)
+về vấn đề này. Có vẻ nhóm Go core muốn __tạm thời để nguyên vấn đề chưa giải quyết__.
+
+    === issue đang mở :: https://github.com/golang/go/issues/377
+    === một issue liên quan hơn :: https://github.com/golang/go/issues/6842
+    === tạm thời chưa giải quyết vấn đề này :: https://github.com/golang/go/issues/30318
+
+@@@ #error-missing-left-brace
+###==========
+    Thông báo lỗi biên dịch `unexpected newline, expecting { ...` có nghĩa là gì?
+
+Trong Go, không thể ngắt dòng code tùy ý.
+Đọc __quy tắc xuống dòng trong Go__ để biết chi tiết.
+Theo quy tắc, nhìn chung không nên xuống dòng ngay trước ngoặc mở.
+
+    === quy tắc xuống dòng trong Go :: line-break-rules.tmd
+
+Ví dụ, đoạn code sau
+
+@@@ .line-numbers
+''' go
+if true
+{
+}
+
+for i := 0; i < 10; i++
+{
+}
+
+var _ = []int
+{
+	1, 2, 3
+}
+'''
+
+sẽ được diễn giải thành
+
+@@@ .line-numbers
+''' go
+if true;
+{
+}
+
+for i := 0; i < 10; i++;
+{
+}
+
+var _ = []int;
+{
+	1, 2, 3;
+}
+'''
+
+Go compiler sẽ báo lỗi tại mỗi dấu ngoặc mở `{`.
+Để tránh lỗi, hãy viết lại đoạn code trên như sau.
+
+@@@ .line-numbers
+''' go
+if true {
+}
+
+for i := 0; i < 10; i++ {
+}
+
+var _ = []int {
+	1, 2, 3,
+}
+'''
+
+@@@ #error-declared-not-used
+###==========
+    Thông báo lỗi compiler `declared and not used` có nghĩa là gì?
+
+Với Go compiler chuẩn, mỗi biến khai báo trong block cục bộ
+phải được dùng ít nhất một lần làm r-value (giá trị vế phải).
+
+Vì vậy đoạn code sau không biên dịch được.
+
+@@@ .line-numbers
+''' go
+func f(x bool) {
+	var y = 1 // y đã khai báo nhưng chưa được dùng (làm r-value)
+	if x {
+		y = 2 // ở đây y được dùng làm giá trị vế trái
+	}
+}
+'''
+
+{ %%
+exception: https://github.com/golang/go/issues/8560
+}
+
+
+@@@ #map-iteration-order
+###==========
+    Go runtime có duy trì thứ tự duyệt map không?
+
+Không. __Đặc tả Go 1__
+nêu rằng thứ tự duyệt map không được quy định và
+không bảo đảm giống nhau giữa các lần duyệt.
+Với Go compiler chuẩn, thứ tự duyệt map luôn được ngẫu nhiên hóa một phần.
+Nếu cần thứ tự duyệt map ổn định, bạn phải tự duy trì thứ tự đó.
+Đọc __Go maps in action__ để biết thêm.
+
+    === đặc tả Go 1 :: https://golang.org/ref/spec#For_range
+    === Go maps in action :: https://go.dev/blog/maps#iteration-order
+
+Tuy nhiên, lưu ý rằng từ Go 1.12, thứ tự entry trong kết quả in
+của các hàm in trong package chuẩn luôn được sắp xếp.
+
+@@@ #compiler-field-padding
+###==========
+    Go compiler có chèn padding để bảo đảm căn chỉnh field của struct không?
+
+Ít nhất với Go compiler chuẩn và gccgo, câu trả lời là có.
+Số byte padding phụ thuộc OS và compiler.
+Đọc __memory layouts__ để biết chi tiết.
+
+    === memory layouts :: memory-layout.tmd#size-and-padding
+
+{ %%
+Ví dụ, Go compiler chuẩn sẽ chèn padding
+như các comment sau mô tả.
+@@@ .line-numbers
+''' go
+type T1 struct {
+	a int8
+	// chèn 7 byte trên OS 64-bit và 3 byte trên i386 tại đây
+	b int64
+	c int16
+	// chèn 6 byte trên OS AMD64 và 2 byte trên i386 tại đây
+}
+
+type T2 struct {
+	a int8
+	// chèn 1 byte trên cả OS AMD64 và i386 tại đây
+	c int16
+	// chèn 4 byte trên AMD64; không padding trên i386
+	b int64
+}
+'''
+Địa chỉ `T1.b` trong bộ nhớ phải căn chỉnh 8 byte trên OS AMD64
+và 4 byte trên OS i386, vì thế có 7 byte padding trên AMD64 và
+3 byte trên i386 sau `T1.a`.
+Đặc tả Go đưa ra __một số bảo đảm về căn chỉnh kiểu__.
+Một trong số đó: alignment của struct bằng alignment lớn nhất trong các kiểu field.
+Vì vậy `T1` cũng căn chỉnh 8 byte trên AMD64 và 4 byte trên i386
+(bằng kiểu `T1.b`, `int64`),
+và Go compiler chuẩn bảo đảm kích thước giá trị của kiểu là bội số của alignment kiểu đó,
+do đó có 6 byte padding trên AMD64 và 2 byte
+padding trên i386 ở cuối giá trị `T1`.
+Thứ tự field struct ảnh hưởng padding, từ đó ảnh hưởng kích thước struct.
+Trên AMD64, kích thước `T1` là 24 byte, còn `T2` là 16 byte.
+
+    === một số bảo đảm về căn chỉnh kiểu :: https://golang.org/ref/spec#Size_and_alignment_guarantees
+}
+
+Go compiler không tự sắp xếp lại field struct để giảm kích thước.
+Việc đó có thể gây kết quả ngoài dự kiến.
+Lập trình viên có thể giảm padding bằng cách tự sắp xếp lại field.
+
+@@@ #final-zero-size-field
+###==========
+    Vì sao field cuối có kiểu kích thước 0 trong struct đôi khi vẫn làm tăng kích thước struct?
+
+{ %%
+https://github.com/golang/go/issues/9401
+}
+
+Trong cách triển khai Go runtime chuẩn hiện tại,
+chỉ cần còn một pointer đang hoạt động trỏ tới vùng nhớ,
+vùng nhớ đó không bị xem là rác và không bị thu gom.
+
+Có thể lấy địa chỉ mọi field trong giá trị struct có thể lấy địa chỉ.
+Nếu field cuối trong struct khác-không có kích thước bằng 0, việc lấy địa chỉ
+field cuối có thể trả về địa chỉ nằm ngoài vùng nhớ đã cấp phát
+cho struct. Địa chỉ trả về có thể trỏ tới vùng nhớ được cấp phát khác
+nằm liền sau vùng nhớ của struct khác-không.
+Khi địa chỉ trả về còn được lưu trong pointer đang hoạt động,
+vùng nhớ được cấp phát kia sẽ không bị garbage collection và có thể gây rò rỉ bộ nhớ.
+
+Để tránh rò rỉ bộ nhớ như vậy, Go compiler chuẩn bảo đảm việc lấy địa chỉ
+field cuối của struct khác-không không bao giờ trả địa chỉ nằm ngoài
+vùng nhớ đã cấp phát cho struct.
+Go compiler chuẩn thực hiện điều này bằng cách chèn padding sau field kích thước 0 cuối cùng
+khi cần.
+
+Nếu kiểu của mọi field trong struct đều có kích thước 0
+(nên struct cũng có kích thước 0), không cần chèn padding,
+vì Go compiler chuẩn xử lý riêng vùng nhớ kích thước 0.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"unsafe"
+	"fmt"
+)
+
+func main() {
+	type T1 struct {
+		a struct{}
+		x int64
+	}
+	fmt.Println(unsafe.Sizeof(T1{})) // 8
+
+	type T2 struct {
+		x int64
+		a struct{}
+	}
+	fmt.Println(unsafe.Sizeof(T2{})) // 16
+}
+'''
+
+Xem thêm __mục FAQ chính thức này__.
+
+    === mục FAQ chính thức này :: https://go.dev/doc/faq#zero_size_types
+
+@@@ #new-function
+###==========
+    `new(T)` có phải cú pháp rút gọn của `var t T; (&t)` không?
+
+Nhìn chung có thể hiểu như vậy, dù có thể tồn tại khác biệt nhỏ tùy cách triển khai compiler.
+Vùng nhớ do `new` cấp phát có thể nằm trên stack hoặc heap.
+
+@@@ #fatal-error-deadlock
+###==========
+    Thông báo lỗi runtime `all goroutines are asleep - deadlock` có nghĩa là gì?
+
+Từ **// asleep //** ở đây chưa chính xác; nó thực ra có nghĩa là
+**// đang ở trạng thái blocking //**.
+
+Vì goroutine đang blocking chỉ có thể được mở khóa bởi goroutine khác,
+nếu mọi goroutine trong chương trình đều vào trạng thái blocking,
+thì tất cả sẽ mắc kẹt ở trạng thái đó mãi mãi.
+Điều đó có nghĩa chương trình bị deadlock.
+Chương trình đang chạy bình thường không được kỳ vọng rơi vào deadlock,
+nên Go runtime chuẩn sẽ làm chương trình crash và thoát.
+
+@@@ #_64-bit-alignment
+###==========
+    Số nguyên 64-bit có được bảo đảm căn chỉnh 64-bit
+    để có thể truy cập nguyên tử không?
+
+Địa chỉ truyền vào các hàm 64-bit của package `sync/atomic`
+phải căn chỉnh 64-bit; nếu không, lời gọi có thể panic khi chạy.
+
+Với Go compiler chuẩn và gccgo,
+trên kiến trúc 64-bit, số nguyên 64-bit được bảo đảm căn chỉnh 64-bit.
+Vì vậy chúng có thể được truy cập nguyên tử an toàn.
+
+Trên kiến trúc 32-bit, số nguyên 64-bit chỉ được bảo đảm căn chỉnh 32-bit.
+Do đó truy cập nguyên tử một số giá trị 64-bit có thể gây panic.
+Tuy nhiên, có cách để bảo đảm một số số nguyên 64-bit được căn chỉnh 64-bit.
+Đọc __memory layouts in Go__ để biết chi tiết.
+
+    === memory layouts trong Go :: memory-layout.tmd#64bit-atomic-operation
+
+{ %%
+
+Tuy nhiên, các word 64-bit sau được bảo đảm có thể truy cập nguyên tử:
+*  word 64-bit được cấp phát độc lập.
+*  field đầu tiên của struct được cấp phát nếu field đó là word 64-bit.
+*  word đầu tiên trong phần tử đầu của array được cấp phát nếu word đó là 64-bit.
+
+Ở đây, giá trị **// được cấp phát độc lập //** nghĩa là địa chỉ của giá trị
+chính là địa chỉ bắt đầu vùng nhớ chứa nó.
+Nói cách khác, giá trị nằm ở đầu vùng nhớ đó.
+
+Một Go compiler đạt yêu cầu nên bảo đảm
+mọi phần tử của array/slice cũng có thể truy cập nguyên tử
+nếu một phần tử trong array/slice truy cập nguyên tử được
+và kiểu phần tử là word 64-bit,
+dù tài liệu chính thức không bảo đảm điều này.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"sync/atomic"
+)
+
+type T struct {
+	a uint64
+	b bool
+	c int64
+}
+
+type V struct {
+	d byte
+	t T // t.a không phải field đầu tiên trong V.
+}
+
+var x int64
+var y [3]uint64
+var z = make([]int64, 5)
+var t T
+
+var v V
+
+func main() {
+	var x2 int64
+	var y2 [3]uint64
+	var z2 = make([]int64, 5)
+	var t2 T
+
+	var v2 = new(V)
+
+	// following lines are guaranteed to be safe on
+	// both 64-bit and 32-bit OS.
+	atomic.LoadInt64(&x)
+	atomic.LoadUint64(&y[1])
+	atomic.LoadInt64(&z[2])
+	atomic.LoadUint64(&t.a)
+
+	atomic.LoadInt64(&x2)
+	atomic.LoadUint64(&y2[1])
+	atomic.LoadInt64(&z2[2])
+	atomic.LoadUint64(&t2.a)
+
+	// the following two lines are safe on 64-bit OS
+	// but may be panic on 32-bit OS
+	atomic.LoadUint64(&v.t.a)
+	atomic.LoadUint64(&v2.t.a)
+}
+'''
+
+}
+
+@@@ #atomical-assignment
+###==========
+    Phép gán giá trị có phải thao tác nguyên tử không?
+
+Không, với Go compiler chuẩn, kể cả khi kích thước giá trị được gán bằng một word gốc.
+
+Đọc __câu hỏi chính thức__ để biết thêm.
+
+    === câu hỏi chính thức :: https://golang.org/doc/faq#What_operations_are_atomic_What_about_mutexes
+
+@@@ #zero-values-zero-bytes
+###==========
+    Mọi zero value có đều gồm một chuỗi byte 0 trong bộ nhớ không?
+
+Điều này đúng với hầu hết kiểu.
+Tuy nhiên, điều này phụ thuộc compiler.
+Ví dụ, với Go compiler chuẩn,
+nhận định này không đúng với một số zero value của kiểu string và số thực dấu phẩy động.
+
+Ví dụ minh họa:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"unsafe"
+	"fmt"
+)
+
+func main() {
+	// case 1:
+	var s = "abc"[0:0]
+	fmt.Println(s == "") // true
+	var addr = unsafe.StringData(s)
+	fmt.Println(addr) // <a-non-zero-value>
+
+	// case 2:
+	var x = 0.0
+	var y = -x
+	fmt.Println(y == 0) // true
+	var n = *(*uintptr)(unsafe.Pointer(&y))
+	fmt.Println(n) // 9223372036854775808
+}
+'''
+
+Ngược lại, trên mọi kiến trúc hiện được Go compiler chuẩn hỗ trợ,
+nếu mọi byte của giá trị đều bằng 0 thì giá trị đó phải là zero value của kiểu.
+Tuy nhiên, đặc tả Go không bảo đảm điều này.
+Tôi từng nghe rằng trên một số bộ xử lý rất cũ,
+nil pointer không có biểu diễn bằng 0 trong bộ nhớ.
+
+@@@ #function-inline
+###==========
+    Go compiler chuẩn có hỗ trợ inline function không?
+
+Có, Go compiler chuẩn hỗ trợ inline function.
+Compiler tự inline một số hàm rất ngắn đáp ứng yêu cầu nhất định.
+Các yêu cầu inline cụ thể có thể thay đổi theo phiên bản.
+
+Hiện tại (Go Toolchain 1.25), với Go compiler chuẩn:
+*
+   Không có cách tường minh chỉ định hàm nào cần inline trong chương trình người dùng.
+*
+   Tùy chọn build `-gcflags "-l"` tắt inline toàn cục, ngăn mọi hàm được inline.
+*
+   Trong chương trình người dùng, không có cách chính thức để ngăn inline một hàm cụ thể.
+   Có thể thêm directive `//go:noinline` trước khai báo hàm để
+   ngăn hàm được inline, nhưng không bảo đảm cách này luôn hoạt động trong tương lai.
+
+@@@ #finalizers
+###==========
+    Có thể dùng finalizer làm hàm hủy đối tượng không?
+
+Trong chương trình Go, có thể đặt finalizer cho đối tượng bằng
+hàm `runtime.SetFinalizer`.
+Thông thường finalizer được gọi trước khi đối tượng bị garbage collection.
+Tuy nhiên finalizer không được thiết kế làm hàm hủy đối tượng.
+Không có bảo đảm finalizer đặt bằng `runtime.SetFinalizer` sẽ chạy.
+Vì vậy không nên dựa vào finalizer để bảo đảm tính đúng đắn chương trình.
+
+Mục đích chính của finalizer là giúp người bảo trì thư viện
+giảm thiểu vấn đề do dùng thư viện sai cách.
+Ví dụ, nếu lập trình viên dùng `os.Open` mở
+nhiều file nhưng quên đóng sau khi dùng, chương trình
+sẽ giữ nhiều file descriptor đến khi thoát. Đây là ví dụ điển hình về rò rỉ tài nguyên.
+Để tránh việc chương trình giữ quá nhiều file descriptor, người bảo trì
+package `os` sẽ đặt finalizer cho mỗi đối tượng `os.File` được tạo.
+đối tượng. Finalizer sẽ đóng file descriptor được lưu trong
+đối tượng `os.File`. Như đã nói, không bảo đảm finalizer sẽ được gọi.
+Chúng chỉ giúp hạn chế mức độ rò rỉ tài nguyên.
+
+// cần bổ sung best practice và thêm trường hợp finalizer không hoạt động.
+
+Lưu ý, có finalizer chắc chắn không bao giờ được gọi,
+và đôi khi đặt finalizer sai cách sẽ khiến một số đối tượng không được garbage collection.
+Đọc __tài liệu hàm runtime.SetFinalizer__
+để biết chi tiết.
+
+    === tài liệu hàm runtime.SetFinalizer :: https://golang.org/pkg/runtime/#SetFinalizer
+
+// các package chuẩn
+
+@@@ #get-days-of-month
+###==========
+    Lấy số ngày của một tháng bất kỳ với ít dòng code nhất như thế nào?
+
+Giả sử năm và tháng đầu vào theo lịch Gregory (tháng Một là tháng 1).
+@@@ .disable-line-numbers111
+''' go
+days := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+'''
+Với API thời gian Go, khoảng tháng thông thường là `[1, 12]` và ngày đầu tháng là `1`.
+Thời điểm bắt đầu tháng `m` của năm `y` là
+`time.Date(y, m, 1, 0, 0, 0, 0, time.UTC)`.
+Đối số truyền vào `time.Date` có thể nằm ngoài khoảng thông thường
+và sẽ được chuẩn hóa khi chuyển đổi.
+Ví dụ, ngày 32 tháng Một sẽ thành ngày 1 tháng Hai.
+
+Dưới đây là ví dụ dùng `time.Date` trong Go:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"time"
+	"fmt"
+)
+
+func main() {
+	// 2017-02-01 00:00:00 +0000 UTC
+	fmt.Println(time.Date(2017, 1, 32, 0, 0, 0, 0, time.UTC))
+
+	// 2017-01-31 23:59:59.999999999 +0000 UTC
+	fmt.Println(time.Date(2017, 1, 32, 0, 0, 0, -1, time.UTC))
+
+	// 2017-01-31 00:00:00 +0000 UTC
+	fmt.Println(time.Date(2017, 2, 0, 0, 0, 0, 0, time.UTC))
+
+	// 2016-12-31 00:00:00 +0000 UTC
+	fmt.Println(time.Date(2016, 13, 0, 0, 0, 0, 0, time.UTC))
+
+	// 2017-02-01 00:00:00 +0000 UTC
+	fmt.Println(time.Date(2016, 13, 32, 0, 0, 0, 0, time.UTC))
+}
+'''
+
+@@@ #time-sleep-after
+###==========
+    Khác biệt giữa lời gọi hàm `time.Sleep(d)` và thao tác nhận từ channel `<-time.After(d)`?
+
+Cả hai đều tạm dừng goroutine hiện tại trong một khoảng thời gian.
+Khác biệt là lời gọi hàm `time.Sleep(d)`
+đưa goroutine hiện tại vào trạng thái con sleeping,
+nhưng vẫn ở __trạng thái running__,
+còn thao tác nhận channel `<-time.After(d)`
+đưa goroutine vào trạng thái blocking.
+
+    === trạng thái running :: control-flows-more.tmd#states-of-goroutine
+
+@@@ #trim
+###==========
+    Các lời gọi hàm `TrimLeft` và `TrimRight` trong `strings` và `bytes`
+    các package chuẩn thường trả kết quả ngoài dự kiến; cách cài đặt các hàm này có lỗi không?
+
+Có thể các cách cài đặt có lỗi, nhưng hiện chưa lỗi nào được xác nhận.
+Nếu kết quả trả về ngoài dự kiến, nhiều khả năng kỳ vọng của bạn chưa đúng.
+
+Có nhiều hàm trim trong package chuẩn `strings` và `bytes`.
+Các hàm này chia thành hai nhóm:
+*.
+   `Trim`, `TrimLeft`, `TrimRight`, `TrimSpace`, `TrimFunc`, `TrimLeftFunc`, `TrimRightFunc`.
+   Các hàm này loại bỏ mọi Unicode code point (còn gọi là rune) ở đầu hoặc cuối, được mã hóa UTF-8,
+   nếu thỏa điều kiện chỉ định hoặc ngầm định (`TrimSpace` ngầm định loại mọi dạng khoảng trắng).
+   Các rune ở hai đầu được kiểm tra lần lượt đến khi gặp rune không thỏa điều kiện.
+*.
+   `TrimPrefix`, `TrimSuffix`.
+   Hai hàm này loại bỏ nguyên vẹn substring (hoặc subslice) tiền tố hay hậu tố được chỉ định.
+
+__Một số``https://github.com/golang/go/issues/19172__
+__lập trình viên``https://github.com/golang/go/issues/18160__
+__dùng sai``https://github.com/golang/go/issues/14657__
+__các hàm``https://github.com/golang/go/issues/19371__
+các hàm `TrimLeft` và `TrimRight`
+như thể là `TrimPrefix` và `TrimSuffix` khi lần đầu dùng các hàm trim.
+Vì vậy kết quả trả về có thể không như mong đợi.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func main() {
+	var s = "abaay森z众xbbab"
+	o := fmt.Println
+	o(strings.TrimPrefix(s, "ab")) // aay森z众xbbab
+	o(strings.TrimSuffix(s, "ab")) // abaay森z众xbb
+	o(strings.TrimLeft(s, "ab"))   // y森z众xbbab
+	o(strings.TrimRight(s, "ab"))  // abaay森z众x
+	o(strings.Trim(s, "ab"))       // y森z众x
+	o(strings.TrimFunc(s, func(r rune) bool {
+		return r < 128 // loại bỏ mọi ký tự ASCII
+	})) // 森z众
+}
+'''
+
+
+@@@ #fmt-print-println
+###==========
+    Khác biệt giữa các hàm `fmt.Print` và `fmt.Println` là gì?
+
+`fmt.Println` luôn ghi dấu cách giữa hai đối số kề nhau,
+còn `fmt.Print` chỉ ghi dấu cách giữa hai đối số kề nhau
+khi giá trị cụ thể của cả hai đều không phải string.
+
+Khác biệt nữa là `fmt.Println` ghi
+ký tự xuống dòng ở cuối,
+còn `fmt.Print` thì không.
+
+@@@ #log-print-println
+###==========
+    Các hàm `log.Print` và `log.Println` có khác nhau không?
+
+Khác biệt giữa hai hàm `log.Print` và `log.Println`
+giống với khác biệt đầu tiên giữa `fmt.Print` và `fmt.Println`
+được mô tả ở câu trước.
+
+Cả hai hàm đều ghi ký tự xuống dòng ở cuối.
+
+@@@ #fmt-print-synced
+###==========
+    Các hàm `fmt.Print`, `fmt.Println` và `fmt.Printf` có đồng bộ hóa không?
+
+Không, các hàm này không được đồng bộ hóa.
+Khi cần đồng bộ, hãy dùng các hàm tương ứng trong package chuẩn `log`
+để thay thế.
+Có thể gọi `log.SetFlags(0)` để bỏ tiền tố khỏi mỗi dòng log.
+
+@@@ #print-builtin-fmt-log
+###==========
+    Khác biệt giữa các hàm dựng sẵn `print`/`println` và các hàm in tương ứng trong package chuẩn `fmt`, `log` là gì?
+
+Ngoài khác biệt ở câu trước,
+ba nhóm hàm còn có một số khác biệt khác.
+*.
+   Các hàm dựng sẵn `print`/`println`
+   ghi ra standard error.
+   Các hàm in trong package chuẩn `fmt`
+   ghi ra standard output.
+   Các hàm in trong package chuẩn `log`
+   mặc định ghi ra standard error,
+   nhưng có thể đổi bằng
+   hàm `log.SetOutput`.
+
+*.
+   Lời gọi `print`/`println` dựng sẵn
+   không thể nhận đối số array hay struct.
+*.
+   Với đối số kiểu tổ hợp,
+   các hàm dựng sẵn `print`/`println`
+   ghi địa chỉ các phần giá trị nền của đối số,
+   còn các hàm in trong `fmt` và `log`
+   cố gắng ghi literal của giá trị động thuộc các đối số interface.
+*.
+   Lời gọi `print`/`println` dựng sẵn
+   không khiến các giá trị được đối số tham chiếu
+   escape lên heap, còn các hàm in trong `fmt`
+   và `log` thì có thể làm vậy.
+*.
+   If an argument has a `String() string` or `Error() string`
+   method, the print trong `fmt` and `log`
+   các package chuẩn sẽ cố gọi method đó khi ghi đối số,
+   whereas các hàm dựng sẵn `print`/`println`
+   bỏ qua method của đối số.
+*.
+   The built-in `print`/`println` functions
+   không được bảo đảm tồn tại trong phiên bản Go tương lai.
+
+@@@ #math-crypto-rand
+###==========
+    Số ngẫu nhiên do `math/rand` và package chuẩn `crypto/rand` tạo ra khác nhau thế nào?
+
+Số giả ngẫu nhiên do package chuẩn `math/rand` tạo ra
+xác định với cùng một seed.
+Các số này không phù hợp với ngữ cảnh nhạy cảm về bảo mật.
+Để bảo đảm an toàn mật mã, nên dùng số giả ngẫu nhiên
+do package chuẩn `crypto/rand` tạo ra.
+
+@@@ #math-round
+###==========
+    Vì sao không có hàm `math.Round`?
+
+Có hàm `math.Round`, nhưng chỉ từ Go 1.10.
+Hai hàm mới `math.Round` và `math.RoundToEven`
+được bổ sung từ Go 1.10.
+
+Trước Go 1.10, người ta đã dành nhiều thời gian __thảo luận__ xem
+có nên thêm `math.Round` vào package chuẩn hay không.
+Cuối cùng, đề xuất được chấp thuận.
+
+    === thảo luận :: https://github.com/golang/go/issues/4594
+
+// hệ thống kiểu
+
+@@@ #incomparable-types
+###==========
+    Những kiểu nào không hỗ trợ so sánh?
+
+Các kiểu sau không hỗ trợ so sánh:
+*  map
+*  slice
+*  function
+*  kiểu struct có field không thể so sánh
+*  kiểu array có phần tử không thể so sánh
+
+Không thể dùng kiểu không hỗ trợ so sánh làm kiểu key của map.
+
+Lưu ý,
+*  dù kiểu map, slice và function không hỗ trợ so sánh,
+   giá trị của chúng vẫn so sánh được với identifier `nil`.
+*  __so sánh hai giá trị interface__
+   bằng `==` sẽ panic khi chạy nếu hai kiểu động của giá trị interface
+   giống nhau và không thể so sánh.
+
+    === so sánh hai giá trị interface :: interface.tmd#comparison
+
+Để biết vì sao kiểu slice, map và function không hỗ trợ so sánh,
+hãy đọc __câu trả lời này__ trong Go FAQ chính thức.
+
+    === câu trả lời này :: https://golang.org/doc/faq#map_keys
+
+@@@ #nil-equality
+###==========
+    Vì sao đôi khi hai giá trị `nil` không bằng nhau?
+
+//
+(__Câu trả lời__ trong Go FAQ chính thức
+cũng có thể giải đáp câu hỏi này.)
+
+    === Câu trả lời :: https://golang.org/doc/faq#nil_error
+
+Có thể xem interface value như một hộp chứa giá trị không phải interface.
+Chỉ giá trị có kiểu triển khai interface đó mới có thể được đóng gói vào interface value.
+Trong Go, zero value của một số kiểu được biểu diễn bằng identifier khai báo sẵn `nil`.
+Interface không chứa gì là zero interface value, còn gọi là nil interface value.
+Ngược lại, interface chứa giá trị nil không phải interface vẫn chứa một giá trị; vì thế nó không phải và không bằng nil interface.
+
+Khi so sánh nil interface với giá trị nil không phải interface (giả sử so sánh được),
+giá trị nil kia sẽ được chuyển sang kiểu nil interface trước khi so sánh.
+Kết quả chuyển đổi là interface value chứa bản sao giá trị đó.
+Interface kết quả không rỗng nên không phải và không bằng nil interface.
+
+Đọc __interfaces in Go__ và
+__nils in Go__ để xem giải thích chi tiết.
+
+    === interfaces trong Go :: interface.tmd
+    === nils trong Go :: nil.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var pi *int = nil
+	var pb *bool = nil
+	var x interface{} = pi
+	var y interface{} = pb
+	var z interface{} = nil
+
+	fmt.Println(x == y)   // false
+	fmt.Println(x == nil) // false
+	fmt.Println(y == nil) // false
+	fmt.Println(x == z)   // false
+	fmt.Println(y == z)   // false
+}
+'''
+
+@@@ #slice-conversion
+###==========
+    Vì sao kiểu `[]T1` và `[]T2` không có cùng underlying type
+    dù hai kiểu `T1` và `T2` có cùng underlying type?
+
+//
+(Có vẻ Go FAQ chính thức cũng mới thêm __một câu hỏi tương tự__.)
+
+    === câu hỏi tương tự :: https://golang.org/doc/faq#convert_slice_with_same_underlying_type
+
+Trong Go, giá trị kiểu slice có thể chuyển sang slice khác
+mà không dùng __cơ chế `unsafe`__ khi hai kiểu slice
+có cùng __underlying type__.
+(__Bài viết này__ liệt kê đầy đủ các quy tắc chuyển đổi giá trị.)
+
+    === cơ chế `unsafe` :: unsafe.tmd
+    === underlying type :: type-system-overview.tmd#underlying-type
+    === Bài viết này :: value-conversions-assignments-and-comparisons.tmd
+
+Underlying type của kiểu tổ hợp không định danh chính là kiểu tổ hợp đó.
+Vì vậy, dù `T1` và `T2` có cùng underlying type,
+`[]T1` và `[]T2` vẫn là hai kiểu khác nhau,
+nên underlying type của chúng khác nhau và không thể chuyển giá trị của kiểu này
+sang kiểu kia.
+
+Lý do underlying type của `[]T1` và `[]T2` khác nhau là:
+*  trong thực tế không có nhiều nhu cầu chuyển đổi qua lại giữa `[]T1` và `[]T2`.
+*  để __quy tắc truy vết underlying type__ đơn giản hơn.
+
+    === quy tắc truy vết underlying type :: type-system-overview.tmd#underlying-type
+
+Lý do tương tự đúng với các kiểu tổ hợp khác.
+Ví dụ, kiểu `map[T]T1` và `map[T]T2` cũng không cùng underlying type
+dù `T1` và `T2` có cùng underlying type.
+
+Có thể chuyển giá trị kiểu `[]T1` sang
+`[]T2` bằng cơ chế `unsafe`,
+nhưng nhìn chung không nên làm vậy:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+)
+
+func main() {
+	type MyInt int
+
+	var a = []int{7, 8, 9}
+	var b = *(*[]MyInt)(unsafe.Pointer(&a))
+	b[0]= 123
+	fmt.Println(a) // [123 8 9]
+	fmt.Println(b) // [123 8 9]
+	fmt.Printf("%T \n", a) // []int
+	fmt.Printf("%T \n", b) // []main.MyInt
+}
+'''
+
+@@@ #unaddressable-values
+###==========
+    Giá trị nào có thể và không thể lấy địa chỉ?
+
+Không thể lấy địa chỉ các giá trị sau:
+*  byte trong string
+*  phần tử map
+*  giá trị động của interface (lấy qua type assertion)
+*  giá trị hằng (bao gồm hằng có tên và literal)
+*  hàm cấp package
+*  method (khi dùng như function value)
+*  giá trị trung gian
+   -  lời gọi hàm
+   -  phép chuyển đổi giá trị tường minh
+   -  mọi phép toán trừ giải tham chiếu pointer, bao gồm:
+      +  thao tác nhận channel
+      +  thao tác lấy substring
+      +  thao tác lấy subslice
+      +  cộng, trừ, nhân, chia, v.v.
+
+@@@ .alert;alert-success
+{
+Lưu ý Go có cú pháp rút gọn `&T{}`.
+Đây là dạng viết ngắn của `tmp := T{}; (&tmp)`.
+Tuy nhiên, dù `&T{}` hợp lệ,
+literal `T{}` vẫn không thể lấy địa chỉ.
+}
+
+Có thể lấy địa chỉ các giá trị sau:
+*  biến
+*  field của struct lấy được địa chỉ
+*  phần tử của array lấy được địa chỉ
+*  phần tử của mọi slice (dù slice có lấy được địa chỉ hay không)
+*  phép giải tham chiếu pointer
+
+@@@ #map-elements-are-unaddressable
+###==========
+    Vì sao không thể lấy địa chỉ phần tử map?
+
+Lý do đầu tiên là điều đó xung đột với cơ chế quản lý bộ nhớ nội bộ của map.
+Trong Go, map được thiết kế là container có thể chứa số entry không giới hạn nếu còn bộ nhớ.
+Để truy cập phần tử map hiệu quả, trong Go runtime chính thức
+mỗi map chỉ quản lý một vùng nhớ liên tục chứa toàn bộ entry của nó.
+Do đó, Go runtime đôi khi phải cấp vùng nhớ lớn hơn cho map
+khi ngày càng nhiều entry được thêm vào.
+Trong quá trình đó, entry ở vùng nhớ cũ sẽ chuyển sang vùng nhớ mới.
+Một số nguyên nhân khác cũng có thể khiến entry di chuyển.
+Nói cách khác, khi cần, địa chỉ phần tử map sẽ thay đổi theo thời gian.
+Nếu được phép lấy địa chỉ phần tử map, mỗi khi entry bị di chuyển,
+Go runtime phải cập nhật mọi pointer đang lưu địa chỉ phần tử bị chuyển,
+khiến việc triển khai compiler và runtime phức tạp hơn, đồng thời giảm mạnh hiệu năng.
+Vì vậy, hiện không thể lấy địa chỉ phần tử map.
+
+Thứ hai, biểu thức truy cập map `aMap[key]` có thể
+trả về entry trong map hoặc không; nghĩa là `aMap[key]` vẫn có thể cho
+zero value sau khi gọi `(&aMap[key]).Modify()`. Điều này gây khó hiểu.
+(Ở đây `Modify()` là method giả định sửa giá trị `aMap[key]`.)
+
+@@@ #slice-elements-always-addressable
+###==========
+    Vì sao phần tử của slice khác nil luôn có thể lấy địa chỉ, dù bản thân slice không thể lấy địa chỉ?
+
+Kiểu nội bộ của slice là struct dạng như sau:
+@@@ .line-numbers
+''' go
+struct {
+	// elements tham chiếu tới một dãy phần tử.
+	elements unsafe.Pointer
+	length   int
+	capacity int
+}
+'''
+Bên trong, mỗi slice tham chiếu gián tiếp tới dãy phần tử nền.
+Dù slice khác nil không thể lấy địa chỉ,
+dãy phần tử nội bộ luôn được cấp phát ở đâu đó và có thể lấy địa chỉ.
+Thực chất lấy địa chỉ phần tử slice là lấy địa chỉ phần tử trong dãy nội bộ.
+Vì vậy phần tử của slice khác nil không thể lấy địa chỉ vẫn luôn lấy được địa chỉ.
+
+{ %%
+Vì lý do tương tự, thao tác substring trên string không thể lấy địa chỉ vẫn biên dịch được
+(với Go compiler chuẩn).
+Tuy nhiên tôi không chắc đặc tả Go có bảo đảm điều này không.
+}
+
+@@@ #method-set-relation
+###==========
+    Với mọi kiểu `T` không phải pointer hay interface,
+    vì sao method set của `*T` luôn bao hàm method set của `T`,
+    nhưng chiều ngược lại không đúng?
+
+Cả hai tình huống đều có cú pháp rút gọn, nhưng chỉ một trường hợp là quy tắc cốt lõi.
+
+*
+   Giá trị kiểu `T` có thể gọi method của `*T`,
+   nhưng chỉ khi giá trị `T` lấy được địa chỉ.
+   Compiler tự lấy địa chỉ giá trị `T`
+   trước khi gọi method có pointer receiver.
+   Vì kiểu `T` có thể có giá trị không lấy được địa chỉ,
+   không phải mọi giá trị kiểu `T` đều gọi được method của `*T`.
+   ;;;
+   **Đây chỉ là cú pháp tiện lợi, không phải quy tắc cốt lõi.**
+
+*
+   Giá trị kiểu `*T` luôn gọi được method của `T`.
+   Vì giải tham chiếu pointer luôn hợp lệ.
+   ;;;
+   **Đây không chỉ là cú pháp tiện lợi mà còn là quy tắc cốt lõi.**
+
+Vì vậy method set của `*T` luôn
+bao hàm method set của `T`, nhưng chiều ngược lại không đúng.
+
+Có thể hình dung rằng với mỗi method khai báo trên kiểu `T`,
+method ngầm định cùng tên và chữ ký cũng tự động được khai báo
+trên kiểu `*T`.
+Đọc __methods__ để biết chi tiết.
+
+    === methods :: method.tmd#implicit-pointer-methods
+
+@@@ .line-numbers
+''' go
+func (t T) MethodX(v0 ParamType0, ...) (ResultType0, ...) {
+	...
+}
+
+// An implicit method of *T is automatically defined as
+func (pt *T) MethodX(v0 ParamType0, ...) (ResultType0, ...) {
+	return (*pt).MethodX(v0, ...)
+}
+'''
+
+{ %%
+Nếu method khai báo trên kiểu `*T`, không thể khai báo method cùng tên
+trên `T` nữa.
+Đây cũng là một cách giải thích vì sao method set của `*T` luôn
+bao hàm method set của `T`, nhưng chiều ngược lại không đúng.
+}
+
+Đọc __câu trả lời này__ trong Go FAQ chính thức để xem giải thích thêm.
+
+    === câu trả lời này :: https://golang.org/doc/faq#different_method_sets
+
+@@@ #types-can-have-methods
+###==========
+    Có thể định nghĩa method cho kiểu nào?
+
+Đọc __methods in Go__ để biết chi tiết.
+
+    === methods trong Go :: method.tmd
+
+@@@ #declare-immutables
+###==========
+    Khai báo giá trị bất biến trong Go như thế nào?
+
+Có ba định nghĩa **// giá trị bất biến //**:
+*. giá trị không có địa chỉ (nên không thể lấy địa chỉ).
+*. giá trị có địa chỉ nhưng không thể lấy địa chỉ bằng cú pháp.
+*. giá trị lấy được địa chỉ nhưng không được phép sửa bằng cú pháp.
+
+Hiện tại (Go 1.25), Go không có giá trị nào thỏa định nghĩa thứ ba.
+Nói cách khác, định nghĩa thứ ba không được hỗ trợ.
+Tuy nhiên, biến thuộc kiểu kích thước 0 có thể được xem là giá trị bất biến trên thực tế (có thể lấy địa chỉ).
+
+Giá trị hằng có tên thỏa định nghĩa thứ nhất.
+
+Method và hàm cấp package cũng có thể xem là giá trị bất biến được khai báo.
+Chúng thỏa định nghĩa thứ hai.
+Byte trong string và entry map cũng thỏa định nghĩa thứ hai.
+
+Go không có cách khai báo giá trị bất biến có tên khác do người dùng định nghĩa.
+
+@@@ #set-container-type
+###==========
+    Vì sao Go không có kiểu container `set` dựng sẵn?
+
+Set thực chất là map nhưng không quan tâm đến giá trị phần tử.
+Trong Go, `map[Tkey]struct{}` thường được dùng làm kiểu set.
+
+@@@ #byte-rune-slice-string
+###==========
+    byte là gì? rune là gì?
+    Chuyển `[]byte` và `[]rune` sang string như thế nào?
+
+Trong Go, `byte` là alias của `uint8`.
+Nói cách khác, `byte` và `uint8` là cùng một kiểu.
+Điều tương tự đúng với `rune` và `int32`.
+
+`rune` thường dùng để lưu Unicode code point.
+
+Có thể chuyển trực tiếp, tường minh giá trị `[]byte` và `[]rune` sang string,
+và ngược lại.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var s0 = "Go"
+
+	var bs = []byte(s0)
+	var s1 = string(bs)
+
+	var rs = []rune(s0)
+	var s2 = string(rs)
+
+	fmt.Println(s0 == s1) // true
+	fmt.Println(s0 == s2) // true
+}
+'''
+
+Đọc __strings in Go__ để tìm hiểu thêm về string.
+
+    === strings trong Go :: string.tmd
+
+@@@ #pointer-atomic
+###==========
+    Thao tác nguyên tử với giá trị pointer như thế nào?
+
+Đọc __atomic operations for pointers__.
+
+    === thao tác nguyên tử với pointer :: concurrent-atomic-operation.tmd#pointer
+
+// khác
+
+@@@ #about-iota
+###==========
+    `iota` có nghĩa là gì?
+
+Iota là chữ cái thứ chín trong bảng chữ cái Hy Lạp.
+Trong Go, `iota` được dùng khi khai báo hằng.
+Trong mỗi nhóm khai báo hằng, giá trị của nó là `N`
+ở đặc tả hằng thứ **// N //** trong nhóm đó.
+Nhờ vậy có thể __khai báo các hằng liên quan__ dễ dàng.
+
+    === khai báo các hằng liên quan :: https://golang.org/ref/spec#Iota
+
+@@@ #check-if-channels-closed
+###==========
+    Vì sao không có hàm dựng sẵn `closed` để kiểm tra channel đã đóng chưa?
+
+Lý do là hàm này ít hữu ích nhưng nguy cơ bị dùng sai cao.
+Kết quả trả về của hàm có thể không phản ánh
+trạng thái mới nhất của channel đầu vào.
+Vì thế không nên dựa vào kết quả đó để quyết định.
+
+Nếu cần, bạn có thể dễ dàng tự viết hàm như vậy.
+Đọc __bài viết này__
+để biết cách viết hàm `closed` và cách tránh dùng nó.
+
+    === bài viết này :: channel-closing.tmd
+
+@@@ #return-local-pointers
+###==========
+    Hàm trả pointer tới biến cục bộ có an toàn không?
+
+Có, hoàn toàn an toàn trong Go.
+
+Go compiler hỗ trợ stack sẽ thực hiện escape analysis.
+Với Go compiler chuẩn, nếu escape analyzer cho rằng một vùng nhớ
+chắc chắn chỉ được dùng trong goroutine hiện tại, vùng nhớ được cấp phát
+trên stack. Nếu không, nó được cấp phát trên heap.
+Đọc __memory block__ để biết thêm.
+
+    === vùng nhớ :: memory-block.tmd
+
+@@@ #gopher
+###==========
+    Từ **// gopher //** có nghĩa gì trong cộng đồng Go?
+
+Trong cộng đồng Go, **// gopher //** nghĩa là lập trình viên Go.
+Biệt danh này có thể bắt nguồn từ việc ngôn ngữ Go
+chọn __gopher hoạt hình__ làm linh vật.
+Nhân tiện, hình gopher hoạt hình do // Renee French // thiết kế,
+bà là vợ của (người đầu tiên) lãnh đạo dự án Go, // Rob Pike //. 
+
+    === gopher hoạt hình :: https://blog.golang.org/gopher
+
+
+} // .summaries-items
+
+""""" //
+
+"Named type" là gì?
+* Đã lỗi thời.
+
+Vì sao không thể embed kiểu pointer có underlying type là pointer hoặc interface?
+* Lý do là, ngoại trừ pointer và interface, với mỗi kiểu T thuộc các nhóm kiểu khác,
+  method set của *T luôn bao hàm method set của T.
+  Để tránh nhầm lẫn, ...
+
+giải thích một số ngoại lệ và chi tiết.
+
+Vì sao vế trái của := chỉ được là identifier thuần túy?
+* s, s[0] = []int{1, 2}, 1. "s[0]" là phần tử của slice cũ hay slice mới? (không phải lý do thuyết phục)
+* Có một số đề xuất bỏ giới hạn này.
+
+Vì sao hàm fmt.Print khiến đối số escape lên heap.
+
+todo: bổ sung liên kết Go Nuts/issue liên quan cho mỗi câu hỏi.
+
+todo: lập chỉ mục cả các câu hỏi FAQ chính thức.
+
+Có thể recover khi gặp lỗi hết bộ nhớ không?
+* https://github.com/golang/go/issues/14162
+* https://github.com/golang/go/issues/16843
+* https://groups.google.com/forum/#!topic/golang-dev/wUEWhk2jtHM
+* https://github.com/golang/go/blob/master/src/runtime/HACKING.md#error-handling-and-reporting
+
+time.Format: các số 01 02 03 04 05 06 07 có nghĩa gì?
+
+Vì sao json marshal không cho kết quả: các field chưa được export.
+
+Vì sao trong Go kiểu size là int chứ không phải uint?
+size_t trong Go là int thay vì uint, ..., thiết kế tốt.
+
+Vì sao Go không hỗ trợ import vòng như C++ và Java?
+Đây chỉ là một trong nhiều sự đánh đổi trong Go.
+
+Vì sao không có hàm lấy underlying type của một kiểu
+https://groups.google.com/forum/#!searchin/golang-nuts/reflect$3A$20get$20underlying$20type|sort:relevance/golang-nuts/BJEuegjQtEA/q2S3b6JxY1MJ
+
+https://www.reddit.com/r/golang/comments/8m4xrh/do_linux_golang_binaries_depend_on_libc/
+
+Vì sao type assertion có ok mà vẫn panic?
+* Dù Go hướng tới tính nhất quán tổng thể, một số chi tiết vẫn thiếu nhất quán.
+* Lý do lịch sử ...
+
+Vì sao kiểu pointer có tên không có và không thể tự định nghĩa method?
+
+Vì sao break và fallthrough không được phép trong type switch và select?
+Vì sao fallthrough không được phép trong select và type switch?
+https://github.com/golang/go/issues/25676#issuecomment-393734800
+(Có thể làm được nếu nhánh tiếp theo là default hoặc không khai báo biến,
+nhưng để nhất quán, ...)
+
+
+
+Một số chi tiết về goto?
+* https://github.com/golang/go/issues/26058#issuecomment-501741325
+
+https://old.reddit.com/r/golang/comments/crdwcv/is_it_possible_to_run_a_go_binaryprogram_without/
+Các thư viện đó rốt cuộc dùng cgo và giao tiếp với thư viện động có trên máy chủ. Dùng ldd <binary> để xem binary liên kết với những thư viện động nào.
+Chúng chỉ làm vậy với các thư viện phổ biến mà họ cho rằng hầu hết máy chủ đều có (glibc / uclibc), nhưng vẫn cần lưu ý rằng không phải toàn bộ stdlib đều hoàn toàn tĩnh.
+https://github.com/golang/go/issues/25670
+https://github.com/golang/go/issues/33673 : khi cross-compile, CGO_ENABLED mặc định là 0.
+
+FAQ:
+* Vì sao reflect có thể liệt kê field không export?
+  * Field không export có thể chứa field export.
+    Nếu không thì không có cách nào liệt kê các field export.
+
+* Địa chỉ của giá trị Go có bao giờ thay đổi trong vòng đời không?
+  Điều này phụ thuộc compiler và phiên bản compiler.
+  Stack có thể di chuyển.
+* Các package chuẩn có thực sự "chuẩn" không?
+  Không hẳn.
+  Ở một mức độ nào đó, package chuẩn gắn với Go toolchain được phân phối cùng chúng.
+  https://stackoverflow.com/questions/22195919/does-go-guarantee-constant-addresses
+  * wg align
+  * atomic order guarantee
+
+Khai báo định nghĩa kiểu và khai báo type alias khác nhau thế nào?
+* Khai báo định nghĩa kiểu không kế thừa trực tiếp method set.
+* Không thể embed kiểu pointer có underlying type là interface hoặc pointer.
+* Method receiver dùng alias sẽ khai báo method trên kiểu được alias đại diện.
+
+Dùng panic và os.Exit để thoát chương trình khác nhau thế nào?
+   Các lời gọi defer sẽ được thực thi
+   sau khi panic, nhưng không phải khi gọi os.Exit.
+Lưu ý: các hàm log.Fatal gọi os.Exit.
+
+Vì sao constString[i] và constString[i:j] không phải hằng?
+
+Phần modules:
+* Vì sao go.mod có định dạng mới: https://github.com/golang/go/issues/23966#issuecomment-377997161
+
+Vì sao map và slice không thể so sánh?
+* https://github.com/golang/go/issues/23725
+  https://github.com/golang/go/issues/38377
+  và một số lý do nêu trong reflect.DeepEqual
+* quy tắc xác định
+  * xét ở vai trò map key, các phần được đem so sánh không nên sửa đổi; nếu không sẽ gây nhầm lẫn.
+  * xét về tính bằng nhau, nhiều người thích cho rằng hai slice bằng nhau khi các phần tử của chúng bằng nhau.
+* Nếu tính cả phần tử (cách nhiều người ưa thích), map và slice khi dùng làm map key có thể thay đổi.
+  Nói cách khác, comparable <=> không cần quan tâm đến copy.
+Vì sao function value không thể so sánh?
+* Một số chi tiết chưa rõ: promoted method value chưa được quy định đầy đủ.
+                       method interface có được so sánh với method cụ thể không? 
+
+Vì sao không dùng pkg::Exported?
+   array[pkg::exported] có thể gây khó khăn khi phân tích cú pháp?
+
+Vì sao có quy tắc suy luận kiểu đặc biệt cho phép shift?
+* ..., nếu nhìn theo cách này thì mọi thứ đều tự nhiên; nếu không sẽ thấy kỳ lạ.
+
+Directive "go 1.N" trong go.mod có nghĩa gì?
+* https://stackoverflow.com/questions/58204618/what-are-the-implications-of-using-the-go-version-directive-within-a-go-module
+* https://github.com/golang/go/issues/30791
+
+tham chiếu biến trong vòng lặp/hàm:
+* https://github.com/golang/go/issues/43741
+
+Lấy GOPATH và GOROOT từ code như thế nào?
+	go/build.Default.GOPATH/GOROOT
+
+package x và x_test khác nhau thế nào?
+https://groups.google.com/g/golang-nuts/c/ajUuSF78wZU
+
+

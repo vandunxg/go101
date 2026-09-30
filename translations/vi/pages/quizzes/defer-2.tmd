@@ -1,0 +1,64 @@
+
+##### defer 2
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func bar() (r int) {
+	defer func() {
+		r += 4
+		if recover() != nil {
+			r += 8
+		}
+	}()
+	
+	var f func()
+	defer f()
+	f = func() {
+		r += 2
+	}
+
+	return 1
+}
+
+func main() {
+	println(bar())
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+1
+7
+12
+13
+"""
+
+
+@@@ #answer
+{
+Đáp án: 13
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/DV4k3pVhS4k __.
+
+Các điểm chính:
+*
+   Dòng 12: khi lời gọi `f()` được đưa vào hàng đợi lời gọi `defer`,
+   `f` được đánh giá thành nil. Gọi một hàm nil sẽ gây panic.
+   Nhưng panic không xảy ra khi lời gọi được đưa vào hàng đợi.
+   Thay vào đó, panic xảy ra sau này, khi lời gọi được thực thi trong giai đoạn kết thúc lời gọi `bar()`.
+*
+   Dòng 13-15: phép gán cho `f` không ảnh hưởng đến quá trình thực thi.
+   Nói cách khác, phép gán này thực chất không làm gì.
+*
+   Dòng 4-9: một lời gọi `defer` có thể sửa đổi giá trị trả về có tên của hàm chứa nó (ở đây là hàm `bar`).
+
+}
+

@@ -1,0 +1,35 @@
+
+### Làm thế nào để duyệt các rune trong một string?
+
+Trong Go, string được giả định là mã hóa theo UTF-8.
+Chỉ cần dùng `for-range` trên một string để lấy các rune (mã điểm Unicode) trong string.
+
+''' Go
+	for i, rune := range aString {
+		... // dùng rune
+	}
+'''
+
+Một rune có thể gồm 1-4 byte (được gọi là độ dài của rune)
+trong mã hóa UTF-8.
+Ở đây, `i` là chỉ số bắt đầu của các byte thuộc rune.
+Có thể lấy kích thước (số byte) của từng rune, nhưng cách làm không được thuận tiện lắm.
+Cách sau đây thuận tiện hơn để lấy kích thước rune:
+
+''' Go
+import "unicode/utf8"
+
+	var str = aString
+	for {
+		rune, size := utf8.DecodeRuneInString(str)
+		if size == 0 {
+			break
+		}
+		str = str[size:]
+		
+		... // dùng rune
+	}
+'''
+
+
+

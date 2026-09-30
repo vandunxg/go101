@@ -1,0 +1,82 @@
+##### vòng lặp 1
+
+@@@ #question
+{
+Chương trình sau in ra nội dung gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	x := []int{7, 8, 9}
+	y := [3]*int{}
+	for i, v := range x {
+		defer func() {
+			print(v)
+		}()
+		y[i] = &i
+	}
+	print(*y[0], *y[1], *y[2], " ")
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+012 789
+012 987
+222 789
+222 999
+"""
+
+
+@@@ #answer
+{
+Đáp án: 222 999 (trước Go 1.22), 012 987 (từ Go 1.22)
+
+Chạy chương trình trên __ Go Playground`` https://go.dev/play/p/fRZCVPt0i8f __.
+
+Các điểm chính:
+*
+   Trước Go 1.22, các biến vòng lặp (ở đây là `i` và `v`)
+   được dùng chung ở mọi bước lặp. Nói cách khác, trong suốt quá trình chạy vòng lặp,
+   mỗi biến vòng lặp chỉ có một instance.
+   Điều đó có nghĩa là mọi phần tử của `y`
+   đều lưu cùng một địa chỉ (địa chỉ của giá trị `v`).
+   Cuối cùng, biến `i` có giá trị `2`,
+   còn biến `v` có giá trị `9`.
+
+Vì vậy, trước Go 1.22, kết quả in ra là 222 999.
+
+*
+   Từ Go 1.22, các biến vòng lặp (ở đây là `i` và `v`)
+   sẽ có instance mới ở mỗi bước lặp. Vì vậy, từ Go 1.22, kết quả in ra là 222 999.
+
+
+
+Khác với chương trình trên, chương trình sau luôn in ra `012 987`,
+cả trước lẫn từ Go 1.22.
+
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	x := []int{7, 8, 9}
+	y := [3]*int{}
+	for i, v := range x {
+		defer print(v)
+		
+		i := i
+		y[i] = &i
+	}
+	print(*y[0], *y[1], *y[2], " ")
+}
+'''
+
+}
+
+

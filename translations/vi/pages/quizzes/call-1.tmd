@@ -1,0 +1,51 @@
+##### Lời gọi hàm 1
+
+@@@ #question
+{
+
+Chương trình sau hoạt động như thế nào?
+
+@@@ .line-numbers
+''' go
+package main
+
+func f(vs ...interface{}) {
+	print(len(vs))
+}
+
+func main() {
+	f()
+	f(nil)
+	f(nil...)
+}
+'''
+}
+
+
+Lựa chọn:
+
+""" go101-quiz
+Chương trình in ra: 0 0 0.
+Chương trình in ra: 0 1 0.
+Chương trình in ra: 0 1 1.
+Chương trình không biên dịch được.
+"""
+
+
+@@@ #answer
+{
+Đáp án: Chương trình in ra `0 1 0`.
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/5CW6f2UatfF __.
+
+Điểm chính:
+*
+   `nil` trong `f(nil...)` được xem là một slice nil (kiểu `[]interface{}`).
+*
+   `nil` trong `f(nil)` được xem là một phần tử trong slice.
+   Lời gọi `f(nil)` tương đương với `f([]interface{}{nil}...)`.
+*
+   Lời gọi `f()` tương đương với `f(nil...)`.
+
+
+}

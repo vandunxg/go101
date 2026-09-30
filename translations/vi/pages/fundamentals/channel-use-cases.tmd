@@ -1,0 +1,1791 @@
+### Các trường hợp sử dụng channel
+
+Trước khi đọc bài này, hãy đọc bài __channel trong Go__,
+giải thích chi tiết về các kiểu và giá trị channel.
+Người mới học Go có thể cần đọc hai bài này vài lần
+để nắm vững cách lập trình với channel trong Go.
+
+    === channel trong Go :: channel.tmd
+
+Phần còn lại của bài viết trình bày nhiều trường hợp sử dụng channel.
+Tôi hy vọng bài viết này sẽ giúp bạn thấy rằng
+*
+   lập trình bất đồng bộ và concurrency bằng channel trong Go rất dễ và thú vị.
+*
+   kỹ thuật đồng bộ bằng channel có phạm vi ứng dụng rộng hơn
+   và nhiều biến thể hơn các giải pháp đồng bộ trong một số ngôn ngữ khác,
+   chẳng hạn như __mô hình actor__ và __mẫu async/await__.
+
+    === mô hình actor :: https://en.wikipedia.org/wiki/Actor_model
+    === mẫu async/await :: https://en.wikipedia.org/wiki/Async/await
+
+Xin lưu ý, mục đích bài viết này là trình bày
+nhiều trường hợp sử dụng channel nhất có thể.
+Channel không phải kỹ thuật đồng bộ concurrency duy nhất Go hỗ trợ,
+và trong một số trường hợp, dùng channel có thể không phải cách tốt nhất.
+Hãy đọc __các thao tác atomic__ và __một số kỹ thuật đồng bộ khác__
+để tìm hiểu thêm các kỹ thuật đồng bộ concurrency trong Go.
+
+    === các thao tác atomic :: concurrent-atomic-operation.tmd
+    === một số kỹ thuật đồng bộ khác :: concurrent-synchronization-more.tmd
+
+@@@ #future-promise
+###=========== Dùng channel như future/promise
+
+Future và promise được dùng trong nhiều ngôn ngữ phổ biến khác.
+Chúng thường gắn với request và response.
+
+###----------- Trả về channel chỉ nhận làm kết quả
+
+Trong ví dụ sau, các giá trị của hai đối số trong lời gọi hàm
+`sumSquares` được yêu cầu đồng thời.
+Mỗi thao tác nhận từ channel sẽ block đến khi
+có thao tác gửi trên channel tương ứng.
+Kết quả cuối cùng trả về sau khoảng ba giây thay vì sáu giây.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func longTimeRequest() <-chan int32 {
+	r := make(chan int32)
+
+	go func() {
+		// Mô phỏng một workload.
+		time.Sleep(time.Second * 3)
+		r <- rand.Int31n(100)
+	}()
+
+	return r
+}
+
+func sumSquares(a, b int32) int32 {
+	return a*a + b*b
+}
+
+func main() {
+	a, b := longTimeRequest(), longTimeRequest()
+	fmt.Println(sumSquares(<-a, <-b))
+}
+'''
+
+###----------- Truyền channel chỉ gửi làm đối số
+
+Tương tự ví dụ trước,
+trong ví dụ sau, các giá trị của hai đối số trong lời gọi hàm
+`sumSquares` được yêu cầu đồng thời.
+Khác với ví dụ trước, hàm `longTimeRequest`
+nhận channel chỉ gửi làm tham số thay vì
+trả về kết quả là channel chỉ nhận.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func longTimeRequest(r chan<- int32)  {
+	// Mô phỏng một workload.
+	time.Sleep(time.Second * 3)
+	r <- rand.Int31n(100)
+}
+
+func sumSquares(a, b int32) int32 {
+	return a*a + b*b
+}
+
+func main() {
+	ra, rb := make(chan int32), make(chan int32)
+	go longTimeRequest(ra)
+	go longTimeRequest(rb)
+
+	fmt.Println(sumSquares(<-ra, <-rb))
+}
+'''
+
+Thực ra, với ví dụ trên,
+ta không cần hai channel để truyền kết quả.
+Dùng một channel là được.
+
+@@@ .line-numbers
+''' go
+...
+
+	// Channel có thể có buffer hoặc không.
+	results := make(chan int32, 2)
+	go longTimeRequest(results)
+	go longTimeRequest(results)
+
+	fmt.Println(sumSquares(<-results, <-results))
+}
+'''
+
+Đây là một dạng tổng hợp dữ liệu sẽ được giới thiệu riêng bên dưới.
+
+@@@ #first-response-wins
+###----------- Phản hồi đến trước thắng
+
+Đây là phiên bản cải tiến của biến thể chỉ dùng một channel trong ví dụ trước.
+
+Đôi khi, có thể nhận một mẩu dữ liệu từ nhiều nguồn để giảm độ trễ.
+Vì nhiều yếu tố, thời gian phản hồi của các nguồn có thể khác nhau đáng kể.
+Ngay cả với cùng một nguồn cụ thể, thời gian phản hồi cũng không cố định.
+Để thời gian phản hồi ngắn nhất có thể,
+ta có thể gửi request tới từng nguồn trong một goroutine riêng.
+Chỉ dùng phản hồi đến đầu tiên; các phản hồi chậm hơn sẽ bị bỏ qua.
+
+Lưu ý, nếu có // N // nguồn thì sức chứa của
+communication channel phải ít nhất bằng // N-1 //,
+để các goroutine gửi phản hồi bị bỏ qua không bị block mãi mãi.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func source(c chan<- int32) {
+	ra, rb := rand.Int31(), rand.Intn(3) + 1
+	// Ngủ 1s/2s/3s.
+	time.Sleep(time.Duration(rb) * time.Second)
+	c <- ra
+}
+
+func main() {
+	startTime := time.Now()
+	// c phải là buffered channel.
+	c := make(chan int32, 5)
+	for i := 0; i < cap(c); i++ {
+		go source(c)
+	}
+	// Chỉ dùng phản hồi đến đầu tiên.
+	rnd := <- c
+	fmt.Println(time.Since(startTime))
+	fmt.Println(rnd)
+}
+'''
+
+Có một số cách khác để triển khai trường hợp phản hồi đến trước thắng,
+bằng cách dùng cơ chế select và buffered channel
+có sức chứa bằng một. Các cách này sẽ được giới thiệu bên dưới.
+
+###----------- Các biến thể request-response khác
+
+Các channel tham số và kết quả có thể được buffer để
+phía phản hồi không phải chờ phía request lấy các giá trị đã truyền.
+
+Đôi khi, request không đảm bảo sẽ nhận được một giá trị hợp lệ.
+Vì nhiều lý do, thay vào đó có thể trả về lỗi.
+Trong trường hợp này, ta có thể dùng kiểu struct như
+`struct{v T; err error}` hoặc kiểu interface rỗng
+làm kiểu phần tử của channel.
+
+Đôi khi, vì lý do nào đó, phản hồi có thể mất
+lâu hơn dự kiến mới tới, hoặc không bao giờ tới.
+Ta có thể dùng cơ chế timeout được giới thiệu bên dưới
+để xử lý tình huống như vậy.
+
+Đôi khi, phía phản hồi có thể trả về một chuỗi giá trị;
+đây là một dạng cơ chế data flow sẽ được nhắc đến sau.
+
+@@@ #notification
+###=========== Dùng channel để gửi thông báo
+
+Có thể xem notification là request/response đặc biệt,
+trong đó giá trị phản hồi không quan trọng.
+Thông thường, ta dùng kiểu struct rỗng `struct{}`
+làm kiểu phần tử của các channel notification,
+vì kích thước kiểu `struct{}` bằng 0,
+nên các giá trị `struct{}` không chiếm bộ nhớ.
+
+###----------- Notification 1-1 bằng cách gửi giá trị vào channel
+
+Nếu không có giá trị nào để nhận từ channel,
+thao tác nhận tiếp theo sẽ block
+cho đến khi goroutine khác gửi một giá trị vào đó.
+Vì vậy, ta có thể gửi giá trị vào channel để thông báo cho goroutine khác
+đang chờ nhận giá trị từ chính channel ấy.
+
+Trong ví dụ sau, channel `done`
+được dùng làm signal channel để gửi notification.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"crypto/rand"
+	"fmt"
+	"os"
+	"sort"
+)
+
+func main() {
+	values := make([]byte, 32 * 1024 * 1024)
+	if _, err := rand.Read(values); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	done := make(chan struct{}) // có thể có buffer hoặc không
+
+	// Goroutine sắp xếp
+	go func() {
+		sort.Slice(values, func(i, j int) bool {
+			return values[i] < values[j]
+		})
+		// Thông báo đã sắp xếp xong.
+		done <- struct{}{}
+	}()
+
+	// thực hiện một số việc khác ...
+
+	<- done // chờ notification tại đây
+	fmt.Println(values[0], values[len(values)-1])
+}
+'''
+
+
+###----------- Notification 1-1 bằng cách nhận giá trị từ channel
+
+Nếu hàng đợi buffer giá trị của channel đã đầy
+(hàng đợi buffer của unbuffered channel luôn đầy),
+thao tác gửi trên channel sẽ block
+cho đến khi goroutine khác nhận giá trị từ channel.
+Vì vậy, ta có thể nhận giá trị từ channel để thông báo cho goroutine khác
+đang chờ gửi vào chính channel đó.
+Thông thường, channel nên là unbuffered channel.
+
+Cách notification này ít được dùng hơn nhiều so với
+cách được giới thiệu trong ví dụ trước.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	done := make(chan struct{})
+		// Sức chứa của signal channel cũng có thể
+		// bằng một. Nếu vậy, cần gửi một giá trị vào channel
+		// trước khi tạo goroutine bên dưới.
+		
+
+	go func() {
+		fmt.Print("Hello")
+		// Mô phỏng một workload.
+		time.Sleep(time.Second * 2)
+
+		// Nhận giá trị từ channel done
+		// để bỏ block thao tác gửi thứ hai
+		// trong goroutine main.
+		<- done
+	}()
+
+	// Bị block tại đây để chờ notification.
+	done <- struct{}{}
+	fmt.Println(" world!")
+}
+'''
+
+Thực ra, không có khác biệt căn bản giữa
+việc nhận và gửi giá trị để tạo notification.
+Có thể khái quát cả hai như sau: bên nhanh hơn thông báo cho bên chậm hơn.
+
+###----------- Notification N-1 và 1-N
+
+Chỉ cần mở rộng đôi chút hai trường hợp trên,
+ta có thể dễ dàng tạo notification N-1 và 1-N.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "log"
+import "time"
+
+type T = struct{}
+
+func worker(id int, ready <-chan T, done chan<- T) {
+	<-ready // block tại đây để chờ notification
+	log.Print("Worker#", id, " starts.")
+	// Mô phỏng một workload.
+	time.Sleep(time.Second * time.Duration(id+1))
+	log.Print("Worker#", id, " job done.")
+	// Thông báo cho goroutine main (N-1),
+	done <- T{}
+}
+
+func main() {
+	log.SetFlags(0)
+
+	ready, done := make(chan T), make(chan T)
+	go worker(0, ready, done)
+	go worker(1, ready, done)
+	go worker(2, ready, done)
+
+	// Mô phỏng giai đoạn khởi tạo.
+	time.Sleep(time.Second * 3 / 2)
+	// Notification 1-N.
+	ready <- T{}; ready <- T{}; ready <- T{}
+	// Nhận notification N-1.
+	<-done; <-done; <-done
+}
+'''
+
+Thực tế, các cách tạo notification 1-N và N-1 trong tiểu mục này
+không phổ biến.
+Ta thường dùng `sync.WaitGroup` để tạo notification N-1,
+và đóng channel để tạo notification 1-N.
+Hãy đọc tiểu mục tiếp theo để biết chi tiết.
+
+###----------- Broadcast notification 1-N bằng cách đóng channel
+
+Cách tạo notification 1-N trong tiểu mục trước
+hiếm khi được dùng vì có cách tốt hơn.
+Tận dụng đặc điểm có thể nhận vô hạn giá trị
+từ channel đã đóng, ta có thể đóng channel để broadcast notification.
+
+Dựa trên ví dụ trong tiểu mục trước,
+ta có thể thay ba thao tác gửi vào channel
+`ready <- struct{}{}` trong ví dụ đó
+bằng một thao tác đóng channel `close(ready)`
+để tạo notification 1-N.
+
+@@@ .line-numbers
+''' go
+...
+	close(ready) // broadcast notification
+...
+'''
+
+Ta cũng có thể đóng channel để tạo notification 1-1.
+Thực tế, đây là cách notification được dùng nhiều nhất trong Go.
+
+Đặc điểm có thể nhận vô hạn giá trị từ channel đã đóng
+sẽ được tận dụng trong nhiều trường hợp bên dưới.
+Đặc điểm này được dùng rộng rãi trong các package chuẩn.
+Ví dụ, package `context` dùng nó để xác nhận việc hủy.
+
+@@@ #timer
+###----------- Timer: notification theo lịch
+
+Dùng channel để triển khai timer chạy một lần rất đơn giản.
+
+Cách triển khai one-time timer tùy chỉnh:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func AfterDuration(d time.Duration) <- chan struct{} {
+	c := make(chan struct{}, 1)
+	go func() {
+		time.Sleep(d)
+		c <- struct{}{}
+	}()
+	return c
+}
+
+func main() {
+	fmt.Println("Hi!")
+	<- AfterDuration(time.Second)
+	fmt.Println("Hello!")
+	<- AfterDuration(time.Second)
+	fmt.Println("Bye!")
+}
+'''
+
+Thực tế, hàm `After` trong package chuẩn `time`
+cung cấp chức năng tương tự với cách triển khai hiệu quả hơn nhiều.
+Nên dùng hàm đó để code gọn hơn.
+
+Lưu ý, `<-time.After(aDuration)` khiến goroutine hiện tại
+chuyển sang trạng thái blocking, còn `time.Sleep(aDuration)` thì không.
+
+`<-time.After(aDuration)` thường được dùng
+trong cơ chế timeout sẽ giới thiệu bên dưới.
+
+@@@ #mutex
+###=========== Dùng channel làm mutex lock
+
+Một ví dụ phía trên đã nhắc rằng buffered channel có sức chứa một
+có thể được dùng làm __binary semaphore__ một lần.
+Thực tế, các channel này cũng có thể dùng làm binary semaphore nhiều lần,
+còn gọi là mutex lock, dù chúng kém hiệu quả hơn
+mutex trong package chuẩn `sync`.
+
+    === binary semaphore :: https://en.wikipedia.org/wiki/Semaphore_(programming)
+
+Có hai cách dùng buffered channel sức chứa một làm mutex lock.
+*.
+   Lock bằng thao tác gửi, unlock bằng thao tác nhận.
+*.
+   Lock bằng thao tác nhận, unlock bằng thao tác gửi.
+
+Sau đây là ví dụ lock bằng thao tác gửi.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	// Sức chứa phải bằng một.
+	mutex := make(chan struct{}, 1)
+
+	counter := 0
+	increase := func() {
+		mutex <- struct{}{} // lock
+		counter++
+		<-mutex // unlock
+	}
+
+	increase1000 := func(done chan<- struct{}) {
+		for i := 0; i < 1000; i++ {
+			increase()
+		}
+		done <- struct{}{}
+	}
+
+	done := make(chan struct{})
+	go increase1000(done)
+	go increase1000(done)
+	<-done; <-done
+	fmt.Println(counter) // 2000
+}
+'''
+
+Sau đây là ví dụ lock bằng thao tác nhận.
+Ví dụ chỉ hiển thị phần thay đổi so với ví dụ lock bằng thao tác gửi ở trên.
+
+@@@ .line-numbers
+''' go
+...
+func main() {
+	mutex := make(chan struct{}, 1)
+	mutex <- struct{}{} // cần có dòng này.
+
+	counter := 0
+	increase := func() {
+		<-mutex // lock
+		counter++
+		mutex <- struct{}{} // unlock
+	}
+...
+'''
+
+@@@ #semaphore
+###=========== Dùng channel làm counting semaphore
+
+Buffered channel có thể được dùng làm __counting semaphore__.
+Có thể xem counting semaphore là lock có nhiều chủ sở hữu.
+Nếu channel có sức chứa `N`, có thể xem nó như
+lock có tối đa `N` chủ sở hữu cùng lúc.
+Binary semaphore (mutex) là counting semaphore đặc biệt;
+mỗi binary semaphore có tối đa một chủ sở hữu tại một thời điểm.
+
+    === counting semaphores :: https://en.wikipedia.org/wiki/Semaphore_(programming)
+
+Counting semaphore thường được dùng để giới hạn số request đồng thời.
+
+Tương tự khi dùng channel làm mutex, cũng có hai cách lấy một suất sở hữu channel semaphore.
+*.
+   Lấy quyền sở hữu bằng thao tác gửi, giải phóng bằng thao tác nhận.
+*.
+   Lấy quyền sở hữu bằng thao tác nhận, giải phóng bằng thao tác gửi.
+
+Ví dụ lấy quyền sở hữu bằng cách nhận giá trị từ channel.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"time"
+)
+
+type Seat int
+type Bar chan Seat
+
+func (bar Bar) ServeCustomer(c int) {
+	log.Print("customer#", c, " enters the bar")
+	seat := <- bar // cần ghế để uống
+	log.Print("++ customer#", c, " drinks at seat#", seat)
+	time.Sleep(time.Second * time.Duration(2 + rand.Intn(6)))
+	log.Print("-- customer#", c, " frees seat#", seat)
+	bar <- seat // trả ghế và rời quán
+}
+
+func main() {
+	// quán có 10 ghế.
+	bar24x7 := make(Bar, 10)
+	// đặt ghế trong quán.
+	for seatId := 0; seatId < cap(bar24x7); seatId++ {
+		// Không thao tác gửi nào bị block.
+		bar24x7 <- Seat(seatId)
+	}
+
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second)
+		go bar24x7.ServeCustomer(customerId)
+	}
+
+	// sleep != blocking
+	for {time.Sleep(time.Second)}
+}
+'''
+
+Trong ví dụ trên, chỉ khách lấy được ghế mới có thể uống.
+Vì vậy, tại một thời điểm sẽ có tối đa mười khách đang uống.
+
+Vòng `for` cuối cùng trong hàm `main`
+ngăn chương trình thoát.
+Bên dưới sẽ giới thiệu cách tốt hơn để làm việc này.
+
+Trong ví dụ trên,
+dù tại một thời điểm chỉ có tối đa mười khách đang uống,
+vẫn có thể có hơn mười khách được phục vụ cùng lúc.
+Một số khách đang chờ ghế trống.
+Mỗi goroutine khách tiêu tốn ít tài nguyên hơn nhiều so với system thread,
+nhưng tổng tài nguyên của số lượng lớn goroutine vẫn đáng kể.
+Vì vậy, tốt nhất chỉ tạo goroutine khách khi có ghế trống.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+... // cùng code như ví dụ phía trên
+
+func (bar Bar) ServeCustomerAtSeat(c int, seat Seat) {
+	log.Print("++ customer#", c, " drinks at seat#", seat)
+	time.Sleep(time.Second * time.Duration(2 + rand.Intn(6)))
+	log.Print("-- customer#", c, " frees seat#", seat)
+	bar <- seat // trả ghế và rời quán
+}
+
+func main() {
+	bar24x7 := make(Bar, 10)
+	for seatId := 0; seatId < cap(bar24x7); seatId++ {
+		bar24x7 <- Seat(seatId)
+	}
+
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second)
+		// Cần ghế để phục vụ khách tiếp theo.
+		seat := <- bar24x7
+		go bar24x7.ServeCustomerAtSeat(customerId, seat)
+	}
+	for {time.Sleep(time.Second)}
+}
+'''
+
+Trong phiên bản tối ưu ở trên sẽ có nhiều nhất khoảng mười goroutine khách
+cùng tồn tại (nhưng trong suốt vòng đời chương trình vẫn sẽ
+tạo ra nhiều goroutine khách).
+
+Trong cách triển khai hiệu quả hơn bên dưới, tối đa
+mười goroutine phục vụ khách sẽ được tạo trong suốt vòng đời chương trình.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+... // cùng code như ví dụ phía trên
+
+func (bar Bar) ServeCustomerAtSeat(consumers chan int) {
+	for c := range consumers {
+		seatId := <- bar
+		log.Print("++ customer#", c, " drinks at seat#", seatId)
+		time.Sleep(time.Second * time.Duration(2 + rand.Intn(6)))
+		log.Print("-- customer#", c, " frees seat#", seatId)
+		bar <- seatId // trả ghế và rời quán
+	}
+}
+
+func main() {
+	bar24x7 := make(Bar, 10)
+	for seatId := 0; seatId < cap(bar24x7); seatId++ {
+		bar24x7 <- Seat(seatId)
+	}
+
+	consumers := make(chan int)
+	for i := 0; i < cap(bar24x7); i++ {
+		go bar24x7.ServeCustomerAtSeat(consumers)
+	}
+	
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second)
+		consumers <- customerId
+	}
+}
+'''
+
+Ngoài lề: nếu không quan tâm đến ID ghế (điều thường gặp trong thực tế),
+thì semaphore `bar24x7` hoàn toàn không cần thiết:
+
+@@@ .line-numbers;must-line-numbers
+''' go
+... // cùng code như ví dụ phía trên
+
+func ServeCustomer(consumers chan int) {
+	for c := range consumers {
+		log.Print("++ customer#", c, " drinks at the bar")
+		time.Sleep(time.Second * time.Duration(2 + rand.Intn(6)))
+		log.Print("-- customer#", c, " leaves the bar")
+	}
+}
+
+func main() {
+	const BarSeatCount = 10
+	consumers := make(chan int)
+	for i := 0; i < BarSeatCount; i++ {
+		go ServeCustomer(consumers)
+	}
+	
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second)
+		consumers <- customerId
+	}
+}
+'''
+
+Cách lấy quyền sở hữu semaphore bằng thao tác gửi tương đối đơn giản hơn.
+Không cần bước đặt ghế.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"time"
+)
+
+type Customer struct{id int}
+type Bar chan Customer
+
+func (bar Bar) ServeCustomer(c Customer) {
+	log.Print("++ customer#", c.id, " starts drinking")
+	time.Sleep(time.Second * time.Duration(3 + rand.Intn(16)))
+	log.Print("-- customer#", c.id, " leaves the bar")
+	<- bar // rời quán và giải phóng chỗ
+}
+
+func main() {
+	// Quán có thể phục vụ tối đa 10 khách
+	// cùng lúc.
+	bar24x7 := make(Bar, 10)
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second * 2)
+		customer := Customer{customerId}
+		// Chờ vào quán.
+		bar24x7 <- customer
+		go bar24x7.ServeCustomer(customer)
+	}
+	for {time.Sleep(time.Second)}
+}
+'''
+
+{ %%
+Đây là một biến thể của trường hợp dùng channel semaphore.
+Trong hai ví dụ trên, dù thông lượng bị giới hạn,
+request (khách hàng) vẫn có thể xếp hàng rất đông.
+Điều này không phải lúc nào cũng tốt; đôi khi nên gợi ý khách đang chờ
+đến quán khác bằng cơ chế try-receive hoặc try-send được giới thiệu bên dưới.
+}
+
+###=========== Đối thoại (ping-pong)
+
+Hai goroutine có thể đối thoại thông qua một channel.
+Ví dụ sau sẽ in ra một dãy số Fibonacci.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+import "os"
+
+type Ball uint64
+
+func Play(playerName string, table chan Ball) {
+	var lastValue Ball = 1
+	for {
+		ball := <- table // nhận bóng
+		fmt.Println(playerName, ball)
+		ball += lastValue
+		if ball < lastValue { // tràn số
+			os.Exit(0)
+		}
+		lastValue = ball
+		table <- ball // đánh trả bóng
+		time.Sleep(time.Second)
+	}
+}
+
+func main() {
+	table := make(chan Ball)
+	go func() {
+		table <- 1 // ném bóng lên bàn
+	}()
+	go Play("A:", table)
+	Play("B:", table)
+}
+'''
+
+###=========== Channel được đóng gói trong channel
+
+Đôi khi, ta có thể dùng kiểu channel làm kiểu phần tử của kiểu channel khác.
+Trong ví dụ sau, `chan chan<- int` là kiểu channel
+có kiểu phần tử là channel chỉ gửi `chan<- int`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+var counter = func (n int) chan<- chan<- int {
+	requests := make(chan chan<- int)
+	go func() {
+		for request := range requests {
+			if request == nil {
+				n++ // tăng
+			} else {
+				request <- n // lấy giá trị
+			}
+		}
+	}()
+
+	// Tự động chuyển kiểu sang chan<- (chan<- int)
+	return requests
+}(0)
+
+func main() {
+	increase1000 := func(done chan<- struct{}) {
+		for i := 0; i < 1000; i++ {
+			counter <- nil
+		}
+		done <- struct{}{}
+	}
+
+	done := make(chan struct{})
+	go increase1000(done)
+	go increase1000(done)
+	<-done; <-done
+
+	request := make(chan int, 1)
+	counter <- request
+	fmt.Println(<-request) // 2000
+}
+'''
+
+Dù cách đóng gói này có thể không hiệu quả nhất
+đối với ví dụ cụ thể ở trên,
+trường hợp sử dụng này có thể hữu ích trong tình huống khác.
+
+###=========== Kiểm tra độ dài và sức chứa của channel
+
+Ta có thể dùng các hàm built-in `len` và `cap`
+để kiểm tra độ dài và sức chứa của channel.
+Tuy nhiên, thực tế ta hiếm khi làm vậy.
+Ít dùng `len` để kiểm tra độ dài channel
+vì độ dài có thể thay đổi sau khi lời gọi `len` trả về.
+Ít dùng `cap` để kiểm tra sức chứa channel
+vì sức chứa thường đã biết hoặc không quan trọng.
+
+Dù vậy, vẫn có tình huống cần dùng hai hàm này.
+Ví dụ, đôi khi ta muốn nhận toàn bộ giá trị đã buffer
+trong channel chưa đóng `c` mà sẽ không còn ai gửi vào nữa;
+khi đó có thể dùng code sau để nhận các giá trị còn lại.
+
+@@@ .line-numbers
+''' go
+// Giả sử goroutine hiện tại là goroutine duy nhất
+// đang cố nhận giá trị từ
+// channel c.
+for len(c) > 0 {
+	value := <-c
+	// sử dụng value ...
+}
+'''
+
+Ta cũng có thể dùng cơ chế try-receive bên dưới để làm tương tự.
+Hiệu năng hai cách gần như ngang nhau.
+Ưu điểm của try-receive là goroutine hiện tại không cần
+là goroutine nhận duy nhất.
+
+Đôi khi, goroutine muốn ghi giá trị vào buffered channel
+`c` cho đến khi đầy mà không bị block ở cuối,
+và đây là sender duy nhất của channel;
+khi đó có thể dùng code sau:
+
+@@@ .line-numbers
+''' go
+for len(c) < cap(c) {
+	c <- aValue
+}
+'''
+
+Ta cũng có thể dùng cơ chế try-send bên dưới để làm tương tự.
+
+###=========== Block goroutine hiện tại mãi mãi
+
+Cơ chế select là tính năng độc đáo của Go.
+Nó đem lại nhiều pattern và mẹo cho lập trình concurrency.
+Để biết quy tắc thực thi code của select,
+hãy đọc bài __channel trong Go__.
+
+    === channel trong Go :: channel.tmd#select
+
+Ta có thể dùng select block rỗng `select{}`
+để block goroutine hiện tại mãi mãi.
+Đây là trường hợp dùng select đơn giản nhất.
+Thực tế, có thể thay một số đoạn `for {time.Sleep(time.Second)}`
+trong ví dụ trước bằng `select{}`.
+
+Thông thường, `select{}` ngăn goroutine main thoát,
+vì khi goroutine main thoát thì toàn bộ chương trình cũng thoát.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "runtime"
+
+func DoSomething() {
+	for {
+		// thực hiện việc gì đó ...
+
+		runtime.Gosched() // tránh chiếm dụng tài nguyên quá mức
+	}
+}
+
+func main() {
+	go DoSomething()
+	go DoSomething()
+	select{}
+}
+'''
+
+Ngoài ra, còn __một số cách khác__
+để khiến goroutine mãi ở trạng thái blocking.
+Nhưng dùng `select{}` là cách đơn giản nhất.
+
+    === một số cách khác :: summaries.tmd#block-forever
+
+@@@ #try-operation
+###=========== Try-send và try-receive
+
+Select block có một nhánh `default`
+và một nhánh `case`
+được gọi là thao tác channel try-send hoặc try-receive,
+tùy thao tác channel sau từ khóa `case`
+là gửi hay nhận.
+
+*
+   Nếu thao tác sau từ khóa `case` là thao tác gửi,
+   select block được gọi là try-send.
+   Nếu thao tác gửi sẽ bị block,
+   nhánh `default` được thực thi (gửi thất bại),
+   nếu không thì thao tác gửi thành công và
+   nhánh `case` duy nhất được thực thi.
+*
+   Nếu thao tác sau từ khóa `case` là thao tác nhận,
+   select block được gọi là try-receive.
+   Nếu thao tác nhận sẽ bị block,
+   nhánh `default` được thực thi (nhận thất bại),
+   nếu không thì thao tác nhận thành công và
+   nhánh `case` duy nhất được thực thi.
+
+Try-send và try-receive không bao giờ block.
+
+Go compiler chuẩn tối ưu riêng các select block try-send
+và try-receive; hiệu năng của chúng
+cao hơn nhiều select block có nhiều nhánh.
+
+Ví dụ sau minh họa cách try-send và try-receive hoạt động.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type Book struct{id int}
+	bookshelf := make(chan Book, 3)
+
+	for i := 0; i < cap(bookshelf) * 2; i++ {
+		select {
+		case bookshelf <- Book{id: i}:
+			fmt.Println("succeeded to put book", i)
+		default:
+			fmt.Println("failed to put book")
+		}
+	}
+
+	for i := 0; i < cap(bookshelf) * 2; i++ {
+		select {
+		case book := <-bookshelf:
+			fmt.Println("succeeded to get book", book.id)
+		default:
+			fmt.Println("failed to get book")
+		}
+	}
+}
+'''
+
+Kết quả chương trình trên:
+
+@@@ .output
+'''
+succeed to put book 0
+succeed to put book 1
+succeed to put book 2
+failed to put book
+failed to put book
+failed to put book
+succeed to get book 0
+succeed to get book 1
+succeed to get book 2
+failed to get book
+failed to get book
+failed to get book
+'''
+
+Các tiểu mục sau trình bày thêm những trường hợp dùng try-send và try-receive.
+
+@@@ #check-closed-status
+###----------- Kiểm tra channel đã đóng mà không block goroutine hiện tại
+
+Giả sử chắc chắn rằng chưa từng có giá trị nào được gửi vào channel,
+và cũng sẽ không có giá trị nào được gửi vào đó,
+ta có thể dùng code sau để kiểm tra đồng thời, an toàn
+channel đã đóng hay chưa mà không block goroutine hiện tại;
+`T` là kiểu phần tử của kiểu channel tương ứng.
+
+@@@ .line-numbers
+''' go
+func IsClosed(c chan T) bool {
+	select {
+	case <-c:
+		return true
+	default:
+	}
+	return false
+}
+'''
+
+Cách kiểm tra channel đã đóng được dùng phổ biến
+trong lập trình concurrency của Go để xem notification đã đến chưa.
+Goroutine khác gửi notification bằng cách đóng channel.
+
+@@@ #peak-limiting
+###----------- Giới hạn peak/burst
+
+Ta có thể giới hạn peak bằng cách kết hợp __dùng channel làm counting semaphore__ với try-send/try-receive.
+Peak limit (hay burst limit) thường dùng để giới hạn số request đồng thời mà không block request nào.
+
+Sau đây là phiên bản sửa đổi của ví dụ cuối trong mục
+__dùng channel làm counting semaphore__.
+
+    === dùng channel làm counting semaphore :: #semaphore
+
+@@@ .line-numbers;must-line-numbers
+''' go
+...
+	// Có thể phục vụ tối đa 10 khách cùng lúc
+	bar24x7 := make(Bar, 10)
+	for customerId := 0; ; customerId++ {
+		time.Sleep(time.Second)
+		customer := Consumer{customerId}
+		select {
+		case bar24x7 <- customer: // thử vào quán
+			go bar24x7.ServeConsumer(customer)
+		default:
+			log.Print("customer#", customerId, " goes elsewhere")
+		}
+	}
+...
+'''
+
+@@@ #first-response-wins-2
+###----------- Một cách khác để triển khai trường hợp phản hồi đến trước thắng
+
+Như đã đề cập, có thể dùng cơ chế select (try-send)
+với buffered channel có sức chứa ít nhất bằng một
+để triển khai trường hợp phản hồi đến trước thắng. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func source(c chan<- int32) {
+	ra, rb := rand.Int31(), rand.Intn(3)+1
+	// Ngủ 1s, 2s hoặc 3s.
+	time.Sleep(time.Duration(rb) * time.Second)
+	select {
+	case c <- ra:
+	default:
+	}
+}
+
+func main() {
+	// Sức chứa nên ít nhất bằng 1.
+	c := make(chan int32, 1)
+	for i := 0; i < 5; i++ {
+		go source(c)
+	}
+	rnd := <-c // chỉ dùng phản hồi đến trước
+	fmt.Println(rnd)
+}
+'''
+
+Lưu ý, channel trong ví dụ trên phải có sức chứa ít nhất bằng một,
+để lần gửi đầu tiên không bị bỏ lỡ
+nếu phía nhận/request chưa kịp sẵn sàng.
+
+@@@ #first-response-wins-3
+###----------- Cách thứ ba để triển khai trường hợp phản hồi đến trước thắng
+
+Với trường hợp phản hồi đến trước thắng, nếu số nguồn ít,
+chẳng hạn hai hoặc ba, ta có thể dùng select block
+để nhận phản hồi từ các nguồn cùng lúc. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
+
+func source() <-chan int32 {
+	// c phải là buffered channel.
+	c := make(chan int32, 1)
+	go func() {
+		ra, rb := rand.Int31(), rand.Intn(3)+1
+		time.Sleep(time.Duration(rb) * time.Second)
+		c <- ra
+	}()
+	return c
+}
+
+func main() {
+	var rnd int32
+	// Block tại đây đến khi một nguồn phản hồi.
+	select{
+	case rnd = <-source():
+	case rnd = <-source():
+	case rnd = <-source():
+	}
+	fmt.Println(rnd)
+}
+'''
+
+Lưu ý: nếu channel trong ví dụ trên là unbuffered channel,
+thì sau khi select block chạy xong sẽ có hai goroutine
+mắc kẹt mãi mãi. Đây là __một trường hợp rò rỉ bộ nhớ__.
+
+    === một trường hợp rò rỉ bộ nhớ :: memory-leaking.tmd#hanging-goroutine
+
+Hai cách được giới thiệu trong tiểu mục này và tiểu mục trước
+cũng có thể dùng để tạo notification N-1.
+
+###----------- Timeout
+
+Trong một số tình huống request-response,
+vì nhiều lý do, request có thể mất rất lâu mới phản hồi,
+đôi khi thậm chí không bao giờ phản hồi.
+Trong trường hợp đó, ta nên trả thông báo lỗi về phía client
+bằng giải pháp timeout.
+Có thể triển khai timeout bằng cơ chế select.
+
+Code sau cho thấy cách gửi request có timeout.
+
+@@@ .line-numbers
+''' go
+func requestWithTimeout(timeout time.Duration) (int, error) {
+	c := make(chan int)
+	// Có thể mất nhiều thời gian để nhận phản hồi.
+	go doRequest(c)
+
+	select {
+	case data := <-c:
+		return data, nil
+	case <-time.After(timeout):
+		return 0, errors.New("timeout")
+	}
+}
+'''
+
+###----------- Ticker
+
+Ta có thể dùng cơ chế try-send để triển khai ticker.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+
+func Tick(d time.Duration) <-chan struct{} {
+	// Tốt nhất đặt sức chứa của c bằng một.
+	c := make(chan struct{}, 1)
+	go func() {
+		for {
+			time.Sleep(d)
+			select {
+			case c <- struct{}{}:
+			default:
+			}
+		}
+	}()
+	return c
+}
+
+func main() {
+	t := time.Now()
+	for range Tick(time.Second) {
+		fmt.Println(time.Since(t))
+	}
+}
+'''
+
+Thực tế, package chuẩn `time` có hàm `Tick`
+cung cấp chức năng tương tự với cách triển khai hiệu quả hơn nhiều.
+Nên dùng hàm đó để code gọn và chạy hiệu quả.
+
+@@@ #rate-limiting
+###----------- Rate limiting
+
+Một mục phía trên đã chỉ cách dùng try-send để __giới hạn peak__.
+Ta cũng có thể dùng try-send để rate limit (kết hợp với ticker).
+Trong thực tế, rate limit thường giúp tránh vượt quota và cạn kiệt tài nguyên.
+
+Ví dụ sau được lấy từ __Go wiki chính thức__ của jh oh.
+Ví dụ giới hạn tối đa 200 request được xử lý trong mỗi khoảng thời gian một phút.
+
+    === giới hạn peak :: #peak-limiting
+    === Go wiki chính thức :: https://go.dev/wiki/RateLimiting
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+
+type Request interface{}
+func handle(r Request) {fmt.Println(r.(int))}
+
+const RateLimitPeriod = time.Minute
+const RateLimit = 200 // tối đa 200 request trong một phút
+
+func handleRequests(requests <-chan Request) {
+	quotas := make(chan time.Time, RateLimit)
+
+	go func() {
+		tick := time.NewTicker(RateLimitPeriod / RateLimit)
+		defer tick.Stop()
+		for t := range tick.C {
+			select {
+			case quotas <- t:
+			default:
+			}
+		}
+	}()
+
+	for r := range requests {
+		<-quotas
+		go handle(r)
+	}
+}
+
+func main() {
+	requests := make(chan Request)
+	go handleRequests(requests)
+	// time.Sleep(time.Minute)
+	for i := 0; ; i++ {requests <- i}
+}
+'''
+
+Trong thực tế, ta thường kết hợp rate limit với peak/burst limit.
+
+###----------- Switch
+
+Qua bài __channel trong Go__,
+ta đã biết gửi giá trị vào channel nil và nhận giá trị
+từ channel nil đều là thao tác blocking.
+Tận dụng đặc điểm này, ta có thể thay đổi các channel trong
+thao tác `case` của select block
+để tác động đến nhánh được chọn.
+
+    === channels in Go :: channel.tmd
+
+Sau đây là ví dụ ping-pong khác được triển khai
+bằng cơ chế select.
+Trong ví dụ này, một trong hai biến channel trong select block là `nil`.
+Nhánh `case` tương ứng với channel nil chắc chắn sẽ không được chọn.
+Có thể xem nhánh `case` đó đang tắt.
+Ở cuối mỗi vòng lặp,
+trạng thái bật/tắt của hai nhánh `case` được đổi cho nhau.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+import "os"
+
+type Ball uint8
+func Play(playerName string, table chan Ball, serve bool) {
+	var receive, send chan Ball
+	if serve {
+		receive, send = nil, table
+	} else {
+		receive, send = table, nil
+	}
+	var lastValue Ball = 1
+	for {
+		select {
+		case send <- lastValue:
+		case value := <- receive:
+			fmt.Println(playerName, value)
+			value += lastValue
+			if value < lastValue { // tràn số
+				os.Exit(0)
+			}
+			lastValue = value
+		}
+		// Đổi trạng thái bật/tắt.
+		receive, send = send, receive
+		time.Sleep(time.Second)
+	}
+}
+
+func main() {
+	table := make(chan Ball)
+	go Play("A:", table, false)
+	Play("B:", table, true)
+}
+'''
+
+Ví dụ sau (không chạy đồng thời) đơn giản hơn nhiều và cũng minh họa hiệu ứng switch.
+Khi chạy, ví dụ sẽ in `1212...`.
+Trong thực tế, ví dụ này không có nhiều ứng dụng;
+ở đây chỉ đưa ra để học.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+import "time"
+
+func main() {
+	for c := make(chan struct{}, 1); true; {
+		select {
+		case c <- struct{}{}:
+			fmt.Print("1")
+		case <-c:
+			fmt.Print("2")
+		}
+		time.Sleep(time.Second)
+	}
+}
+'''
+
+###----------- Điều khiển xác suất thực thi code
+
+Ta có thể nhân bản một nhánh `case` trong select block
+để tăng xác suất thực thi đoạn code tương ứng.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	foo, bar := make(chan struct{}), make(chan struct{})
+	close(foo); close(bar) // chỉ để minh họa
+	x, y := 0.0, 0.0
+	f := func(){x++}
+	g := func(){y++}
+	for i := 0; i < 100000; i++ {
+		select {
+		case <-foo: f()
+		case <-foo: f()
+		case <-bar: g()
+		}
+	}
+	fmt.Println(x/y) // khoảng 2
+}
+'''
+
+Xác suất gọi hàm `f`
+xấp xỉ gấp đôi xác suất gọi hàm `g`.
+
+###----------- Select với số nhánh động
+
+Dù số nhánh trong select block là cố định,
+ta có thể dùng chức năng của package chuẩn `reflect`
+để tạo select block tại thời điểm chạy.
+Select block tạo động có thể có số nhánh `case` tùy ý.
+Lưu ý, dùng reflection kém hiệu quả hơn cách cố định.
+
+Package chuẩn `reflect` cũng cung cấp
+hàm `TrySend` và `TryRecv` để
+triển khai select block có một case và một default.
+
+@@@ #data-flow
+###=========== Thao tác với data flow
+
+Phần này giới thiệu một số trường hợp dùng channel để thao tác data flow.
+
+Thông thường, ứng dụng data flow gồm nhiều module.
+Các module đảm nhiệm những công việc khác nhau.
+Mỗi module có thể có một hoặc nhiều worker (goroutine),
+cùng thực hiện đồng thời công việc được giao.
+Sau đây là một số ví dụ về công việc của module trong thực tế:
+*
+   tạo/thu thập/tải dữ liệu.
+*
+   cung cấp/lưu dữ liệu.
+*
+   tính toán/phân tích dữ liệu.
+*
+   xác thực/lọc dữ liệu.
+*
+   tổng hợp/chia dữ liệu.
+*
+   kết hợp/phân rã dữ liệu.
+*
+   nhân bản/khuếch đại dữ liệu.
+
+Worker trong một module có thể nhận dữ liệu đầu vào
+từ một số module khác và gửi dữ liệu đầu ra cho các module khác.
+Nói cách khác, module vừa có thể tiêu thụ dữ liệu vừa có thể tạo dữ liệu.
+Module chỉ gửi dữ liệu đến module khác mà không bao giờ
+nhận dữ liệu từ module khác được gọi là module chỉ sản xuất dữ liệu.
+Module chỉ nhận dữ liệu từ module khác mà không bao giờ
+gửi dữ liệu đi được gọi là module chỉ tiêu thụ dữ liệu.
+
+Nhiều module kết hợp tạo thành hệ thống data flow.
+
+Sau đây là một số cách triển khai worker của module data flow.
+Chúng chỉ nhằm mục đích giải thích,
+nên rất đơn giản và có thể chưa hiệu quả.
+
+###----------- Tạo/thu thập/tải dữ liệu
+
+Có nhiều loại module chỉ sản xuất dữ liệu.
+Worker của module như vậy có thể tạo data stream bằng cách
+*
+   tải file, đọc cơ sở dữ liệu hoặc crawl web.
+*
+   thu thập các metric từ hệ thống phần mềm hoặc phần cứng.
+*
+   tạo số ngẫu nhiên.
+*
+   v.v.
+
+Ở đây, ta lấy bộ tạo số ngẫu nhiên làm ví dụ.
+Hàm generator trả về một kết quả nhưng không nhận tham số.
+
+@@@ .line-numbers
+''' go
+import (
+	"crypto/rand"
+	"encoding/binary"
+)
+
+func RandomGenerator() <-chan uint64 {
+	c := make(chan uint64)
+	go func() {
+		rnds := make([]byte, 8)
+		for {
+			_, err := rand.Read(rnds)
+			if err != nil {
+				close(c)
+				break
+			}
+			c <- binary.BigEndian.Uint64(rnds)
+		}
+	}()
+	return c
+}
+'''
+
+Thực ra, bộ tạo số ngẫu nhiên là future/promise trả về nhiều kết quả.
+
+Producer dữ liệu có thể đóng channel stream đầu ra bất kỳ lúc nào
+để kết thúc việc tạo dữ liệu.
+
+###----------- Tổng hợp dữ liệu
+
+Worker của module tổng hợp dữ liệu gộp nhiều data stream
+cùng kiểu dữ liệu thành một stream.
+Giả sử kiểu dữ liệu là `int64`,
+hàm sau sẽ gộp số lượng tùy ý data stream thành một.
+
+@@@ .line-numbers
+''' go
+func Aggregator(inputs ...<-chan uint64) <-chan uint64 {
+	out := make(chan uint64)
+	for _, in := range inputs {
+		go func(in <-chan uint64) {
+			for {
+				out <- <-in // tương đương out <- (<-in)
+			}
+		}(in)
+	}
+	return out
+}
+'''
+
+Cách triển khai tốt hơn nên xét
+stream đầu vào đã đóng hay chưa.
+(Điều này cũng đúng với các worker module tiếp theo.)
+
+@@@ .line-numbers
+''' go
+import "sync"
+
+func Aggregator(inputs ...<-chan uint64) <-chan uint64 {
+	output := make(chan uint64)
+	var wg sync.WaitGroup
+	for _, in := range inputs {
+		wg.Add(1)
+		go func(int <-chan uint64) {
+			defer wg.Done()
+			// Nếu in đã đóng thì
+			// vòng lặp cuối cùng cũng kết thúc.
+			for x := range in {
+				output <- x
+			}
+		}(in)
+	}
+	go func() {
+		wg.Wait()
+		close(output)
+	}()
+	return output
+}
+'''
+
+Nếu số data stream cần gộp rất ít (hai hoặc ba),
+ta có thể dùng select block để tổng hợp chúng.
+
+@@@ .line-numbers
+''' go
+// Giả sử có hai stream đầu vào.
+...
+	output := make(chan uint64)
+	go func() {
+		inA, inB := inputs[0], inputs[1]
+		for {
+			select {
+			case v := <- inA: output <- v
+			case v := <- inB: output <- v
+			}
+		}
+	}
+...
+'''
+
+###----------- Chia dữ liệu
+
+Worker của module chia dữ liệu làm ngược lại
+với worker của module tổng hợp dữ liệu.
+Triển khai worker chia dữ liệu khá dễ,
+nhưng thực tế worker loại này ít hữu ích và hiếm khi dùng.
+
+@@@ .line-numbers
+''' go
+func Divisor(input <-chan uint64, outputs ...chan<- uint64) {
+	for _, out := range outputs {
+		go func(o chan<- uint64) {
+			for {
+				o <- <-input // tương đương o <- (<-input)
+			}
+		}(out)
+	}
+}
+'''
+
+###----------- Kết hợp dữ liệu
+
+Worker kết hợp dữ liệu gộp nhiều mẩu dữ liệu từ các stream đầu vào khác nhau thành một mẩu.
+
+Sau đây là ví dụ worker kết hợp dữ liệu: hai giá trị `uint64`
+từ một stream và một giá trị `uint64` từ stream khác
+kết hợp thành một giá trị `uint64` mới.
+Trong thực tế, kiểu phần tử của các channel stream này thường khác nhau.
+
+@@@ .line-numbers
+''' go
+func Composer(inA, inB <-chan uint64) <-chan uint64 {
+	output := make(chan uint64)
+	go func() {
+		for {
+			a1, b, a2 := <-inA, <-inB, <-inA
+			output <- a1 ^ b & a2
+		}
+	}()
+	return output
+}
+'''
+
+###----------- Phân rã dữ liệu
+
+Phân rã dữ liệu là quá trình ngược với kết hợp dữ liệu.
+Hàm worker phân rã nhận một tham số stream đầu vào
+và trả về nhiều stream đầu ra.
+Ở đây không có ví dụ về phân rã dữ liệu.
+
+###----------- Nhân bản/khuếch đại dữ liệu
+
+Có thể xem nhân bản dữ liệu (khuếch đại) là dạng phân rã dữ liệu đặc biệt.
+Một mẩu dữ liệu được nhân bản và từng bản sao
+được gửi đến các stream đầu ra khác nhau.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+func Duplicator(in <-chan uint64) (<-chan uint64, <-chan uint64) {
+	outA, outB := make(chan uint64), make(chan uint64)
+	go func() {
+		for x := range in {
+			outA <- x
+			outB <- x
+		}
+	}()
+	return outA, outB
+}
+'''
+
+###----------- Tính toán/phân tích dữ liệu
+
+Chức năng của module tính toán và phân tích dữ liệu khác nhau,
+mỗi module có đặc thù riêng.
+Thông thường, hàm worker chuyển từng mẩu dữ liệu đầu vào
+thành một mẩu dữ liệu đầu ra khác.
+
+Để minh họa đơn giản, đây là ví dụ worker
+đảo từng bit của mỗi giá trị `uint64` được truyền qua.
+
+@@@ .line-numbers
+''' go
+func Calculator(in <-chan uint64, out chan uint64) (<-chan uint64) {
+	if out == nil {
+		out = make(chan uint64)
+	}
+	go func() {
+		for x := range in {
+			out <- ^x
+		}
+	}()
+	return out
+}
+'''
+
+###----------- Xác thực/lọc dữ liệu
+
+Module xác thực hoặc lọc dữ liệu loại bỏ
+một số dữ liệu được truyền qua stream.
+Ví dụ, hàm worker sau loại bỏ mọi số không nguyên tố.
+
+@@@ .line-numbers
+''' go
+import "math/big"
+
+func Filter0(input <-chan uint64, output chan uint64) <-chan uint64 {
+	if output == nil {
+		output = make(chan uint64)
+	}
+	go func() {
+		bigInt := big.NewInt(0)
+		for x := range input {
+			bigInt.SetUint64(x)
+			if bigInt.ProbablyPrime(1) {
+				output <- x
+			}
+		}
+	}()
+	return output
+}
+
+func Filter(input <-chan uint64) <-chan uint64 {
+	return Filter0(input, nil)
+}
+'''
+
+Xin lưu ý, mỗi cách triển khai trong hai ví dụ này
+được dùng trong một trong hai ví dụ cuối bên dưới.
+
+###----------- Cung cấp/lưu dữ liệu
+
+Thông thường, module cung cấp hoặc lưu dữ liệu là module đầu ra cuối cùng
+trong hệ thống data flow.
+Ở đây chỉ đưa ra worker đơn giản in từng mẩu dữ liệu
+nhận từ stream đầu vào.
+
+@@@ .line-numbers
+''' go
+import "fmt"
+
+func Printer(input <-chan uint64) {
+	for x := range input {
+		fmt.Println(x)
+	}
+}
+'''
+
+###----------- Ghép nối hệ thống data flow
+
+Bây giờ, hãy dùng các hàm worker module ở trên
+để ghép nối một số hệ thống data flow.
+Việc ghép nối chỉ gồm tạo worker thuộc các module khác nhau
+và chỉ định stream đầu vào cho từng worker.
+
+Ví dụ hệ thống data flow 1 (pipeline tuyến tính):
+@@@ .line-numbers
+''' go
+package main
+
+... // các hàm worker được khai báo phía trên.
+
+func main() {
+	Printer(
+		Filter(
+			Calculator(
+				RandomGenerator(), nil,
+			),
+		),
+	)
+}
+'''
+
+Hệ thống data flow trên được minh họa trong sơ đồ sau.
+
+{ ><
+&& res/data-flow-linear.png
+}
+
+Ví dụ hệ thống data flow 2 (pipeline đồ thị có hướng không chu trình):
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+... // các hàm worker được khai báo phía trên.
+
+func main() {
+	filterA := Filter(RandomGenerator())
+	filterB := Filter(RandomGenerator())
+	filterC := Filter(RandomGenerator())
+	filter := Aggregator(filterA, filterB, filterC)
+	calculatorA := Calculator(filter, nil)
+	calculatorB := Calculator(filter, nil)
+	calculator := Aggregator(calculatorA, calculatorB)
+	Printer(calculator)
+}
+'''
+
+Hệ thống data flow trên được minh họa trong sơ đồ sau.
+
+{ ><
+&& res/data-flow-dag.png
+}
+
+Topology của data flow phức tạp hơn có thể là đồ thị bất kỳ.
+Ví dụ, hệ thống có thể có nhiều đầu ra cuối cùng.
+Tuy nhiên, hệ thống data flow có topology đồ thị chu trình hiếm khi gặp trong thực tế.
+
+Qua hai ví dụ trên, ta thấy xây dựng hệ thống data flow bằng channel
+rất dễ và trực quan.
+
+Từ ví dụ cuối, ta thấy aggregator giúp triển khai fan-in và fan-out dễ dàng
+cho số lượng worker của một module cụ thể.
+
+Thực tế, ta có thể dùng channel đơn giản thay vai trò của aggregator.
+Ví dụ sau thay hai aggregator bằng hai channel.
+
+@@@ .line-numbers
+''' go
+package main
+
+... // các hàm worker được khai báo phía trên.
+
+func main() {
+	c1 := make(chan uint64, 100)
+	Filter0(RandomGenerator(), c1) // filterA
+	Filter0(RandomGenerator(), c1) // filterB
+	Filter0(RandomGenerator(), c1) // filterC
+	c2 := make(chan uint64, 100)
+	Calculator(c1, c2) // calculatorA
+	Calculator(c1, c2) // calculatorB
+	Printer(c2)
+}
+'''
+
+Hệ thống data flow đã sửa được minh họa trong sơ đồ sau.
+
+{ ><
+&& res/data-flow-dag-b.png
+}
+
+Các giải thích về hệ thống data flow phía trên chưa đề cập nhiều đến
+cách đóng data stream. Hãy đọc __bài viết này__
+để tìm hiểu cách đóng channel an toàn.
+
+    === bài viết này :: channel-closing.tmd
+
+{ %%
+
+// mẫu channel: dùng buffered channel và try-send để ghi nhận tối thiểu các notification.
+
+}
+
+
+
+

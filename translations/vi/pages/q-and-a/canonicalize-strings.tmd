@@ -1,0 +1,90 @@
+
+### Làm thế nào chuẩn hóa chuỗi để tiết kiệm bộ nhớ?
+
+Khi chương trình Go chạy, đôi khi một số chuỗi bằng nhau không dùng chung
+các khối bộ nhớ chứa byte bên dưới, dù chúng có thể dùng chung một khối
+bộ nhớ chứa byte.
+
+Quá trình khiến chúng dùng chung một khối bộ nhớ chứa byte được gọi là
+chuẩn hóa chuỗi. Có một số cách triển khai việc chuẩn hóa chuỗi trong Go.
+
+###====== Cách 1: chuẩn hóa hai chuỗi khi phát hiện chúng bằng nhau
+
+Logic và cách triển khai rất đơn giản:
+
+''' Go
+	if str1 == str2 {
+		str1 = str2 // bỏ khối bộ nhớ chứa byte bên dưới của str2
+	}
+'''
+
+Dưới đây là một cách triển khai khá vụng về để chuẩn hóa các chuỗi trong một slice:
+
+''' Go
+func CanonicalizeStrings(ss []string) {
+	type S struct {
+		str   string
+		index int
+	}
+	var temp = make([]S, len(ss))
+	for i := range temp {
+		temp[i] = S {
+			str: ss[i],
+			index: i,
+		}
+	}
+	
+	for i := 0; i < len(temp); {
+		var k = i+1
+		for j := k; j < len(temp); j++ {
+			if temp[j].str == temp[i].str {
+				temp[j].str = temp[i].str
+				temp[k], temp[j] = temp[j], temp[k]
+				k++
+			}
+		}
+		i = k
+	}
+	
+	for i := range temp {
+		ss[temp[i].index] = temp[i].str
+	}
+}
+'''
+
+Cách này hiệu quả hơn cách dưới đây trong trường hợp cụ thể là chuẩn hóa
+tất cả chuỗi trong một slice.
+
+###====== Cách 2: dùng `unique.Handle` được giới thiệu trong Go 1.23
+
+Go 1.23 giới thiệu `unique.Handle`, một cách tiện lợi để chuẩn hóa chuỗi.
+
+''' Go
+import "unique"
+
+func CanonicalizeString(s string) string {
+	return unique.Make(s).Value()
+}
+
+func CanonicalizeStrings(ss []string) {
+	for i, s := range ss {
+		ss[i] = CanonicalizeString(s)
+	}
+}
+'''
+
+Cách này linh hoạt hơn. Chỉ cần áp dụng hàm `CanonicalizeString` ở trên
+cho mọi chuỗi được dùng khi chương trình chạy, khi đó tất cả chuỗi bằng nhau
+sẽ dùng chung các khối bộ nhớ chứa byte bên dưới.
+
+!  Lưu ý: cách dùng `unique.Make` không phải lúc nào cũng phù hợp với mọi tình huống.
+   Hàm `unique.Make` sẽ cấp phát một khối bộ nhớ chứa byte làm vùng lưu trữ
+   cho mỗi chuỗi phân biệt.
+   Vì vậy, nếu một số chuỗi không bằng nhau cần chuẩn hóa lại dùng chung
+   một khối bộ nhớ làm vùng lưu trữ, hàm `unique.Make` sẽ cấp phát
+   một khối bộ nhớ mới chứa dãy byte cho từng chuỗi.
+   Thực tế, việc này cấp phát nhiều bộ nhớ hơn so với dùng một khối bộ nhớ duy nhất.
+
+
+
+

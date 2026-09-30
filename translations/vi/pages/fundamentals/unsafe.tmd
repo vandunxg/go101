@@ -1,0 +1,1076 @@
+### Con trỏ không an toàn về kiểu
+
+Bạn đã tìm hiểu về con trỏ trong Go qua bài __con trỏ trong Go__.
+Qua bài viết đó, ta biết rằng con trỏ Go có nhiều giới hạn hơn con trỏ C.
+Ví dụ, con trỏ Go không thể tham gia các phép toán số học; ngoài ra, giá trị của hai kiểu con trỏ bất kỳ có thể không chuyển đổi được cho nhau.
+
+    === con trỏ trong Go :: pointer.tmd
+
+Các con trỏ được giải thích trong bài viết đó thực ra được gọi là con trỏ an toàn về kiểu (type-safe pointer).
+Những giới hạn của chúng giúp ta dễ viết mã Go an toàn,
+nhưng cũng gây trở ngại khi cần viết mã hiệu quả trong một số tình huống.
+
+Go cũng hỗ trợ con trỏ không an toàn về kiểu, tức những con trỏ không chịu các giới hạn áp dụng cho con trỏ an toàn.
+Trong Go, chúng còn được gọi là unsafe pointer.
+Chúng khá giống con trỏ C: mạnh mẽ nhưng cũng nguy hiểm.
+Trong một số trường hợp, unsafe pointer giúp viết mã hiệu quả hơn.
+Mặt khác, rất dễ viết ra mã lỗi tinh vi đến mức không kịp phát hiện.
+
+Một rủi ro lớn khác khi dùng unsafe pointer là cơ chế unsafe không được bảo đảm bởi __các nguyên tắc tương thích Go 1__.
+Mã đang hoạt động hôm nay nhưng phụ thuộc vào unsafe pointer có thể bị lỗi ở phiên bản Go sau.
+
+    === các nguyên tắc tương thích Go 1 :: https://golang.org/doc/go1compat
+
+Nếu vì lý do nào đó bạn thực sự cần cải thiện hiệu năng bằng unsafe pointer, hãy hiểu rõ các rủi ro nêu trên, làm theo hướng dẫn trong tài liệu Go chính thức và nắm chính xác tác động của từng lần sử dụng unsafe pointer để có thể viết mã Go an toàn.
+
+###=========== Giới thiệu package chuẩn `unsafe`
+
+Go cung cấp một __loại kiểu đặc biệt__ dành cho unsafe pointer.
+Để sử dụng chúng, ta phải import __package chuẩn `unsafe`__.
+Kiểu `unsafe.Pointer` được định nghĩa như sau:
+
+@@@ .disable-line-numbers111
+''' go
+type Pointer *ArbitraryType
+'''
+
+    === loại kiểu :: type-system-overview.tmd#type-kinds
+    === package chuẩn `unsafe` :: https://golang.org/pkg/unsafe/
+
+Đây không phải định nghĩa kiểu thông thường.
+`ArbitraryType` chỉ biểu thị rằng giá trị `unsafe.Pointer` có thể chuyển đổi sang bất kỳ con trỏ an toàn nào trong Go và ngược lại.
+Nói cách khác, `unsafe.Pointer` tương tự `void*` trong C.
+
+Unsafe pointer trong Go là các kiểu có kiểu nền là `unsafe.Pointer`.
+
+Giá trị zero của unsafe pointer cũng được biểu diễn bằng identifier khai báo sẵn `nil`.
+
+Trước Go 1.17, package chuẩn `unsafe` đã cung cấp ba hàm:
+*
+   `func Alignof(variable ArbitraryType) uintptr`,
+   dùng để lấy căn chỉnh địa chỉ (alignment) của một giá trị.
+   Lưu ý, alignment của giá trị thuộc field trong struct và giá trị không thuộc field
+   cùng kiểu có thể khác nhau. Với Go compiler chuẩn, chúng luôn giống nhau;
+   với compiler gccgo, chúng có thể khác.
+
+*
+   `func Offsetof(selector ArbitraryType) uintptr`,
+   dùng để lấy độ lệch địa chỉ của một field trong giá trị struct.
+   Độ lệch được tính tương đối với địa chỉ của giá trị struct.
+   Kết quả trả về luôn giống nhau đối với cùng field tương ứng
+   của các giá trị cùng kiểu struct trong một chương trình.
+*
+   `func Sizeof(variable ArbitraryType) uintptr`,
+   dùng để lấy kích thước của một giá trị
+   (hay kích thước kiểu của giá trị đó).
+   Kết quả trả về luôn giống nhau
+   với mọi giá trị cùng kiểu trong một chương trình.
+
+
+Lưu ý:
+*
+   kiểu kết quả của cả ba hàm đều là `uintptr`. Ta sẽ thấy rằng giá trị `uintptr`
+   có thể chuyển đổi sang unsafe pointer và ngược lại.
+*
+   dù kết quả gọi bất kỳ hàm nào trong ba hàm này nhất quán trong cùng chương trình,
+   chúng có thể khác nhau giữa các hệ điều hành, kiến trúc,
+   compiler hoặc phiên bản compiler.
+*
+   lời gọi ba hàm này luôn được tính tại thời điểm biên dịch.
+   Kết quả là hằng có kiểu `uintptr`.
+*
+   đối số truyền cho `unsafe.Offsetof` phải có dạng selector field của struct `value.field`.
+   Selector có thể chỉ đến field nhúng, nhưng phải truy cập được
+   mà không cần compiler tự động giải tham chiếu con trỏ.
+
+
+Ví dụ sử dụng ba hàm trên:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "unsafe"
+
+func main() {
+	var x struct {
+		a int64
+		b bool
+		c string
+	}
+	const M, N = unsafe.Sizeof(x.c), unsafe.Sizeof(x)
+	fmt.Println(M, N) // 16 32
+
+	fmt.Println(unsafe.Alignof(x.a)) // 8
+	fmt.Println(unsafe.Alignof(x.b)) // 1
+	fmt.Println(unsafe.Alignof(x.c)) // 8
+
+	fmt.Println(unsafe.Offsetof(x.a)) // 0
+	fmt.Println(unsafe.Offsetof(x.b)) // 8
+	fmt.Println(unsafe.Offsetof(x.c)) // 16
+}
+'''
+
+Ví dụ minh họa lưu ý cuối cùng ở trên:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "unsafe"
+
+func main() {
+	type T struct {
+		c string
+	}
+	type S struct {
+		b bool
+	}
+	var x struct {
+		a int64
+		*S
+		T
+	}
+
+	fmt.Println(unsafe.Offsetof(x.a)) // 0
+	
+	fmt.Println(unsafe.Offsetof(x.S)) // 8
+	fmt.Println(unsafe.Offsetof(x.T)) // 16
+	
+	// Dòng này biên dịch được vì có thể truy cập c
+	// mà không cần tự động giải tham chiếu con trỏ.
+	fmt.Println(unsafe.Offsetof(x.c)) // 16
+	
+	// Dòng này không biên dịch được vì muốn truy cập b
+	// phải tự động giải tham chiếu con trỏ field S.
+	//fmt.Println(unsafe.Offsetof(x.b)) // lỗi
+	
+	// Dòng này biên dịch được. Tuy nhiên, nó in ra
+	// độ lệch của field b trong giá trị x.S.
+	fmt.Println(unsafe.Offsetof(x.S.b)) // 0
+}
+'''
+
+Lưu ý, kết quả in trong chú thích được lấy từ Go compiler chuẩn phiên bản 1.25.n trên kiến trúc Linux AMD64.
+
+Ba hàm trong package `unsafe` có vẻ không quá nguy hiểm.
+Chữ ký của chúng gần như __không thể thay đổi trong các phiên bản Go 1 tương lai__.
+Rob Pike thậm chí từng __đề xuất chuyển ba hàm này sang nơi khác__.
+Phần lớn rủi ro của package `unsafe` đến từ unsafe pointer.
+Chúng nguy hiểm như con trỏ C, điều mà con trỏ an toàn của Go luôn cố tránh.
+
+    === gần như không thể thay đổi ... :: https://groups.google.com/g/golang-nuts/c/Pi7VveWDUPc
+    === từng đề xuất ... :: https://github.com/golang/go/issues/5602
+
+Go 1.17 bổ sung một kiểu mới và hai hàm mới vào package `unsafe`.
+Kiểu mới là `IntegerType`, được định nghĩa như sau.
+Kiểu này không đại diện cho một kiểu cụ thể mà biểu thị một kiểu số nguyên bất kỳ.
+Có thể xem nó như một kiểu generic.
+@@@ .disable-line-numbers111
+''' go
+type IntegerType int
+'''
+
+Hai hàm được giới thiệu trong Go 1.17 là:
+*
+   `func Add(ptr Pointer, len IntegerType) Pointer`.
+   Hàm này cộng một độ lệch vào địa chỉ mà unsafe pointer biểu diễn
+   rồi trả về unsafe pointer mới biểu diễn địa chỉ mới.
+   Hàm này đáp ứng một phần cách dùng ở mẫu số 3
+   về unsafe pointer được giới thiệu bên dưới.
+*
+   `func Slice(ptr *ArbitraryType, len IntegerType) []ArbitraryType`.
+   Hàm này tạo một slice có độ dài chỉ định từ con trỏ an toàn,
+   trong đó `ArbitraryType` là kiểu phần tử của slice kết quả.
+
+
+Go 1.20 tiếp tục bổ sung ba hàm:
+*
+   `func String(ptr *byte, len IntegerType) string`.
+   Hàm này tạo string có độ dài chỉ định từ con trỏ `byte` an toàn.
+*
+   `func StringData(str string) *byte`.
+   Hàm này lấy con trỏ đến dãy byte nền của string.
+   Lưu ý, không truyền string rỗng làm đối số cho hàm này.
+*
+   `func SliceData(slice []ArbitraryType) *ArbitraryType`.
+   Hàm này lấy con trỏ đến dãy phần tử nền của slice.
+
+Các hàm được giới thiệu từ Go 1.17 có một số rủi ro và cần được dùng thận trọng.
+Ví dụ sau sử dụng hai hàm được giới thiệu trong Go 1.17:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+)
+
+func main() {
+	a := [16]int{3: 3, 9: 9, 11: 11}
+	fmt.Println(a)
+	eleSize := int(unsafe.Sizeof(a[0]))
+	p9 := &a[9]
+	up9 := unsafe.Pointer(p9)
+	p3 := (*int)(unsafe.Add(up9, -6 * eleSize))
+	fmt.Println(*p3) // 3
+	s := unsafe.Slice(p9, 5)[:3]
+	fmt.Println(s) // [9 0 11]
+	fmt.Println(len(s), cap(s)) // 3 5
+
+	t := unsafe.Slice((*int)(nil), 0)
+	fmt.Println(t == nil) // true
+
+	// Hai lời gọi sau đây nguy hiểm.
+	// Chúng khiến kết quả trỏ đến
+	// các vùng nhớ không xác định.
+	_ = unsafe.Add(up9, 7 * eleSize)
+	_ = unsafe.Slice(p9, 8)
+}
+'''
+
+{ %%
+https://github.com/golang/go/issues/46742
+}
+
+Có thể dùng hai hàm sau để chuyển đổi string và byte slice theo cách không an toàn về kiểu.
+So với cách an toàn về kiểu, cách này không sao chép dãy byte nền của string và byte slice,
+nên có hiệu năng tốt hơn.
+
+@@@ .line-numbers
+''' go
+import "unsafe"
+
+func String2ByteSlice(str string) []byte {
+	if str == "" {
+		return nil
+	}
+	return unsafe.Slice(unsafe.StringData(str), len(str))
+}
+
+func ByteSlice2String(bs []byte) string {
+	if len(bs) == 0 {
+		return ""
+	}
+	return unsafe.String(unsafe.SliceData(bs), len(bs))
+}
+'''
+
+###=========== Quy tắc chuyển đổi liên quan đến unsafe pointer
+
+Hiện tại (Go 1.25), Go compiler cho phép các phép chuyển đổi tường minh sau:
+*
+   Có thể chuyển đổi tường minh con trỏ an toàn sang unsafe pointer
+   và ngược lại.
+*
+   Có thể chuyển đổi tường minh giá trị `uintptr` sang unsafe pointer
+   và ngược lại.
+   Lưu ý: không chuyển một `unsafe.Pointer` nil sang `uintptr` rồi chuyển ngược lại kèm phép toán số học.
+
+Nhờ các phép chuyển đổi này, ta có thể đổi giá trị con trỏ an toàn sang kiểu con trỏ an toàn bất kỳ.
+
+Tuy nhiên, dù tất cả phép chuyển đổi này đều hợp lệ khi biên dịch,
+không phải phép nào cũng hợp lệ (an toàn) lúc chạy.
+Chúng phá vỡ các bảo đảm an toàn bộ nhớ mà toàn bộ hệ thống kiểu Go
+(các phần ngoài unsafe) cố duy trì.
+Để viết mã Go hợp lệ với unsafe pointer, ta phải tuân theo hướng dẫn
+được liệt kê ở phần sau.
+
+
+###=========== Một số điều cần biết về Go
+
+Trước khi giới thiệu các cách dùng unsafe pointer hợp lệ,
+ta cần biết một số đặc điểm của Go.
+
+###----------- Đặc điểm 1: unsafe pointer là con trỏ, còn giá trị uintptr là số nguyên
+
+Mỗi con trỏ an toàn hoặc unsafe pointer khác nil đều tham chiếu đến một giá trị khác.
+Ngược lại, giá trị `uintptr` không tham chiếu đến giá trị nào; chúng chỉ là số nguyên thông thường,
+dù thường được dùng để biểu diễn địa chỉ bộ nhớ.
+
+Go hỗ trợ garbage collection tự động.
+Khi chương trình Go chạy, runtime sẽ định kỳ
+__kiểm tra những vùng nhớ không còn được giá trị nào sử dụng
+và thu hồi bộ nhớ__ đã cấp phát cho các vùng nhớ đó.
+Con trỏ đóng vai trò quan trọng trong quá trình kiểm tra.
+Nếu không thể đi đến một vùng nhớ từ (không có giá trị nào đang dùng tham chiếu đến) các giá trị còn hoạt động,
+runtime xem vùng nhớ ấy là không còn được sử dụng và có thể thu gom an toàn.
+
+    === kiểm tra ... :: memory-block.tmd#when-to-collect
+
+Vì giá trị `uintptr` là số nguyên nên chúng có thể tham gia phép toán số học.
+
+Ví dụ ở mục tiếp theo cho thấy sự khác nhau giữa con trỏ
+và giá trị `uintptr`.
+
+###----------- Đặc điểm 2: vùng nhớ không sử dụng có thể bị thu gom bất cứ lúc nào
+
+Khi chương trình chạy, garbage collector có thể hoạt động vào thời điểm không xác định,
+và mỗi lần thu gom có thể kéo dài trong khoảng thời gian không xác định.
+Vì vậy, khi một vùng nhớ không còn được sử dụng, nó có thể bị
+__thu gom vào thời điểm không xác định__.
+
+    === thu gom vào thời điểm không xác định :: memory-block.tmd#when-can-collect
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+import "unsafe"
+
+// Giả sử createInt sẽ không được inline.
+//go:noinline
+func createInt() *int {
+	return new(int)
+}
+
+func foo() {
+	p0, y, z := createInt(), createInt(), createInt()
+	var p1 = unsafe.Pointer(y)
+	var p2 = uintptr(unsafe.Pointer(z))
+
+	// Tại thời điểm này, dù địa chỉ của giá trị int
+	// được z tham chiếu vẫn còn nằm trong p2,
+	// giá trị int đó đã không còn được dùng, vì vậy
+	// garbage collector có thể thu gom vùng nhớ
+	// cấp phát cho nó. Trong khi đó, các giá trị int
+	// được p0 và p1 tham chiếu vẫn đang
+	// được sử dụng.
+
+	// uintptr có thể tham gia phép toán số học.
+	p2 += 2; p2--; p2--
+
+	*p0 = 1                         // an toàn
+	*(*int)(p1) = 2                 // an toàn
+	*(*int)(unsafe.Pointer(p2)) = 3 // nguy hiểm!
+}
+'''
+
+Trong ví dụ trên, việc giá trị `p2` vẫn đang được dùng không bảo đảm
+vùng nhớ từng chứa giá trị `int` được `z` tham chiếu chưa bị garbage collector thu gom.
+Nói cách khác, khi thực thi `*(*int)(unsafe.Pointer(p2)) = 3`, vùng nhớ có thể đã bị thu gom hoặc chưa.
+Giải tham chiếu địa chỉ lưu trong `p2` thành giá trị `int` là nguy hiểm,
+vì vùng nhớ đó có thể đã được cấp phát lại cho giá trị khác (thậm chí cho chương trình khác).
+
+
+{ %%
+https://github.com/golang/go/issues/32115
+}
+{ %%
+###----------- Đặc điểm 3: có thể gọi `runtime.KeepAlive` để đánh dấu một giá trị vẫn còn được dùng (còn reachable) trước lời gọi đó
+
+// (Tôi đã quyết định bỏ đặc điểm này khỏi bài viết. Điều đó không có nghĩa là đặc điểm này không tồn tại.
+Nó chỉ có nghĩa là nội dung này không liên quan nhiều đến bài viết.
+Đặc điểm này cũng không khắc phục được vấn đề ở mục ngay trước.
+Hãy đọc đặc điểm tiếp theo để biết lý do.)
+
+Để đánh dấu một giá trị và các phần giá trị mà nó tham chiếu vẫn còn reachable, ta nên truyền một giá trị tham chiếu đến nó làm đối số cho lời gọi `runtime.KeepAlive`.
+Con trỏ đến giá trị thường được dùng làm đối số.
+
+Ví dụ, nếu thêm lời gọi `runtime.KeepAlive(&z)`
+vào ví dụ ở mục trước,
+thì giờ có thể thực thi an toàn câu lệnh `*(*int)(unsafe.Pointer(p2)) = 3`.
+
+@@@ .line-numbers
+''' go
+func foo() {
+	p0, y, z := createInt(), createInt(), createInt()
+	var p1 = unsafe.Pointer(y)
+	var p2 = uintptr(unsafe.Pointer(z))
+
+	p2 += 2; p2 - -; p2 - -
+
+	*p0 = 1
+	*(*int)(p1) = 2
+	*(*int)(unsafe.Pointer(p2)) = 3 // hiện đã an toàn!
+
+	runtime.KeepAlive(&z) // Dòng này giữ z còn reachable.
+}
+'''
+
+}
+
+@@@ #fact-value-address-might-change
+###----------- Đặc điểm 3: địa chỉ của một số giá trị có thể thay đổi khi chạy
+
+Đọc bài __các khối bộ nhớ__ để biết chi tiết (xem cuối mục được liên kết).
+Ở đây, chỉ cần biết rằng khi kích thước stack của một goroutine thay đổi,
+các vùng nhớ được cấp phát trên stack sẽ được di chuyển.
+Nói cách khác, địa chỉ của các giá trị nằm trong những vùng nhớ đó sẽ thay đổi.
+
+    === các khối bộ nhớ :: memory-block.tmd#where-to-allocate
+
+###----------- Đặc điểm 4: thời gian sống của giá trị khi chạy có thể ngắn hơn vẻ ngoài trong mã
+
+
+Trong ví dụ sau, việc giá trị `t` vẫn đang được dùng
+không bảo đảm các giá trị mà `t.y` tham chiếu cũng vẫn còn được dùng.
+
+@@@ .line-numbers
+''' go
+type T struct {
+	x int
+	y *[1<<23]byte
+}
+
+func bar() {
+	t := T{y: new([1<<23]byte)}
+	p := uintptr(unsafe.Pointer(&t.y[0]))
+
+	... // sử dụng T.x và T.y
+
+	// Compiler thông minh có thể nhận ra rằng giá trị
+	// t.y sẽ không còn được dùng nữa và kết luận rằng
+	// vùng nhớ chứa t.y có thể được thu gom ngay.
+
+	// Dùng *(*byte)(unsafe.Pointer(p))) ở đây
+	// sẽ nguy hiểm.
+
+	// Tiếp tục dùng giá trị t, nhưng chỉ dùng field x.
+	println(t.x)
+}
+'''
+
+###----------- Đặc điểm 5: `*unsafe.Pointer` là kiểu con trỏ an toàn thông thường
+
+Đúng vậy, `*unsafe.Pointer` là kiểu con trỏ an toàn.
+Kiểu cơ sở của nó là `unsafe.Pointer`.
+Vì đây là con trỏ an toàn nên theo quy tắc chuyển đổi ở trên,
+nó có thể chuyển đổi sang kiểu `unsafe.Pointer` và ngược lại.
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "unsafe"
+
+func main() {
+	x := 123                // of type int
+	p := unsafe.Pointer(&x) // of type unsafe.Pointer
+	pp := &p                // of type *unsafe.Pointer
+	p = unsafe.Pointer(pp)
+	pp = (*unsafe.Pointer)(p)
+}
+'''
+
+###=========== Cách sử dụng unsafe pointer đúng cách
+
+Tài liệu package chuẩn `unsafe` liệt kê __sáu mẫu sử dụng unsafe pointer__.
+Phần sau sẽ lần lượt giới thiệu và giải thích từng mẫu.
+
+    === sáu mẫu sử dụng unsafe pointer :: https://golang.org/pkg/unsafe/#Pointer
+
+###----------- Mẫu 1: chuyển giá trị `*T1` sang unsafe Pointer, rồi chuyển giá trị unsafe pointer sang `*T2`.
+
+Như đã nói ở trên, dùng quy tắc chuyển đổi unsafe pointer,
+ta có thể chuyển giá trị kiểu `*T1` sang `*T2`,
+trong đó `T1` và `T2` là hai kiểu bất kỳ.
+Tuy nhiên, chỉ nên chuyển đổi như vậy nếu kích thước của `T1`
+không nhỏ hơn `T2` và phép chuyển đổi có ý nghĩa.
+
+Nhờ mẫu này, ta cũng có thể chuyển đổi giữa
+kiểu `T1` và `T2`.
+
+Một ví dụ là hàm `math.Float64bits`,
+hàm chuyển giá trị `float64` thành `uint64`
+mà không thay đổi bit nào của giá trị `float64`.
+Hàm `math.Float64frombits` thực hiện chuyển đổi ngược lại.
+
+@@@ .line-numbers
+''' go
+func Float64bits(f float64) uint64 {
+	return *(*uint64)(unsafe.Pointer(&f))
+}
+
+func Float64frombits(b uint64) float64 {
+	return *(*float64)(unsafe.Pointer(&b))
+}
+'''
+
+Lưu ý, kết quả trả về khi gọi `math.Float64bits(aFloat64)`
+khác với kết quả của phép chuyển đổi tường minh
+`uint64(aFloat64)`.
+
+Trong ví dụ sau, ta dùng mẫu này để chuyển slice `[]MyString`
+sang kiểu `[]string` và ngược lại.
+Slice kết quả và slice ban đầu dùng chung các phần tử nền.
+Không thể thực hiện phép chuyển đổi này bằng cách an toàn:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+)
+
+func main() {
+	type MyString string
+	ms := []MyString{"C", "C++", "Go"}
+	fmt.Printf("%s\n", ms)  // [C C++ Go]
+	// ss := ([]string)(ms) // lỗi biên dịch
+	ss := *(*[]string)(unsafe.Pointer(&ms))
+	ss[1] = "Zig"
+	fmt.Printf("%s\n", ms) // [C Zig Go]
+	// ms = []MyString(ss) // lỗi biên dịch
+	ms = *(*[]MyString)(unsafe.Pointer(&ss))
+	
+	// Từ Go 1.17, ta cũng có thể dùng
+	// hàm unsafe.Slice để chuyển đổi.
+	ss = unsafe.Slice((*string)(&ms[0]), len(ms))
+	ms = unsafe.Slice((*MyString)(&ss[0]), len(ms))
+}
+'''
+
+Ngoài ra, từ Go 1.17, ta cũng có thể dùng hàm `unsafe.Slice` để chuyển đổi:
+
+@@@ .line-numbers
+''' go
+func main() {
+	...
+	
+	ss = unsafe.Slice((*string)(&ms[0]), len(ms))
+	ms = unsafe.Slice((*MyString)(&ss[0]), len(ss))
+}
+'''
+
+Một cách ứng dụng mẫu này là chuyển byte slice sẽ không được dùng nữa sau khi chuyển đổi thành string,
+như đoạn mã sau. Cách chuyển đổi này tránh sao chép dãy byte nền.
+
+@@@ .line-numbers
+''' go
+func ByteSlice2String(bs []byte) string {
+	return *(*string)(unsafe.Pointer(&bs))
+}
+'''
+
+Đây là cách triển khai được phương thức `String` của kiểu `Builder`
+trong package chuẩn `strings` sử dụng từ Go 1.10.
+Byte slice có kích thước lớn hơn string
+và __cấu trúc bên trong của chúng__ tương tự nhau,
+nên phép chuyển đổi hợp lệ (với các Go compiler phổ biến).
+Tuy nhiên, dù hiện nay cách triển khai này có thể được dùng an toàn trong package chuẩn,
+không khuyến nghị dùng trong mã ứng dụng thông thường.
+Từ Go 1.20, trong mã ứng dụng, nên ưu tiên cách triển khai
+dùng hàm `unsafe.String` đã nhắc ở trên.
+
+    === cấu trúc bên trong của chúng :: value-part.tmd#internal-definitions
+
+Phép chuyển đổi ngược, tức chuyển string thành byte slice theo cách tương tự, không hợp lệ,
+vì string có kích thước nhỏ hơn byte slice.
+
+@@@ .line-numbers
+''' go
+func String2ByteSlice(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&s)) // nguy hiểm!
+}
+'''
+
+Phần về mẫu 6 bên dưới giới thiệu cách triển khai hợp lệ để thực hiện việc tương tự.
+
+Lưu ý: khi dùng cách không an toàn vừa giới thiệu để chuyển byte slice thành string,
+đừng sửa các byte trong byte slice nếu string kết quả vẫn còn được sử dụng.
+
+###----------- Mẫu 2: chuyển unsafe pointer sang uintptr rồi sử dụng giá trị uintptr.
+
+Mẫu này không hữu ích lắm.
+Thông thường, ta in giá trị `uintptr` để kiểm tra địa chỉ bộ nhớ
+được lưu trong đó. Tuy nhiên, có những cách khác vừa an toàn vừa ngắn gọn hơn.
+Vì vậy, mẫu này ít khi cần thiết.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "unsafe"
+
+func main() {
+	type T struct{a int}
+	var t T
+	fmt.Printf("%p\n", &t)                          // 0xc6233120a8
+	println(&t)                                     // 0xc6233120a8
+	fmt.Printf("%x\n", uintptr(unsafe.Pointer(&t))) // c6233120a8
+}
+'''
+
+Các địa chỉ được in ra có thể khác nhau mỗi lần chạy.
+
+@@@ #pattern-convert-to-uintptr-and-back
+###----------- Mẫu 3: chuyển unsafe pointer sang uintptr, thực hiện phép toán số học với uintptr rồi chuyển ngược lại
+
+Với mẫu này, unsafe pointer kết quả phải tiếp tục trỏ vào vùng nhớ được cấp phát ban đầu.
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "unsafe"
+
+type T struct {
+	x bool
+	y [3]int16
+}
+
+const N = unsafe.Offsetof(T{}.y)
+const M = unsafe.Sizeof(T{}.y[0])
+
+func main() {
+	t := T{y: [3]int16{123, 456, 789}}
+	p := unsafe.Pointer(&t)
+	// "uintptr(p)+N+M+M" là địa chỉ của t.y[2].
+	ty2 := (*int16)(unsafe.Pointer(uintptr(p)+N+M+M))
+	fmt.Println(*ty2) // 789
+}
+'''
+
+Thực tế, từ Go 1.17, nên ưu tiên dùng hàm `unsafe.Add` đã giới thiệu ở trên
+để tính độ lệch địa chỉ như vậy.
+
+Lưu ý, trong ví dụ cụ thể này,
+không nên tách phép chuyển đổi `unsafe.Pointer(uintptr(p) + N + M + M)`
+thành hai dòng như trong đoạn mã sau.
+Hãy đọc chú thích trong mã để biết lý do.
+
+@@@ .line-numbers
+''' go
+func main() {
+	t := T{y: [3]int16{123, 456, 789}}
+	p := unsafe.Pointer(&t)
+	// ty2 := (*int16)(unsafe.Pointer(uintptr(p)+N+M+M))
+	addr := uintptr(p) + N + M + M
+	
+	// ... (một số thao tác khác)
+	
+	// Lúc này giá trị t không còn được dùng, vùng nhớ của nó
+	// có thể bị garbage collector thu gom. Vì thế, việc dùng
+	// địa chỉ t.y[2] bên dưới có thể không còn hợp lệ
+	// và trở nên nguy hiểm!
+	// Một nguy cơ khác là nếu một thao tác nào đó
+	// làm stack tăng hoặc giảm tại đây, thì
+	// địa chỉ của t có thể thay đổi khiến địa chỉ
+	// lưu trong addr không còn hợp lệ (đặc điểm 3).
+	ty2 := (*int16)(unsafe.Pointer(addr))
+	fmt.Println(*ty2)
+}
+'''
+
+Các lỗi này rất tinh vi và khó phát hiện,
+đó là lý do việc sử dụng unsafe pointer nguy hiểm.
+
+{ %%
+Nếu vẫn muốn tách phép chuyển đổi đó thành hai dòng,
+ta nên gọi hàm `runtime.KeepAlive` sau hai dòng vừa tách và truyền unsafe pointer `p`
+(hoặc giá trị khác cũng đang tham chiếu đến `t.y[2]`) làm đối số. Ví dụ:
+
+@@@ .line-numbers
+''' go
+func main() {
+	t := T{y: [3]int16{123, 456, 789}}
+	p := unsafe.Pointer(&t)
+	addr := uintptr(p) + N + M + M
+	ty2 := (*int16)(unsafe.Pointer(addr))
+	// Dòng sau bảo đảm vùng nhớ của
+	// giá trị t chưa bị garbage collector thu gom
+	// tại thời điểm này nếu mã biên dịch
+	// bằng các compiler chính thức.
+	runtime.KeepAlive(p)
+	fmt.Println(*ty2)
+}
+'''
+
+https://github.com/golang/go/issues/34684#issuecomment-584461646
+
+
+Tuy nhiên, tôi không khuyến nghị dùng thủ thuật `runtime.KeepAlive` cho mẫu này
+vì nguy cơ khác đã nêu ở trên.
+Stack có thể tăng khi runtime cấp phát bộ nhớ cho biến `ty2`,
+khiến địa chỉ `t` thay đổi và giá trị lưu trong `addr` không còn hợp lệ,
+từ đó giá trị `ty2` cũng không hợp lệ.
+Nhưng nói thật, nguy cơ này không xảy ra ở đây nếu mã được biên dịch bằng Go compiler chuẩn.
+Trong cách triển khai của Go compiler chuẩn,
+lời gọi `runtime.KeepAlive` sẽ khiến các giá trị được đối số tham chiếu
+được cấp phát trên heap; các vùng nhớ cấp phát trên heap sẽ không bị di chuyển.
+
+// (Phần giải thích trên đã bị xóa. Lý do là không có bảo đảm rằng
+lời gọi `runtime.KeepAlive` sẽ khiến các giá trị được đối số
+tham chiếu được cấp phát trên heap.) //
+}
+
+Giá trị `uintptr` trung gian cũng có thể tham gia phép xóa bit `&^` để căn chỉnh địa chỉ,
+miễn là unsafe pointer kết quả và con trỏ ban đầu đều trỏ vào cùng vùng nhớ đã cấp phát.
+
+Một điểm khác cần lưu ý là không nên lưu địa chỉ cuối của vùng nhớ
+trong một con trỏ (an toàn hay unsafe đều vậy).
+Làm như thế có thể ngăn vùng nhớ khác nằm ngay sau vùng nhớ trước đó được garbage collector thu gom,
+hoặc làm chương trình bị crash nếu địa chỉ biên đó không thuộc vùng nhớ nào đã cấp phát
+(tùy cách triển khai compiler).
+Đọc __mục FAQ này__ để biết thêm giải thích.
+
+    === mục FAQ này :: unofficial-faq.tmd#final-zero-size-field
+
+###----------- Mẫu 4: chuyển unsafe pointer thành `uintptr` làm đối số cho lời gọi `syscall.Syscall`.
+
+Từ phần giải thích về mẫu trước,
+ta biết hàm sau đây rất nguy hiểm.
+
+@@@ .line-numbers
+''' go
+// Giả sử hàm này sẽ không được inline.
+func DoSomething(addr uintptr) {
+	// đọc hoặc ghi giá trị tại địa chỉ được truyền vào ...
+}
+'''
+
+Hàm trên nguy hiểm vì bản thân hàm không thể bảo đảm vùng nhớ tại địa chỉ của đối số truyền vào
+chưa bị garbage collector thu gom.
+Nếu vùng nhớ đã bị thu gom hoặc được cấp phát lại cho giá trị khác,
+các thao tác trong thân hàm sẽ nguy hiểm.
+
+Tuy nhiên, khai báo của hàm `Syscall` trong
+package chuẩn `syscall` như sau:
+@@@ .disable-line-numbers111
+''' go
+func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno)
+'''
+
+Làm thế nào hàm này bảo đảm các vùng nhớ tại địa chỉ truyền vào
+`a1`, `a2` và `a3` chưa bị garbage collector thu gom
+trong lúc hàm đang chạy?
+Bản thân hàm không thể bảo đảm điều đó.
+Thực tế, compiler chịu trách nhiệm bảo đảm.
+Đây là đặc quyền của lời gọi `syscall.Syscall` và các hàm tương tự.
+
+Có thể hình dung compiler tự động chèn một số chỉ thị
+cho từng đối số unsafe pointer được chuyển thành `uintptr`,
+như đối số thứ ba trong lời gọi `syscall.Syscall` sau,
+để ngăn vùng nhớ mà đối số tham chiếu bị garbage collector thu gom hoặc di chuyển.
+
+Lưu ý, trước Go 1.15, biểu thức chuyển đổi `uintptr(anUnsafePointer)` có thể
+là biểu thức con của đối số được nói đến.
+Từ Go 1.15, yêu cầu nghiêm ngặt hơn một chút:
+đối số đó phải có chính xác dạng `uintptr(anUnsafePointer)`.
+
+Lời gọi sau là an toàn:
+@@@ .line-numbers
+''' go
+syscall.Syscall(SYS_READ, uintptr(fd),
+			uintptr(unsafe.Pointer(p)), uintptr(n))
+'''
+
+Nhưng các lời gọi sau nguy hiểm:
+
+@@@ .line-numbers
+''' go
+u := uintptr(unsafe.Pointer(p))
+// Lúc này, giá trị được p tham chiếu có thể
+// đã không còn được dùng và đã bị thu gom,
+// hoặc địa chỉ của giá trị đã thay đổi.
+syscall.Syscall(SYS_READ, uintptr(fd), u, uintptr(n))
+
+// Đối số phải có dạng "uintptr(anUnsafePointer)".
+// Thực tế, lời gọi này an toàn trước Go 1.15.
+// Nhưng Go 1.15 đã thay đổi quy tắc một chút.
+syscall.Syscall(SYS_XXX, uintptr(uintptr(fd)),
+			uint(uintptr(unsafe.Pointer(p))), uintptr(n))
+'''
+
+{ %%
+https://github.com/golang/go/issues/34684#issuecomment-540103545
+}
+Lưu ý: mẫu này cũng áp dụng cho các phương thức __syscall.Proc.Call__
+và __syscall.LazyProc.Call__ trên Windows.
+
+    === syscall.Proc.Call :: https://golang.org/pkg/syscall/?GOOS=windows#Proc.Call
+    === syscall.LazyProc.Call :: https://golang.org/pkg/syscall/?GOOS=windows#LazyProc.Call
+
+Nhắc lại, tuyệt đối không dùng mẫu này khi gọi các hàm khác.
+
+###----------- Mẫu 5: chuyển kết quả `uintptr` của lời gọi phương thức `reflect.Value.Pointer` hoặc `reflect.Value.UnsafeAddr` sang unsafe pointer
+
+Các phương thức `Pointer` và `UnsafeAddr` của
+kiểu `Value` trong package chuẩn `reflect`
+đều trả về `uintptr` thay vì
+`unsafe.Pointer`.
+Đây là thiết kế có chủ đích nhằm tránh việc chuyển kết quả của hai phương thức này
+sang kiểu con trỏ an toàn bất kỳ
+mà không import package chuẩn `unsafe`.
+
+Thiết kế này yêu cầu kết quả trả về từ lời gọi một trong hai phương thức
+phải được chuyển sang unsafe pointer ngay sau khi gọi.
+Nếu không, trong một khoảng thời gian ngắn, vùng nhớ tại
+địa chỉ lưu trong kết quả có thể mất mọi tham chiếu và bị garbage collector thu gom.
+
+Ví dụ, lời gọi sau là an toàn.
+
+@@@ .disable-line-numbers111
+''' go
+p := (*int)(unsafe.Pointer(reflect.ValueOf(new(int)).Pointer()))
+'''
+
+Ngược lại, lời gọi sau nguy hiểm.
+
+@@@ .line-numbers
+''' go
+u := reflect.ValueOf(new(int)).Pointer()
+// Lúc này, vùng nhớ tại địa chỉ
+// lưu trong u có thể đã bị thu gom.
+p := (*int)(unsafe.Pointer(u))
+'''
+
+Lưu ý, Go 1.19 giới thiệu phương thức mới `reflect.Value.UnsafePointer()`,
+phương thức trả về giá trị `unsafe.Pointer` và được ưu tiên hơn hai phương thức vừa nêu.
+Điều đó có nghĩa thiết kế có chủ đích cũ hiện được xem là không còn phù hợp.
+
+###----------- Mẫu 6: chuyển field `reflect.SliceHeader.Data` hoặc `reflect.StringHeader.Data` sang unsafe pointer và ngược lại.
+
+Vì lý do tương tự như mục trước, các field `Data`
+của struct `SliceHeader` và `StringHeader` trong
+package chuẩn `reflect` được khai báo kiểu
+`uintptr` thay vì `unsafe.Pointer`.
+
+Ta có thể chuyển con trỏ string thành giá trị con trỏ `*reflect.StringHeader`
+để thao tác với phần bên trong của string.
+Tương tự, ta có thể chuyển con trỏ slice thành giá trị con trỏ `*reflect.SliceHeader`
+để thao tác với phần bên trong của slice.
+
+Ví dụ sử dụng `reflect.StringHeader`:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "unsafe"
+import "reflect"
+
+func main() {
+	a := [...]byte{'G', 'o', 'l', 'a', 'n', 'g'}
+	s := "Java"
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	hdr.Data = uintptr(unsafe.Pointer(&a))
+	hdr.Len = len(a)
+	fmt.Println(s) // Golang
+	// Lúc này s và a dùng chung dãy byte,
+	// khiến các byte trong string s có thể thay đổi.
+	a[2], a[3], a[4], a[5] = 'o', 'g', 'l', 'e'
+	fmt.Println(s) // Google
+}
+'''
+
+Ví dụ sử dụng `reflect.SliceHeader`:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"unsafe"
+	"reflect"
+)
+
+func main() {
+	a := [6]byte{'G', 'o', '1', '0', '1'}
+	bs := []byte("Golang")
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&bs))
+	hdr.Data = uintptr(unsafe.Pointer(&a))
+
+	hdr.Len = 2
+	hdr.Cap = len(a)
+	fmt.Printf("%s\n", bs) // Go
+	bs = bs[:cap(bs)]
+	fmt.Printf("%s\n", bs) // Go101
+}
+'''
+
+{ %% not correct
+Lưu ý, ví dụ này cần gọi `runtime.KeepAlive`,
+nếu không slice có thể tham chiếu đến dãy byte nền không hợp lệ.
+
+// (Ở đây không bắt buộc gọi `runtime.KeepAlive`.) //
+https://groups.google.com/forum/#!topic/golang-nuts/MgIP2KvEAaU
+}
+
+Nói chung,
+chỉ nên lấy giá trị con trỏ `*reflect.StringHeader` từ một string thực sự đã tồn tại,
+hoặc lấy giá trị con trỏ `*reflect.SliceHeader` từ một slice thực sự đã tồn tại.
+Không nên làm ngược lại, chẳng hạn tạo string từ `StringHeader` mới cấp phát,
+hay tạo slice từ `SliceHeader` mới cấp phát.
+Ví dụ, đoạn mã sau nguy hiểm.
+
+@@@ .line-numbers
+''' go
+var hdr reflect.StringHeader
+hdr.Data = uintptr(unsafe.Pointer(new([5]byte)))
+// Mảng byte vừa cấp phát lúc này đã mất mọi
+// tham chiếu và có thể bị garbage collector thu gom.
+hdr.Len = 5
+s := *(*string)(unsafe.Pointer(&hdr)) // nguy hiểm!
+'''
+
+Ví dụ sau cho thấy cách chuyển string thành byte slice
+bằng phương thức unsafe.
+Khác với cách chuyển đổi an toàn từ string sang byte slice,
+cách unsafe không cấp phát dãy byte nền mới
+cho slice kết quả ở mỗi lần chuyển đổi.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+	"unsafe"
+)
+
+func String2ByteSlice(str string) (bs []byte) {
+	strHdr := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	sliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&bs))
+	sliceHdr.Data = strHdr.Data
+	sliceHdr.Cap = strHdr.Len
+	sliceHdr.Len = strHdr.Len
+	return
+}
+
+func main() {
+	// str := "Golang"
+	// Với compiler chuẩn chính thức, dòng trên
+	// sẽ khiến các byte của str được cấp phát
+	// trong vùng nhớ bất biến.
+	// Vì vậy, thay vào đó ta dùng dòng sau.
+	str := strings.Join([]string{"Go", "land"}, "")
+	s := String2ByteSlice(str)
+	fmt.Printf("%s\n", s) // Goland
+	s[5] = 'g'
+	fmt.Println(str) // Golang
+}
+'''
+
+{ %%
+// (Trước đây bài viết từng nói rằng lời gọi `runtime.KeepAlive` trong ví dụ trên là bắt buộc.
+Tôi rất tiếc vì đã truyền đạt thông tin sai. Thực tế, lời gọi này không bắt buộc ở đây,
+ít nhất là với compiler chuẩn chính thức.) //
+}
+
+Lưu ý, khi dùng cách unsafe vừa nêu để chuyển string thành byte slice,
+đừng sửa các byte trong slice kết quả nếu string vẫn còn được dùng
+(ví dụ trên vi phạm nguyên tắc này để minh họa).
+
+Cũng có thể chuyển byte slice sang string theo cách tương tự.
+Cách này an toàn hơn một chút (nhưng chậm hơn một chút) so với cách ở mẫu 1.
+
+@@@ .line-numbers
+''' go
+func ByteSlice2String(bs []byte) (str string) {
+	sliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&bs))
+	strHdr := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	strHdr.Data = sliceHdr.Data
+	strHdr.Len = sliceHdr.Len
+	return
+}
+'''
+
+Tương tự, hãy đảm bảo không sửa các byte trong byte slice đối số nếu string kết quả vẫn còn được dùng.
+
+Nhân tiện, hãy xem một ví dụ sai vi phạm nguyên tắc của mẫu 3
+(ví dụ được trích từ một bình luận Slack của Bryan C. Mills):
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+	"unsafe"
+)
+
+func Example_Bad() *byte {
+	var str = "godoc"
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	pbyte := (*byte)(unsafe.Pointer(hdr.Data + 2))
+	return pbyte // *pbyte == 'd'
+}
+
+func main() {
+	fmt.Println(string(*Example_Bad()))
+}
+'''
+
+Hai cách triển khai đúng:
+
+@@@ .line-numbers
+''' go
+func Example_Good1() *byte {
+	var str = "godoc"
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	pbyte := (*byte)(unsafe.Pointer(
+		uintptr(unsafe.Pointer(hdr.Data)) + 2))
+	return pbyte
+}
+
+// Hoạt động từ Go 1.17.
+func Example_Good2() *byte {
+	var str = "godoc"
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&str))
+	pbyte := (*byte)(unsafe.Add(unsafe.Pointer(hdr.Data), 2))
+	return pbyte
+}
+'''
+
+Khó hiểu không? Đúng vậy.
+
+__Tài liệu__ của kiểu `SliceHeader` và `StringHeader` trong
+package chuẩn `reflect` đều nêu rằng biểu diễn của hai struct này có thể thay đổi ở bản phát hành sau.
+Vì vậy, các ví dụ hợp lệ ở trên dùng hai kiểu này có thể trở nên không hợp lệ dù quy tắc unsafe không đổi.
+May mắn là hiện tại (Go 1.25), hai Go compiler phổ biến (Go compiler chuẩn và gccgo)
+đều nhận biết cách biểu diễn của hai kiểu được khai báo trong package chuẩn `reflect`.
+
+Nhóm phát triển Go core cũng nhận ra hai kiểu này bất tiện và dễ gây lỗi,
+nên từ Go 1.20 đã không còn khuyến nghị dùng chúng và từ Go 1.21 chúng bị deprecated.
+Thay vào đó, nên dùng các hàm `unsafe.String`, `unsafe.StringData`,
+`unsafe.Slice` và `unsafe.SliceData` đã mô tả trước đó trong bài.
+
+    === Tài liệu :: https://golang.org/pkg/reflect/#SliceHeader
+
+###=========== Lời kết
+
+Từ những nội dung trên, ta biết cơ chế unsafe có thể giúp viết mã Go hiệu quả hơn trong một số trường hợp.
+Tuy nhiên, khi dùng cơ chế này rất dễ mắc các lỗi tinh vi,
+dù xác suất chúng xuất hiện khá thấp.
+Chương trình có thể chạy ổn trong thời gian dài,
+rồi đột nhiên hoạt động bất thường hoặc thậm chí crash.
+Những lỗi như vậy rất khó phát hiện và gỡ lỗi.
+
+Chỉ nên dùng cơ chế unsafe khi thật sự cần,
+và phải hết sức thận trọng.
+Đặc biệt, cần tuân theo các hướng dẫn ở trên.
+
+Một lần nữa, hãy nhớ rằng cơ chế unsafe được mô tả ở trên
+có thể thay đổi, thậm chí hoàn toàn không còn hợp lệ ở các phiên bản Go sau,
+dù hiện chưa có bằng chứng cho thấy điều này sắp xảy ra.
+Nếu quy tắc unsafe thay đổi,
+các mẫu dùng unsafe pointer được giới thiệu ở trên có thể trở nên không hợp lệ.
+Vì vậy, hãy thiết kế mã phụ thuộc vào unsafe sao cho dễ chuyển lại
+sang các cách triển khai an toàn.
+
+Cuối cùng, cần nhắc đến tùy chọn compiler phân tích động
+`-gcflags=all=-d=checkptr`, được hỗ trợ từ Go Toolchain 1.14
+(khuyến nghị dùng tùy chọn này trên Windows với Go Toolchain 1.15 trở lên).
+Khi bật tùy chọn này, một số (không phải tất cả) cách dùng unsafe pointer sai sẽ được phát hiện lúc chạy.
+Khi phát hiện cách dùng sai như vậy, chương trình sẽ panic.
+Cảm ơn Matthew Dempsky đã triển khai __tính năng tuyệt vời này__!
+
+    === tính năng tuyệt vời :: https://github.com/golang/go/issues/22218
+

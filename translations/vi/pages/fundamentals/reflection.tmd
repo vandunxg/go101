@@ -1,0 +1,754 @@
+### Reflection trong Go
+
+Go là ngôn ngữ tĩnh có hỗ trợ reflection tốt.
+Phần còn lại của bài viết giải thích các chức năng reflection
+do package chuẩn `reflect` cung cấp.
+
+Bạn nên đọc các bài __tổng quan về hệ thống kiểu của Go__ và __interface trong Go__
+trước khi đọc phần còn lại của bài viết này.
+
+    === overview ... :: type-system-overview.tmd
+    === interfaces ... :: interface.tmd
+
+###========== Tổng quan về Reflection trong Go
+
+Reflection trong Go bổ sung nhiều chức năng động cho lập trình Go.
+Nhiều package chuẩn, chẳng hạn `fmt` và `encoding`,
+phụ thuộc nhiều vào reflection.
+
+Ta có thể kiểm tra giá trị Go thông qua các giá trị kiểu `Type` và
+`Value` được định nghĩa trong package chuẩn `reflect`.
+Phần còn lại của bài viết đưa ra ví dụ cách dùng hai kiểu này.
+
+Một mục tiêu thiết kế reflection của Go là mọi thao tác thông thường
+cũng có thể thực hiện bằng reflection.
+Vì nhiều lý do, mục tiêu này chưa đạt hoàn toàn.
+Tuy vậy, hiện nay hầu hết thao tác thông thường đều có thể thực hiện bằng reflection.
+Mặt khác, reflection cho phép thực hiện một số thao tác
+không thể thực hiện theo cách thông thường.
+Các thao tác không thể thực hiện, hoặc chỉ có thể thực hiện bằng reflection,
+sẽ được đề cập trong những phần sau.
+
+###========== Kiểu `reflect.Type` và các giá trị
+
+Trong Go, ta tạo `reflect.Type` từ một giá trị bất kỳ
+không phải interface bằng cách gọi `reflect.TypeOf`.
+Giá trị trả về biểu diễn kiểu của giá trị đó.
+Có thể truyền giá trị interface vào `reflect.TypeOf`,
+nhưng hàm trả về `reflect.Type` biểu diễn kiểu động của giá trị interface.
+Hàm `reflect.TypeOf` chỉ có một tham số kiểu `interface{}`
+và luôn trả về kiểu động của tham số interface đó.
+Muốn lấy `reflect.Type` biểu diễn một kiểu interface bằng hàm này,
+ta phải dùng cách gián tiếp sẽ được giới thiệu bên dưới.
+
+Từ Go 1.22, ta cũng có thể dùng __hàm `reflect.TypeFor`__
+để lấy `reflect.Type` biểu diễn kiểu đã biết lúc biên dịch.
+Kiểu đó có thể là interface hoặc không phải interface.
+
+    === the `reflect.TypeFor` function :: https://docs.go101.org/std/pkg/reflect.html#name-TypeFor
+
+`reflect.Type` là kiểu interface và __định nghĩa một số method__.
+Ta gọi chúng để kiểm tra kiểu được biểu diễn bởi receiver `reflect.Type`.
+Một số method áp dụng cho mọi __loại kiểu__, số khác chỉ dành cho một hoặc vài loại.
+Hãy đọc tài liệu từng method để biết chi tiết.
+Gọi method bằng receiver không phù hợp sẽ gây panic.
+
+    === specifies several methods :: https://golang.org/pkg/reflect/#Type
+    === kinds of types :: https://golang.org/pkg/reflect/#Kind
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	type A = [16]int16
+	var c <-chan map[A][]byte
+	tc := reflect.TypeOf(c)
+	fmt.Println(tc.Kind())    // chan
+	fmt.Println(tc.ChanDir()) // <-chan
+	tm := tc.Elem()
+	ta, tb := tm.Key(), tm.Elem()
+	// Dòng tiếp theo in ra: map array slice
+	fmt.Println(tm.Kind(), ta.Kind(), tb.Kind())
+	tx, ty := ta.Elem(), tb.Elem()
+
+	// byte là bí danh của uint8
+	fmt.Println(tx.Kind(), ty.Kind()) // int16 uint8
+	fmt.Println(tx.Bits(), ty.Bits()) // 16 8
+	fmt.Println(tx.ConvertibleTo(ty)) // true
+	fmt.Println(tb.ConvertibleTo(ta)) // false
+
+	// Kiểu slice và map không thể so sánh với nhau.
+	fmt.Println(tb.Comparable()) // false
+	fmt.Println(tm.Comparable()) // false
+	fmt.Println(ta.Comparable()) // true
+	fmt.Println(tc.Comparable()) // true
+}
+'''
+
+Go có __26 loại kiểu__.
+
+    === 26 kinds of types :: https://golang.org/pkg/reflect/#Kind
+
+Trong ví dụ trên, ta dùng method `Elem` để lấy kiểu phần tử
+của một số kiểu container (channel, map, slice và array).
+Method này cũng lấy được kiểu cơ sở của pointer. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+type T []interface{m()}
+func (T) m() {}
+
+func main() {
+	tp := reflect.TypeOf(new(interface{}))
+	tt := reflect.TypeOf(T{})
+	fmt.Println(tp.Kind(), tt.Kind()) // ptr slice
+
+	// Lấy gián tiếp hai kiểu interface.
+	ti, tim := tp.Elem(), tt.Elem()
+	// Dòng tiếp theo in ra: interface interface
+	fmt.Println(ti.Kind(), tim.Kind())
+
+	fmt.Println(tt.Implements(tim))  // true
+	fmt.Println(tp.Implements(tim))  // false
+	fmt.Println(tim.Implements(tim)) // true
+
+	// Mọi kiểu đều triển khai mọi interface rỗng.
+	fmt.Println(tp.Implements(ti))  // true
+	fmt.Println(tt.Implements(ti))  // true
+	fmt.Println(tim.Implements(ti)) // true
+	fmt.Println(ti.Implements(ti))  // true
+}
+'''
+
+Ví dụ trên cũng cho thấy cách lấy gián tiếp `reflect.Type` biểu diễn một kiểu interface.
+
+Reflection cho phép lấy kiểu của mọi field (trong struct) và thông tin method của một kiểu.
+Ta cũng có thể lấy kiểu tham số và kiểu kết quả của function.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+type F func(string, int) bool
+func (f F) m(s string) bool {
+	return f(s, 32)
+}
+func (f F) M() {}
+
+type I interface{m(s string) bool; M()}
+
+func main() {
+	var x struct {
+		F F
+		i I
+	}
+	tx := reflect.TypeOf(x)
+	fmt.Println(tx.Kind())        // struct
+	fmt.Println(tx.NumField())    // 2
+	fmt.Println(tx.Field(1).Name) // i
+	// Đường dẫn package là thuộc tính vốn có của
+	// selector không export (field hoặc method).
+	fmt.Println(tx.Field(0).PkgPath) // 
+	fmt.Println(tx.Field(1).PkgPath) // main
+
+	tf, ti := tx.Field(0).Type, tx.Field(1).Type
+	fmt.Println(tf.Kind())               // func
+	fmt.Println(tf.IsVariadic())         // false
+	fmt.Println(tf.NumIn(), tf.NumOut()) // 2 1
+	t0, t1, t2 := tf.In(0), tf.In(1), tf.Out(0)
+	// Dòng tiếp theo in ra: string int bool
+	fmt.Println(t0.Kind(), t1.Kind(), t2.Kind())
+
+	fmt.Println(tf.NumMethod(), ti.NumMethod()) // 1 2
+	fmt.Println(tf.Method(0).Name)              // M
+	fmt.Println(ti.Method(1).Name)              // m
+	_, ok1 := tf.MethodByName("m")
+	_, ok2 := ti.MethodByName("m")
+	fmt.Println(ok1, ok2) // false true
+}
+'''
+
+Từ ví dụ trên, có thể thấy:
+*.
+   với kiểu không phải interface, `reflect.Type.NumMethod` chỉ trả số method được export
+   (kể cả method khai báo ngầm).
+   Không thể lấy thông tin method không được export bằng `reflect.Type.MethodByName`.
+   Kiểu interface không có giới hạn này (tài liệu trước Go 1.16 không đề cập).
+   Điều tương tự áp dụng cho các method tương ứng của `reflect.Value` ở phần sau.
+*.
+   dù `reflect.Type.NumField` trả số lượng mọi field (kể cả field không export)
+   của struct, __không nên__ dùng `reflect.Type.FieldByName`
+   để lấy thông tin field không được export.
+
+    === không nên làm :: https://golang.org/pkg/reflect/#pkg-note-BUG
+
+    === kiểm tra struct field tag bằng reflection :: https://golang.org/pkg/reflect/#StructTag
+
+@@@ #struct-field-tag
+Ta có thể __kiểm tra struct field tag bằng reflection__.
+Kiểu tag là `reflect.StructTag`, có hai method `Get` và `Lookup`
+để kiểm tra các cặp key-value trong tag. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+type T struct {
+	X    int  `max:"99" min:"0" default:"0"`
+	Y, Z bool `optional:"yes"`
+}
+
+func main() {
+	t := reflect.TypeOf(T{})
+	x := t.Field(0).Tag
+	y := t.Field(1).Tag
+	z := t.Field(2).Tag
+	fmt.Println(reflect.TypeOf(x)) // reflect.StructTag
+	// v là string
+	v, present := x.Lookup("max")     
+	fmt.Println(len(v), present)      // 2 true
+	fmt.Println(x.Get("max"))         // 99
+	fmt.Println(x.Lookup("optional")) //  false
+	fmt.Println(y.Lookup("optional")) // yes true
+	fmt.Println(z.Lookup("optional")) // yes true
+}
+'''
+
+Lưu ý:
+*
+   key của tag không được chứa dấu cách (Unicode 32),
+   dấu nháy kép (Unicode 34) hoặc dấu hai chấm (Unicode 58).
+*
+   để tạo cặp key-value hợp lệ, không được có dấu cách sau dấu chấm phẩy
+   trong cặp key-value dự kiến. Vì vậy,
+   \\ `^``optional: "yes"^``` không tạo thành cặp key-value.
+*
+   dấu cách trong giá trị tag có ý nghĩa, không bị bỏ qua. Vì vậy,
+   \\ `^``json:"author, omitempty"^```,
+   \\ `^``json:" author,omitempty"^``` and
+   \\ `^``json:"author,omitempty"^``` khác nhau.
+*
+   tag của mỗi field struct cần nằm trên một dòng để có đầy đủ ý nghĩa.
+   { %%
+   https://github.com/golang/go/issues/43379
+   https://github.com/golang/go/issues/38641
+   https://github.com/golang/go/issues/15893
+   }
+
+Ngoài `reflect.TypeOf`, ta có thể dùng các hàm khác trong package chuẩn
+`reflect` để tạo `reflect.Type` biểu diễn kiểu tổ hợp không tên.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	ta := reflect.ArrayOf(5, reflect.TypeOf(123))
+	fmt.Println(ta) // [5]int
+	tc := reflect.ChanOf(reflect.SendDir, ta)
+	fmt.Println(tc) // chan<- [5]int
+	tp := reflect.PtrTo(ta)
+	fmt.Println(tp) // *[5]int
+	ts := reflect.SliceOf(tp)
+	fmt.Println(ts) // []*[5]int
+	tm := reflect.MapOf(ta, tc)
+	fmt.Println(tm) // map[[5]int]chan<- [5]int
+	tf := reflect.FuncOf([]reflect.Type{ta},
+				[]reflect.Type{tp, tc}, false)
+	fmt.Println(tf) // func([5]int) (*[5]int, chan<- [5]int)
+	tt := reflect.StructOf([]reflect.StructField{
+		{Name: "Age", Type: reflect.TypeOf("abc")},
+	})
+	fmt.Println(tt)            // struct { Age string }
+	fmt.Println(tt.NumField()) // 1
+}
+'''
+
+Còn method `reflect.Type` chưa dùng trong ví dụ trên.
+Hãy đọc tài liệu package `reflect` để biết cách sử dụng.
+
+Lưu ý, tính đến Go 1.25:
+*
+   chưa có cách tạo kiểu interface bằng reflection.
+*
+   có thể tạo struct có field nhúng bằng reflection, nhưng cách này tiềm ẩn nhiều vấn đề.
+
+{ %%
+https://github.com/golang/go/issues/39717
+https://github.com/golang/go/issues/15924
+https://github.com/golang/go/issues/38783
+}
+
+###========== Kiểu `reflect.Value` và các giá trị
+
+Tương tự, ta tạo `reflect.Value` từ giá trị không phải interface
+bằng cách gọi `reflect.ValueOf`. Giá trị trả về biểu diễn giá trị đó.
+Giống `reflect.TypeOf`, hàm này nhận một tham số `interface{}`.
+Khi truyền đối số interface, hàm trả về `reflect.Value` biểu diễn giá trị động của nó.
+Muốn lấy `reflect.Value` biểu diễn giá trị interface,
+ta phải dùng cách gián tiếp sẽ được giới thiệu bên dưới.
+
+Giá trị do `reflect.Value` `v` biểu diễn
+thường được gọi là giá trị nền tảng của `v`.
+
+Kiểu `reflect.Value` có __rất nhiều method__ để kiểm tra thông tin
+và thao tác với giá trị nền tảng của receiver `reflect.Value`.
+Một số áp dụng với mọi giá trị, số khác chỉ dành cho một hoặc vài loại.
+Hãy đọc tài liệu package chuẩn `reflect`.
+Gọi method đặc thù với receiver không phù hợp sẽ gây panic.
+
+    === rất nhiều method :: https://golang.org/pkg/reflect/
+
+Method `CanSet` cho biết giá trị nền tảng của `reflect.Value`
+có thể sửa đổi (được gán) hay không.
+Nếu có, ta gọi method `Set` của `reflect.Value` tương ứng để thay đổi giá trị Go.
+Lưu ý, `reflect.Value` trả về trực tiếp từ `reflect.ValueOf` luôn chỉ đọc.
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	n := 123
+	p := &n
+	vp := reflect.ValueOf(p)
+	fmt.Println(vp.CanSet(), vp.CanAddr()) // false false
+	vn := vp.Elem() // lấy giá trị được vp tham chiếu
+	fmt.Println(vn.CanSet(), vn.CanAddr()) // true true
+	vn.Set(reflect.ValueOf(789)) // <=> vn.SetInt(789)
+	fmt.Println(n)               // 789
+}
+'''
+
+Không thể sửa field không export của struct bằng reflection.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	var s struct {
+		X interface{} // field được export
+		y interface{} // field không được export
+	}
+	vp := reflect.ValueOf(&s)
+	// Nếu vp biểu diễn pointer,
+	// dòng sau tương đương với "vs := vp.Elem()".
+	vs := reflect.Indirect(vp)
+	// vx và vy đều biểu diễn giá trị interface.
+	vx, vy := vs.Field(0), vs.Field(1)
+	fmt.Println(vx.CanSet(), vx.CanAddr()) // true true
+	// vy lấy được địa chỉ nhưng không thể sửa đổi.
+	fmt.Println(vy.CanSet(), vy.CanAddr()) // false true
+	vb := reflect.ValueOf(123)
+	vx.Set(vb)     // hợp lệ vì vx có thể sửa đổi
+	// vy.Set(vb)  // sẽ panic vì vy không thể sửa đổi
+	fmt.Println(s) // {123 <nil>}
+	fmt.Println(vx.IsNil(), vy.IsNil()) // false true
+}
+'''
+
+Từ hai ví dụ trên, có hai cách lấy `reflect.Value` có giá trị nền tảng
+được tham chiếu bởi giá trị nền tảng (một pointer) của `reflect.Value` khác.
+*.
+   Cách thứ nhất là gọi `Elem` trên `reflect.Value` biểu diễn pointer.
+*.
+   Cách thứ hai là truyền `reflect.Value` biểu diễn pointer vào `reflect.Indirect`.
+   (Nếu đối số không biểu diễn pointer, hàm trả về bản sao của đối số.)
+
+Lưu ý, method `reflect.Value.Elem` cũng lấy được `reflect.Value`
+biểu diễn giá trị động của interface. Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	var z = 123
+	var y = &z
+	var x interface{} = y
+	v := reflect.ValueOf(&x)
+	vx := v.Elem()
+	vy := vx.Elem()
+	vz := vy.Elem()
+	vz.Set(reflect.ValueOf(789))
+	fmt.Println(z) // 789
+}
+'''
+
+Package chuẩn `reflect` còn khai báo một số hàm liên quan đến `reflect.Value`.
+Mỗi hàm tương ứng với hàm built-in hoặc chức năng không dùng reflection.
+Ví dụ sau minh họa cách gán hàm generic tùy chỉnh cho các giá trị function.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func InvertSlice(args []reflect.Value) []reflect.Value {
+	inSlice, n := args[0], args[0].Len()
+	outSlice := reflect.MakeSlice(inSlice.Type(), 0, n)
+	for i := n-1; i >= 0; i-- {
+		element := inSlice.Index(i)
+		outSlice = reflect.Append(outSlice, element)
+	}
+	return []reflect.Value{outSlice}
+}
+
+func Bind(p interface{},
+		f func ([]reflect.Value) []reflect.Value) {
+	// invert biểu diễn giá trị function.
+	invert := reflect.ValueOf(p).Elem()
+	invert.Set(reflect.MakeFunc(invert.Type(), f))
+}
+
+func main() {
+	var invertInts func([]int) []int
+	Bind(&invertInts, InvertSlice)
+	fmt.Println(invertInts([]int{2, 3, 5})) // [5 3 2]
+
+	var invertStrs func([]string) []string
+	Bind(&invertStrs, InvertSlice)
+	fmt.Println(invertStrs([]string{"Go", "C"})) // [C Go]
+}
+'''
+
+Nếu giá trị nền tảng của `reflect.Value` là function,
+ta có thể gọi method `Call` để gọi function đó.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+type T struct {
+	A, b int
+}
+
+func (t T) AddSubThenScale(n int) (int, int) {
+	return n * (t.A + t.b), n * (t.A - t.b)
+}
+
+func main() {
+	t := T{5, 2}
+	vt := reflect.ValueOf(t)
+	vm := vt.MethodByName("AddSubThenScale")
+	results := vm.Call([]reflect.Value{reflect.ValueOf(3)})
+	fmt.Println(results[0].Int(), results[1].Int()) // 21 9
+
+	neg := func(x int) int {
+		return -x
+	}
+	vf := reflect.ValueOf(neg)
+	fmt.Println(vf.Call(results[:1])[0].Int()) // -21
+	fmt.Println(vf.Call([]reflect.Value{
+		vt.FieldByName("A"), // panic nếu đổi thành b
+	})[0].Int()) // -5
+}
+'''
+
+Không nên dùng field không export làm đối số cho lời gọi reflection.
+Nếu thay `vt.FieldByName("A")` trong ví dụ trên bằng
+`vt.FieldByName("b")`, chương trình sẽ panic.
+
+Ví dụ reflection với giá trị map.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	valueOf := reflect.ValueOf
+	m := map[string]int{"Unix": 1973, "Windows": 1985}
+	v := valueOf(m)
+	// Đối số Value thứ hai bằng zero nghĩa là xóa phần tử.
+	v.SetMapIndex(valueOf("Windows"), reflect.Value{})
+	v.SetMapIndex(valueOf("Linux"), valueOf(1991))
+	for i := v.MapRange(); i.Next(); {
+		fmt.Println(i.Key(), "\t:", i.Value())
+	}
+}
+'''
+
+Method `MapRange` được hỗ trợ từ Go 1.12.
+
+Ví dụ reflection với giá trị channel.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	c := make(chan string, 2)
+	vc := reflect.ValueOf(c)
+	vc.Send(reflect.ValueOf("C"))
+	succeeded := vc.TrySend(reflect.ValueOf("Go"))
+	fmt.Println(succeeded) // true
+	succeeded = vc.TrySend(reflect.ValueOf("C++"))
+	fmt.Println(succeeded) // false
+	fmt.Println(vc.Len(), vc.Cap()) // 2 2
+	vs, succeeded := vc.TryRecv()
+	fmt.Println(vs.String(), succeeded) // C true
+	vs, sentBeforeClosed := vc.Recv()
+	fmt.Println(vs.String(), sentBeforeClosed) // Go true
+	vs, succeeded = vc.TryRecv()
+	fmt.Println(vs.String()) // <invalid Value>
+	fmt.Println(succeeded)   // false
+}
+'''
+
+`TrySend` và `TryRecv` tương ứng với
+__khối điều khiển `select` có một case và một default__.
+
+    === `select` ... :: channel.tmd#select
+
+Có thể dùng `reflect.Select` để mô phỏng khối `select`
+có số nhánh `case` thay đổi khi chạy chương trình.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "reflect"
+
+func main() {
+	c := make(chan int, 1)
+	vc := reflect.ValueOf(c)
+	succeeded := vc.TrySend(reflect.ValueOf(123))
+	fmt.Println(succeeded, vc.Len(), vc.Cap()) // true 1 1
+
+	vSend, vZero := reflect.ValueOf(789), reflect.Value{}
+	branches := []reflect.SelectCase{
+		{Dir: reflect.SelectDefault, Chan: vZero, Send: vZero},
+		{Dir: reflect.SelectRecv, Chan: vc, Send: vZero},
+		{Dir: reflect.SelectSend, Chan: vc, Send: vSend},
+	}
+	selIndex, vRecv, sentBeforeClosed := reflect.Select(branches)
+	fmt.Println(selIndex)         // 1
+	fmt.Println(sentBeforeClosed) // true
+	fmt.Println(vRecv.Int())      // 123
+	vc.Close()
+	// Lần này hãy bỏ nhánh case gửi,
+	// vì nhánh đó có thể gây panic.
+	selIndex, _, sentBeforeClosed = reflect.Select(branches[:2])
+	fmt.Println(selIndex, sentBeforeClosed) // 1 false
+}
+'''
+
+Giá trị nền tảng của một số `reflect.Value` có thể không tồn tại,
+ví dụ các giá trị `reflect.Value` zero.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "reflect"
+import "fmt"
+
+func main() {
+	var z reflect.Value // một giá trị Value zero
+	fmt.Println(z)      // <invalid reflect.Value>
+	v := reflect.ValueOf((*int)(nil)).Elem()
+	fmt.Println(v)      // <invalid reflect.Value>
+	fmt.Println(v == z) // true
+	var i = reflect.ValueOf([]interface{}{nil}).Index(0)
+	fmt.Println(i)             // <nil>
+	fmt.Println(i.Elem() == z) // true
+	fmt.Println(i.Elem())      // <invalid reflect.Value>
+}
+'''
+
+Dùng `reflect.ValueOf` cùng `interface{}` để tạo `reflect.Value`
+biểu diễn một giá trị Go.
+Quá trình ngược lại cũng tương tự: gọi method `Interface` để lấy `interface{}`,
+rồi type assert để lấy giá trị Go do `reflect.Value` biểu diễn (giá trị nền tảng).
+Lưu ý, gọi `Interface` trên `reflect.Value` biểu diễn field không export sẽ gây panic.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+	"time"
+)
+
+func main() {
+	vx := reflect.ValueOf(123)
+	vy := reflect.ValueOf("abc")
+	vz := reflect.ValueOf([]bool{false, true})
+	vt := reflect.ValueOf(time.Time{})
+
+	x := vx.Interface().(int)
+	y := vy.Interface().(string)
+	z := vz.Interface().([]bool)
+	m := vt.MethodByName("IsZero").Interface().(func() bool)
+	fmt.Println(x, y, z, m()) // 123 abc [false true] true
+
+	type T struct {x int}
+	t := &T{3}
+	v := reflect.ValueOf(t).Elem().Field(0)
+	fmt.Println(v)             // 3
+	fmt.Println(v.Interface()) // panic
+}
+'''
+
+`reflect.Value.IsZero` được giới thiệu trong Go 1.13 để kiểm tra
+giá trị nền tảng của `reflect.Value` có phải zero value hay không.
+
+Từ Go 1.17, __có thể chuyển slice thành pointer tới array__.
+Phép chuyển đổi có thể panic nếu độ dài array nền tảng quá lớn.
+Method `reflect.Value.CanConvert(T reflect.Type)` (Go 1.17) dùng để kiểm tra phép chuyển đổi có thành công hay không.
+
+    === a slice may be converted to an array pointer :: container.tmd#slice-to-array-pointer
+
+Ví dụ dùng method `CanConvert`:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func main() {
+	s := reflect.ValueOf([]int{1, 2, 3, 4, 5})
+	ts := s.Type()
+	t1 := reflect.TypeOf(&[5]int{})
+	t2 := reflect.TypeOf(&[6]int{})
+	fmt.Println(ts.ConvertibleTo(t1)) // true
+	fmt.Println(ts.ConvertibleTo(t2)) // true
+	fmt.Println(s.CanConvert(t1))     // true
+	fmt.Println(s.CanConvert(t2))     // false
+}
+'''
+
+@@@ #deep-equal
+Còn nhiều hàm và method liên quan đến `reflect.Value` chưa được dùng trong ví dụ;
+hãy đọc tài liệu `reflect` để biết cách sử dụng.
+__Go details 101__ cũng đề cập __một số chi tiết__ liên quan đến __reflection__.
+
+    === some reflection :: details.tmd#reflect-deep-equal
+    === details :: details.tmd#reflect-value-bytes
+    === Go details 101 :: details.tmd
+
+{ %%
+
+lỗi trong phần tài liệu reflect
+
+số lượng method của kiểu interface, method không được export, ...
+
+
+https://github.com/golang/go/issues/15924
+https://github.com/golang/go/issues/16522
+https://github.com/golang/go/issues/20824
+
+https://github.com/golang/go/issues/22073
+
+https://github.com/golang/go/issues/22075
+*  bug on reflect query method of interface type and value
+
+https://github.com/golang/go/issues/22143
+
+https://github.com/golang/go/issues/20541
+
+https://github.com/golang/go/issues/20013
+
+
+
+https://groups.google.com/forum/#!msg/golang-dev/coyYwxU3dfM/K_nSPAbOY4kJ;context-place=searchin/golang-dev/closure$20$20callable$20pointer%7Csort:date
+
+reflect.StructOf: hiện tại StructOf không tạo method wrapper cho field nhúng.
+Giới hạn này có thể được gỡ bỏ trong phiên bản tương lai.
+
+reflect.StructOf: field ẩn danh sẽ không tạo bảng method
+
+https://github.com/golang/go/issues/15924
+
+https://github.com/golang/go/issues/24781
+
+https://github.com/golang/go/issues/20633
+https://github.com/golang/go/issues/20632
+https://github.com/golang/go/issues/20824
+
+https://github.com/golang/go/issues/24782
+*  https://play.golang.org/p/Kd4igw-vOp7
+*  https://play.golang.org/p/KCvFWtWRC1b
+
+https://github.com/golang/go/issues/25400 (not a bug)
+https://github.com/golang/go/issues/25401
+https://github.com/golang/go/issues/25402
+https://github.com/golang/go/issues/25403
+
+https://github.com/golang/go/issues/28761
+https://github.com/golang/go/issues/28748
+
+https://github.com/golang/go/issues/29381
+
+    ============================================
+
+
+
+
+    ================
+
+reflectutil
+*  UnderlyingTypeOf(.)
+*  IsZeroValue(.)
+   được tạo bằng cách dùng reflect.Zero(type)
+
+    ======================
+
+nói chung, reflect làm được mọi việc mà cách không dùng reflection làm được (không tính cách dùng unsafe)
+reflect thậm chí làm được cả việc mà cách không dùng reflection không thể.
+*  SetLen and SetCap
+*  select với số case bất kỳ
+*  lấy loại của một giá trị
+*  chuyển []MyByte thành []byte
+
+}

@@ -1,0 +1,500 @@
+""" html
+﻿<h1>Loại bỏ kiểm tra giới hạn</h1>
+
+<p>
+Go là một ngôn ngữ an toàn về bộ nhớ.
+Khi truy cập phần tử mảng/slice hoặc thực hiện thao tác tạo subslice,
+Go runtime sẽ kiểm tra các chỉ số liên quan có nằm ngoài phạm vi hay không.
+Nếu một chỉ số nằm ngoài phạm vi, chương trình sẽ panic để ngăn chỉ số không hợp lệ gây hại.
+Việc này được gọi là kiểm tra giới hạn.
+Kiểm tra giới hạn giúp mã chạy an toàn, nhưng đồng thời cũng khiến mã chạy chậm hơn đôi chút.
+</p>
+
+<p>
+Kể từ Go Toolchain 1.7, Go compiler tiêu chuẩn sử dụng backend compiler mới,
+dựa trên SSA (static single-assignment form).
+SSA giúp Go compiler áp dụng hiệu quả các tối ưu hóa như
+<a href="https://en.wikipedia.org/wiki/Bounds-checking_elimination">BCE</a> (loại bỏ kiểm tra giới hạn)
+và <a href="https://en.wikipedia.org/wiki/Common_subexpression_elimination">CSE</a> (loại bỏ biểu thức con trùng lặp).
+BCE có thể bỏ qua một số lần kiểm tra giới hạn không cần thiết, còn CSE có thể tránh một số phép tính trùng lặp,
+nhờ đó Go compiler tiêu chuẩn tạo ra chương trình hiệu quả hơn.
+Đôi khi hiệu quả cải thiện của các tối ưu hóa này rất rõ rệt.
+</p>
+
+<p>
+Bài viết này đưa ra một số ví dụ minh họa cách BCE hoạt động với Go compiler tiêu chuẩn phiên bản 1.7 trở lên.
+</p>
+
+<p>
+Với Go Toolchain 1.7 trở lên, ta có thể dùng compiler flag <code>-gcflags="-d=ssa/check_bce"</code> để
+hiển thị những dòng mã vẫn cần kiểm tra giới hạn.
+</p>
+
+<h3>Ví dụ 1</h3>
+
+<div>
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example1.go
+package main
+
+func f1(s []int) {
+	_ = s[0] // line 5: kiểm tra giới hạn
+	_ = s[1] // line 6: kiểm tra giới hạn
+	_ = s[2] // line 7: kiểm tra giới hạn
+}
+
+func f2(s []int) {
+	_ = s[2] // line 11: kiểm tra giới hạn
+	_ = s[1] // line 12: đã loại bỏ kiểm tra giới hạn!
+	_ = s[0] // line 13: đã loại bỏ kiểm tra giới hạn!
+}
+
+func f3(s []int, index int) {
+	_ = s[index] // line 17: kiểm tra giới hạn
+	_ = s[index] // line 18: đã loại bỏ kiểm tra giới hạn!
+}
+
+func f4(a [5]int) {
+	_ = a[4] // line 22: đã loại bỏ kiểm tra giới hạn!
+}
+
+func main() {}
+</code></pre>
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example1.go
+./example1.go:5: Found IsInBounds
+./example1.go:6: Found IsInBounds
+./example1.go:7: Found IsInBounds
+./example1.go:11: Found IsInBounds
+./example1.go:17: Found IsInBounds
+</code></pre>
+
+<p>
+Ta thấy không cần kiểm tra giới hạn ở dòng <i>12</i>
+và dòng <i>13</i> trong hàm <code>f2</code>,
+vì kiểm tra giới hạn ở dòng <i>11</i> bảo đảm các chỉ số tại
+dòng <i>12</i> và dòng <i>13</i> không nằm ngoài phạm vi.
+</p>
+
+<p>
+Trong hàm <code>f1</code>, cần thực hiện kiểm tra giới hạn ở cả ba dòng.
+Kiểm tra giới hạn ở dòng <i>5</i> không thể bảo đảm dòng <i>6</i>
+và dòng <i>7</i> an toàn; kiểm tra giới hạn ở dòng <i>6</i> cũng không thể bảo đảm dòng <i>7</i> an toàn.
+</p>
+
+<p>
+Với hàm <code>f3</code>, compiler biết lần truy cập <code>s[index]</code> thứ hai
+chắc chắn an toàn nếu lần truy cập <code>s[index]</code> thứ nhất an toàn.
+</p>
+
+<p>
+Compiler cũng xác định đúng rằng dòng duy nhất (dòng <i>22</i>)
+trong hàm <code>f4</code> là an toàn.
+</p>
+
+<p>
+Lưu ý: tính đến hiện tại (Go Toolchain 1.25.n), compiler tiêu chuẩn
+không kiểm tra BCE cho một thao tác trong generic function nếu thao tác đó
+liên quan đến type parameter và generic function chưa từng được khởi tạo với kiểu cụ thể.
+</p>
+
+Ví dụ minh họa:
+
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example1b.go
+package main
+
+func foo[E any](s []E) {
+	_ = s[0] // line 5
+	_ = s[1] // line 6
+	_ = s[2] // line 7
+}
+
+// var _ = foo[bool]
+
+func main() {
+}
+</code></pre>
+
+Khi dòng khai báo biến bị vô hiệu hóa, compiler không xuất ra gì:
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example1b.go
+</code></pre>
+
+<p>
+</p>
+
+Khi bật dòng khai báo biến, compiler xuất ra:
+
+<pre class="output"><code>./aaa.go:5:7: Found IsInBounds
+./example1b.go:6:7: Found IsInBounds
+./example1b.go:7:7: Found IsInBounds
+./example1b.go:4:6: Found IsInBounds
+</code></pre>
+
+<p>
+</p>
+
+</div>
+
+<h3>Ví dụ 2</h3>
+
+<div>
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example2.go
+package main
+
+func f5(s []int) {
+	for i := range s {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f6(s []int) {
+	for i := 0; i < len(s); i++ {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f7(s []int) {
+	for i := len(s) - 1; i >= 0; i-- {
+		_ = s[i]
+		_ = s[i:len(s)]
+	}
+}
+
+func f8(s []int, index int) {
+	if index >= 0 && index < len(s) {
+		_ = s[index]
+		_ = s[index:len(s)]
+	}
+}
+
+func f9(s []int) {
+	if len(s) > 2 {
+	    _, _, _ = s[0], s[1], s[2]
+	}
+}
+
+func main() {}
+</code></pre>
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example2.go
+</code></pre>
+
+<p>
+Hay đấy! Compiler tiêu chuẩn loại bỏ mọi kiểm tra giới hạn trong chương trình này.
+</p>
+
+<p>
+Lưu ý: trước Go Toolchain 1.11, compiler tiêu chuẩn chưa đủ thông minh để nhận ra
+dòng <i>22</i> an toàn.
+</p>
+
+</div>
+
+<h3>Ví dụ 3</h3>
+
+<div>
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example3.go
+package main
+
+import "math/rand"
+
+func fa() {
+	s := []int{0, 1, 2, 3, 4, 5, 6}
+	index := rand.Intn(7)
+	_ = s[:index] // line 9: kiểm tra giới hạn
+	_ = s[index:] // line 10: đã loại bỏ kiểm tra giới hạn!
+}
+
+func fb(s []int, i int) {
+	_ = s[:i] // line 14: kiểm tra giới hạn
+	_ = s[i:] // line 15: kiểm tra giới hạn, compiler chưa đủ thông minh?
+}
+
+func fc() {
+	s := []int{0, 1, 2, 3, 4, 5, 6}
+	s = s[:4]
+	i := rand.Intn(7)
+	_ = s[:i] // line 22: kiểm tra giới hạn
+	_ = s[i:] // line 23: kiểm tra giới hạn, compiler chưa đủ thông minh?
+}
+
+func main() {}
+</code></pre>
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example3.go
+./example3.go:9: Found IsSliceInBounds
+./example3.go:14: Found IsSliceInBounds
+./example3.go:15: Found IsSliceInBounds
+./example3.go:22: Found IsSliceInBounds
+./example3.go:23: Found IsSliceInBounds
+</code></pre>
+
+<p>
+Ồ, vẫn còn nhiều chỗ cần kiểm tra giới hạn!
+</p>
+
+<p>
+Khoan đã, tại sao Go compiler tiêu chuẩn cho rằng dòng <i>10</i>
+an toàn nhưng dòng <i>15</i> và <i>23</i> thì không?
+Compiler vẫn chưa đủ thông minh sao?
+</p>
+
+<p>
+Thực ra ở đây compiler làm đúng! Vì sao?
+Nguyên nhân là chỉ số bắt đầu trong biểu thức subslice có thể lớn hơn độ dài của slice cơ sở.
+Hãy xem một ví dụ đơn giản:
+</p>
+
+<pre class="line-numbers must-line-numbers"><code class="language-go">package main
+
+func main() {
+	s0 := make([]int, 5, 10) // len(s0) == 5, cap(s0) == 10
+
+	index := 8
+
+	// Trong Go, với cú pháp subslice s[a:b],
+	// phải bảo đảm các quan hệ 0 <= a <= b <= cap(s)
+	// để tránh panic.
+
+	_ = s0[:index]
+	// Dòng trên an toàn không có nghĩa dòng sau
+	// cũng an toàn. Thực tế, dòng sau sẽ panic vì
+	// chỉ số bắt đầu lớn hơn chỉ số kết thúc.
+	_ = s0[index:] // panic
+}
+</code></pre>
+
+<p>
+Vì vậy, kết luận <b>nếu <code>s[:index]</code> an toàn thì <code>s[index:]</code>
+cũng an toàn</b> chỉ đúng khi <code>len(s)</code> bằng <code>cap(s)</code>.
+Đó là lý do các dòng mã trong hàm <code>fb</code> và <code>fc</code>
+ở ví dụ 3 vẫn cần kiểm tra giới hạn.
+</p>
+
+<p>
+Go compiler tiêu chuẩn nhận diện thành công rằng <code>len(s)</code> bằng
+<code>cap(s)</code> trong hàm <code>fa</code>.
+Làm tốt lắm, đội ngũ Go!
+</p>
+
+</div>
+
+<h3>Ví dụ 4</h3>
+
+<div>
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example4.go
+package main
+
+import "math/rand"
+
+func fb2(s []int, index int) {
+	_ = s[index:] // line 7: kiểm tra giới hạn
+	_ = s[:index] // line 8: đã loại bỏ kiểm tra giới hạn!
+}
+
+func fc2() {
+	s := []int{0, 1, 2, 3, 4, 5, 6}
+	s = s[:4]
+	index := rand.Intn(7)
+	_ = s[index:] // line 15: kiểm tra giới hạn
+	_ = s[:index] // line 16: đã loại bỏ kiểm tra giới hạn!
+}
+
+func main() {}
+</code></pre>
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example4.go
+./example4.go:7:7: Found IsSliceInBounds
+./example4.go:15:7: Found IsSliceInBounds
+</code></pre>
+
+Trong ví dụ này, Go compiler tiêu chuẩn kết luận chính xác rằng
+<ul>
+<li>
+	dòng <i>8</i> cũng an toàn nếu dòng <i>7</i> an toàn trong hàm <code>fb2</code>.
+</li>
+<li>
+	dòng <i>16</i> cũng an toàn nếu dòng <i>15</i> an toàn trong hàm <code>fc2</code>.
+</li>
+</ul>
+
+<p>
+Lưu ý: Go compiler tiêu chuẩn ở các phiên bản Go Toolchain trước 1.9 không nhận ra
+rằng dòng <i>8</i> không cần kiểm tra giới hạn.
+</p>
+
+</div>
+
+<h3>Ví dụ 5</h3>
+
+<div>
+Phiên bản Go compiler tiêu chuẩn hiện tại chưa đủ thông minh
+để loại bỏ tất cả các kiểm tra giới hạn không cần thiết.
+Đôi khi, ta có thể đưa ra một số gợi ý để giúp compiler loại bỏ những kiểm tra không cần thiết.
+
+<pre class="line-numbers must-line-numbers"><code class="language-go">// example5.go
+package main
+
+func fd(is []int, bs []byte) {
+	if len(is) >= 256 {
+		for _, n := range bs {
+			_ = is[n] // line 7: kiểm tra giới hạn
+		}
+	}
+}
+
+func fd2(is []int, bs []byte) {
+	if len(is) >= 256 {
+		is = is[:256] // line 14: gợi ý
+		for _, n := range bs {
+			_ = is[n] // line 16: BCE đã loại bỏ kiểm tra!
+		}
+	}
+}
+
+func main() {}
+</code></pre>
+
+<!--
+kể từ Go Toolchain 1.11, compiler trở nên thông minh hơn
+
+func ff(s []int) []int {
+	s2 := make([]int, len(s))
+	for i := range s {
+		s2[i] = -s[i] // line 41: kiểm tra giới hạn, compiler chưa đủ thông minh
+	}
+	return s2
+}
+
+func ff2(s []int) []int {
+	s2 := make([]int, len(s))
+	s2 = s2[:len(s)] // line 48: để tránh kiểm tra giới hạn ở dòng 50
+	for i := range s {
+		s2[i] = -s[i] // line 50: đã loại bỏ kiểm tra giới hạn!
+	}
+	return s2
+}
+-->
+
+<pre class="output"><code>$ go run -gcflags="-d=ssa/check_bce" example5.go
+./example5.go:7: Found IsInBounds
+</code></pre>
+</div>
+
+<!--
+<a class="anchor" id="slice-comparison"></a>
+<h3>Một ứng dụng của BCE: So sánh slice hiệu quả</h3>
+
+<p><b><i>
+(Lưu ý: như Erik Dubbelboer đã chỉ ra, <a href="https://github.com/go101/go101/issues/64">mẹo tối ưu so sánh slice được trình bày trong phần này
+không còn cần thiết kể từ Go Toolchain 1.11</a>.
+Go compiler tiêu chuẩn 1.11 trở lên còn thông minh hơn nên không cần mẹo này nữa.
+Sau một thời gian, tôi sẽ xóa phần này.)
+</i></b></p>
+
+<div>
+
+<p>
+Ta đều biết các kiểu slice không hỗ trợ phép so sánh trong Go.
+Để so sánh hai slice, ta phải tự viết mã so sánh,
+hoặc dùng hàm <code>DeepEqual</code> trong package chuẩn <code>reflect</code>.
+Tuy nhiên, hàm <code>reflect.DeepEqual</code> chạy quá chậm.
+</p>
+
+Dưới đây là một hàm so sánh slice do ta tự viết.
+
+<pre class="line-numbers"><code class="language-go">func CompareSlices_General(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	for i, v := range a {
+		if v != b[i] { // ở đây cần kiểm tra giới hạn cho b[i]
+			return false
+		}
+	}
+
+	return true
+}
+</code></pre>
+
+Trong khối vòng lặp <code>for-range</code>, <code>b[i]</code> vẫn cần kiểm tra giới hạn
+để tránh chỉ số <code>i</code> nằm ngoài phạm vi.
+Ta có thể sửa hàm một chút để bỏ bước kiểm tra này.
+
+<pre class="line-numbers"><code class="language-go">func CompareSlices_BCE(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	if (a == nil) != (b == nil) {
+		return false
+	}
+
+	b = b[:len(a)] // dòng này là then chốt.
+	for i, v := range a {
+		if v != b[i] { // giờ không cần kiểm tra giới hạn cho b[i]!
+			return false
+		}
+	}
+
+	return true
+}
+</code></pre>
+
+Hãy <a href="https://github.com/go101/go-benchmarks/blob/master/bce/bce_test.go">benchmark hai hàm này</a>.
+Kết quả (cập nhật: không có khác biệt với compiler tiêu chuẩn 1.11 trở lên):
+
+<pre class="output"><code>Benchmark_SliceComparison/General-4         	 5000000	       287 ns/op
+Benchmark_SliceComparison/BCE-4             	 5000000	       251 ns/op
+</code></pre>
+
+<p>
+Phiên bản BCE nhanh hơn phiên bản thông thường khoảng 12,5%.
+Kết quả khá tốt.
+</p>
+
+</div>
+-->
+
+<h3>Tóm tắt</h3>
+
+<p>
+Go compiler tiêu chuẩn còn có những tối ưu hóa BCE khác.
+Chúng có thể không rõ ràng như các trường hợp đã nêu,
+nên bài viết này không trình bày tất cả.
+</p>
+
+<p>
+Tính năng BCE trong Go compiler tiêu chuẩn chưa hoàn hảo,
+nhưng hoạt động rất tốt trong nhiều trường hợp phổ biến.
+Chắc chắn Go compiler tiêu chuẩn sẽ hoạt động tốt hơn ở các phiên bản sau,
+để những gợi ý trong ví dụ thứ 5 ở trên có thể không còn cần thiết.
+
+Cảm ơn đội ngũ Go đã bổ sung tính năng tuyệt vời này!
+</p>
+
+<h3>Tài liệu tham khảo:</h3>
+<div>
+<ol>
+<li><a href="https://docs.google.com/document/d/1vdAEAjYdzjnPA9WDOQ1e4e05cYVMpqSxJYZT33Cqw2g">Loại bỏ kiểm tra giới hạn</a></li>
+<li>
+	<a href="https://talks.godoc.org/github.com/klauspost/talks/2016/go17-compiler.slide">Tận dụng Go 1.7 SSA Compiler</a>
+	(và <a href="https://talks.godoc.org/github.com/klauspost/talks/2016/go17-compiler-2.slide">phần thứ hai</a>)
+</li>
+</ol>
+</div>
+
+<!--
+<p class="well well-sm">
+[edit@2016/09/22] đã bổ sung ví dụ 5 và tài liệu tham khảo.
+</p>
+-->

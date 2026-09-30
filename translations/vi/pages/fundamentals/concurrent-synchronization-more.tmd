@@ -1,0 +1,702 @@
+### Các kỹ thuật đồng bộ hóa trong package chuẩn `sync`
+
+Bài viết __các trường hợp sử dụng channel__ giới thiệu
+nhiều trường hợp dùng channel để đồng bộ dữ liệu giữa các goroutine.
+Trên thực tế, channel không phải là kỹ thuật đồng bộ hóa duy nhất mà Go cung cấp.
+Go còn hỗ trợ một số kỹ thuật đồng bộ hóa khác.
+Trong một số tình huống cụ thể, dùng các kỹ thuật đồng bộ hóa
+khác channel sẽ hiệu quả và dễ đọc hơn.
+Phần dưới đây giới thiệu những kỹ thuật đồng bộ hóa trong package chuẩn `sync`.
+
+    === các trường hợp sử dụng channel :: channel-use-cases.tmd
+
+Package chuẩn `sync` cung cấp một số kiểu
+có thể dùng để đồng bộ hóa trong các tình huống chuyên biệt
+và bảo đảm một số thứ tự bộ nhớ nhất định.
+Trong các tình huống đó, những kỹ thuật này hiệu quả hơn
+và có mã gọn gàng hơn cách dùng channel.
+
+//
+(Lưu ý: để tránh hành vi bất thường, tốt nhất không bao giờ sao chép
+các giá trị thuộc những kiểu trong package chuẩn `sync`.)
+
+@@@ #waitgroup
+###========== Kiểu `sync.WaitGroup`
+
+Mỗi giá trị `sync.WaitGroup` duy trì một bộ đếm bên trong.
+Giá trị ban đầu của bộ đếm là zero.
+
+Kiểu `*WaitGroup` có __ba method__:
+`Add(delta int)`, `Done()` và `Wait()`.
+
+    === ba method :: https://golang.org/pkg/sync/#WaitGroup
+
+Với một giá trị `WaitGroup` có thể lấy địa chỉ `wg`,
+*
+   ta có thể gọi method `wg.Add(delta)` để
+   thay đổi giá trị bộ đếm mà `wg` đang duy trì.
+*
+   lời gọi method `wg.Done()` hoàn toàn tương đương với
+   lời gọi method `wg.Add(-1)`.
+*
+   nếu lời gọi `wg.Add(delta)` (hoặc `wg.Done()`) làm
+   bộ đếm mà `wg` duy trì thành số âm thì sẽ xảy ra panic.
+*
+   khi một goroutine gọi `wg.Wait()`,
+   -
+      nếu bộ đếm mà `wg` duy trì đã bằng zero,
+      ta có thể xem lời gọi `wg.Wait()` như một thao tác không làm gì.
+   -
+      nếu không (bộ đếm đang dương), goroutine đó sẽ chuyển sang trạng thái chờ.
+      Nó sẽ trở lại trạng thái chạy (tức là lời gọi `wg.Wait()` trả về)
+      khi một goroutine khác đưa bộ đếm về zero,
+      thường bằng cách gọi `wg.Done()`.
+
+Lưu ý rằng `wg.Add(delta)`, `wg.Done()` và `wg.Wait()`
+lần lượt là cách viết tắt của `(&wg).Add(delta)`, `(&wg).Done()`
+và `(&wg).Wait()`.
+
+Thông thường, một giá trị `WaitGroup` được dùng trong tình huống
+một goroutine chờ cho đến khi một số goroutine khác hoàn thành công việc của chúng.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"math/rand"
+	"sync"
+)
+
+func main() {
+	const N = 5
+	var values [N]int32
+
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func(n int) {
+			values[n] = 50 + rand.Int31n(50)
+			log.Println("Done:", n)
+			wg.Done() // <=> wg.Add(-1)
+		}(i)
+	}
+
+	wg.Wait()
+	// Mọi phần tử được bảo đảm đã
+	// khởi tạo ở thời điểm này.
+	log.Println("values:", values)
+}
+'''
+
+Trong ví dụ trên, goroutine main chờ cho đến khi tất cả `N` goroutine còn lại
+đã điền giá trị vào phần tử tương ứng trong mảng `values`.
+Một kết quả đầu ra có thể là:
+@@@ .output
+'''
+Done: 4
+Done: 1
+Done: 3
+Done: 0
+Done: 2
+values: [71 89 50 62 60]
+'''
+
+Ta có thể tách lời gọi method `Add` duy nhất trong ví dụ trên thành nhiều lời gọi.
+@@@ .line-numbers
+''' go
+...
+	var wg sync.WaitGroup
+	for i := 0; i < N; i++ {
+		wg.Add(1) // sẽ được gọi N lần
+		go func(n int) {
+			values[n] = 50 + rand.Int31n(50)
+			wg.Done()
+		}(i)
+	}
+...
+'''
+
+Có thể gọi method `Wait` trong nhiều goroutine.
+Khi bộ đếm về zero, tất cả chúng sẽ được thông báo cùng lúc theo kiểu broadcast.
+
+@@@ .line-numbers
+''' go
+func main() {
+	const N = 5
+	var values [N]int32
+
+	var wgA, wgB sync.WaitGroup
+	wgA.Add(N)
+	wgB.Add(1)
+
+	for i := 0; i < N; i++ {
+		go func(n int) {
+			wgB.Wait() // chờ thông báo
+			log.Printf("values[%v]=%v \n", n, values[n])
+			wgA.Done()
+		}(i)
+	}
+
+	// Vòng lặp chắc chắn hoàn tất trước khi
+	// bất kỳ lời gọi wg.Wait nào ở trên trả về.
+	for i := 0; i < N; i++ {
+		values[i] = 50 + rand.Int31n(50)
+	}
+	// Phát thông báo broadcast.
+	wgB.Done()
+	wgA.Wait()
+}
+'''
+
+Có thể tái sử dụng một giá trị `WaitGroup` sau khi một lần gọi method `Wait` trả về.
+Tuy nhiên, lưu ý rằng mỗi lần gọi `Add` với delta dương khi bộ đếm bằng zero
+phải xảy ra trước khi bất kỳ lời gọi `Wait` nào bắt đầu,
+nếu không có thể xảy ra data race.
+
+@@@ #once
+###========== Kiểu `sync.Once`
+
+Một giá trị `*sync.Once` có method `Do(f func())`,
+nhận một tham số duy nhất có kiểu `func()`.
+
+Với một giá trị `Once` có thể lấy địa chỉ `o`,
+lời gọi method `o.Do()`, là cách viết tắt của `(&o).Do()`,
+có thể được thực thi đồng thời nhiều lần trong nhiều goroutine.
+Các đối số của những lời gọi `o.Do()` này nên
+(nhưng không bắt buộc phải) là cùng một giá trị hàm.
+
+Trong số các lời gọi method `o.Do`, chỉ đúng một hàm đối số được gọi.
+Hàm đối số được gọi được bảo đảm kết thúc trước khi
+bất kỳ lời gọi method `o.Do` nào trả về.
+Nói cách khác, mã trong hàm đối số được gọi
+được bảo đảm thực thi trước khi bất kỳ lời gọi method `o.Do` nào trả về.
+
+Thông thường, một giá trị `Once` được dùng để bảo đảm rằng
+một đoạn mã chỉ được thực thi đúng một lần trong lập trình đồng thời.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"log"
+	"sync"
+)
+
+func main() {
+	log.SetFlags(0)
+
+	x := 0
+	doSomething := func() {
+		x++
+		log.Println("Hello")
+	}
+
+	var wg sync.WaitGroup
+	var once sync.Once
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			once.Do(doSomething)
+			log.Println("world!")
+		}()
+	}
+
+	wg.Wait()
+	log.Println("x =", x) // x = 1
+}
+'''
+
+Trong ví dụ trên, `Hello` sẽ được in một lần,
+còn `world!` sẽ được in năm lần.
+Và `Hello` được bảo đảm in ra trước cả năm lần `world!`.
+
+@@@ #mutex
+###========== Các kiểu `sync.Mutex` và `sync.RWMutex`
+
+Cả hai kiểu `*sync.Mutex` và `*sync.RWMutex` đều triển khai
+__interface `sync.Locker`__.
+Do đó, cả hai đều có hai method `Lock` và `Unlock`
+để ngăn nhiều bên sử dụng dữ liệu cùng truy cập một phần dữ liệu đồng thời.
+
+    === interface `sync.Locker` :: https://golang.org/pkg/sync/#Locker
+
+Ngoài các method `Lock` và `Unlock`,
+kiểu `*RWMutex` còn có hai method khác là
+`RLock` và `RUnlock`,
+nhằm ngăn một số bên sử dụng dữ liệu (dù là bên ghi hay bên đọc) và một bên ghi dữ liệu
+cùng sử dụng một phần dữ liệu tại cùng thời điểm,
+đồng thời cho phép một số bên đọc truy cập phần dữ liệu đó cùng lúc.
+
+//
+(Lưu ý, các thuật ngữ **// bên đọc dữ liệu //** và **// bên ghi dữ liệu //**
+ở đây không nên được hiểu theo nghĩa đen. Chúng chỉ nhằm mục đích giải thích.
+Bên đọc dữ liệu có thể sửa đổi dữ liệu, còn bên ghi dữ liệu có thể chỉ đọc dữ liệu.)
+
+Một giá trị `Mutex` thường được gọi là khóa loại trừ lẫn nhau.
+Giá trị `Mutex` zero là một mutex đang mở khóa.
+Chỉ có thể khóa một giá trị `Mutex` khi nó đang ở trạng thái mở khóa.
+Nói cách khác, khi một giá trị `Mutex` có thể lấy địa chỉ `m` đã được khóa thành công
+(tức là lời gọi method `m.Lock()` trả về),
+một goroutine khác thử khóa giá trị `Mutex` đó sẽ chuyển sang trạng thái chờ,
+cho đến khi giá trị `Mutex` được mở khóa (qua một lời gọi `m.Unlock()` sau đó).
+
+Lưu ý rằng `m.Lock()` và `m.Unlock()`
+lần lượt là cách viết tắt của `(&m).Lock()` và `(&m).Unlock()`.
+
+Ví dụ sử dụng `sync.Mutex`:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"sync"
+)
+
+type Counter struct {
+	m sync.Mutex
+	n uint64
+}
+
+func (c *Counter) Value() uint64 {
+	c.m.Lock()
+	defer c.m.Unlock()
+	return c.n
+}
+
+func (c *Counter) Increase(delta uint64) {
+	c.m.Lock()
+	c.n += delta
+	c.m.Unlock()
+}
+
+func main() {
+	var c Counter
+	for i := 0; i < 100; i++ {
+		go func() {
+			for k := 0; k < 100; k++ {
+				c.Increase(1)
+			}
+		}()
+	}
+
+	// Vòng lặp chỉ nhằm mục đích minh họa.
+	for c.Value() < 10000 {
+		runtime.Gosched()
+	}
+	fmt.Println(c.Value()) // 10000
+}
+'''
+
+Trong ví dụ trên, giá trị `Counter` dùng một trường `Mutex`
+để bảo đảm trường `n` của giá trị `Counter`
+không bao giờ bị nhiều goroutine sử dụng cùng lúc.
+
+Một giá trị `RWMutex` thường được gọi là khóa loại trừ lẫn nhau dành cho bên đọc và bên ghi.
+Nó có hai khóa: khóa ghi và khóa đọc.
+Cả hai khóa của một giá trị `RWMutex` zero đều ở trạng thái mở khóa.
+Với một giá trị `RWMutex` có thể lấy địa chỉ `rwm`,
+bên ghi dữ liệu có thể khóa khóa ghi của `rwm` qua lời gọi method `rwm.Lock()`,
+còn bên đọc dữ liệu có thể khóa khóa đọc của `rwm` qua lời gọi method `rwm.RLock()`.
+Các lời gọi method `rwm.Unlock()` và `rwm.RUnlock()`
+dùng để mở khóa ghi và khóa đọc tương ứng.
+Khóa đọc của `rwm` duy trì một bộ đếm khóa: bộ đếm tăng thêm một
+khi `rwm.Lock()` được gọi thành công và giảm đi một
+khi `rwm.Unlock()` được gọi thành công.
+Bộ đếm khóa bằng zero nghĩa là khóa đọc đang ở trạng thái mở khóa;
+giá trị khác zero (phải lớn hơn một) nghĩa là khóa đọc đang bị khóa.
+
+Lưu ý rằng `rwm.Lock()`, `rwm.Unlock()`,
+`rwm.RLock()` và `rwm.RUnlock()`
+lần lượt là cách viết tắt của `(&m).Lock()`, `(&m).Unlock()`,
+`(&m).RLock()` và `(&m).RUnlock()`.
+
+Với một giá trị `RWMutex` có thể lấy địa chỉ `rwm`, có các quy tắc sau.
+*
+   Chỉ có thể khóa khóa ghi của `rwm` khi cả khóa đọc lẫn
+   khóa ghi của `rwm` đều không ở trạng thái bị khóa.
+   Nói cách khác, tại một thời điểm chỉ tối đa một bên ghi có thể giữ khóa ghi của `rwm`,
+   và khóa đọc cùng khóa ghi không thể được giữ đồng thời.
+*
+   Khi khóa ghi của `rwm` đang ở trạng thái bị khóa, mọi lần thử khóa mới
+   đối với khóa ghi hoặc khóa đọc của `rwm`
+   sẽ bị chặn cho đến khi khóa ghi ban đầu được mở khóa.
+*
+   Khi khóa đọc của `rwm` đang ở trạng thái bị khóa,
+   mọi lần thử khóa mới đối với khóa ghi sẽ bị chặn
+   cho đến khi khóa đọc được mở khóa.
+   Tuy nhiên, các lần thử khóa mới đối với khóa đọc sẽ thành công
+   miễn là chúng được thực hiện trước mọi lần thử khóa ghi đang bị chặn
+   (xem quy tắc tiếp theo để biết chi tiết).
+   Nói cách khác, nhiều bên đọc có thể giữ khóa đọc cùng lúc.
+   Khóa đọc trở về trạng thái mở khóa khi bộ đếm khóa của nó trở về zero.
+*
+   Giả sử khóa đọc của giá trị `rwm` hiện đang bị khóa.
+   Để tránh khóa đọc vô thời hạn, mọi lần thử khóa đọc mới sau
+   lần thử khóa ghi đã bị chặn sẽ bị chặn.
+*
+   Giả sử khóa ghi của giá trị `rwm` hiện đang bị khóa.
+   Với Go compiler chính thức, để tránh khóa ghi vô thời hạn,
+   các lần thử khóa đọc được thực hiện trước khi nhả khóa ghi chắc chắn sẽ thành công
+   khi khóa ghi được mở, ngay cả khi một số lần thử được thực hiện
+   sau một số lần thử khóa ghi vẫn đang bị chặn.
+
+Hai quy tắc cuối nhằm bảo đảm cả bên đọc lẫn bên ghi đều có cơ hội lấy khóa.
+
+Lưu ý rằng khóa không gắn với goroutine.
+Một goroutine có thể khóa, sau đó một goroutine khác mở khóa.
+Nói cách khác, khóa không biết goroutine nào đã khóa hay mở khóa thành công.
+
+{ %%
+https://github.com/golang/go/issues/17973
+}
+
+Có thể đổi kiểu của trường `m` trong kiểu `Counter` ở ví dụ trước
+thành `sync.RWMutex`, như đoạn mã sau, để đạt hiệu năng tốt hơn
+khi method `Value` được gọi thường xuyên nhưng method `Increase`
+không được gọi thường xuyên.
+
+@@@ .line-numbers
+''' go
+...
+type Counter struct {
+	//m sync.Mutex
+	m sync.RWMutex
+	n uint64
+}
+
+func (c *Counter) Value() uint64 {
+	//c.m.Lock()
+	//defer c.m.Unlock()
+	c.m.RLock()
+	defer c.m.RUnlock()
+	return c.n
+}
+...
+'''
+
+Một tình huống sử dụng khác của giá trị `sync.RWMutex` là chia một công việc ghi thành nhiều phần nhỏ.
+Hãy đọc phần tiếp theo để xem ví dụ.
+
+Theo hai quy tắc cuối được nêu ở trên, chương trình sau rất có thể in ra `abdc`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"time"
+	"sync"
+)
+
+func main() {
+	var m sync.RWMutex
+	go func() {
+		m.RLock()
+		fmt.Print("a")
+		time.Sleep(time.Second)
+		m.RUnlock()
+	}()
+	go func() {
+		time.Sleep(time.Second * 1 / 4)
+		m.Lock()
+		fmt.Print("b")
+		time.Sleep(time.Second)
+		m.Unlock()
+	}()
+	go func() {
+		time.Sleep(time.Second * 2 / 4)
+		m.Lock()
+		fmt.Print("c")
+		m.Unlock()
+	}()
+	go func () {
+		time.Sleep(time.Second * 3 / 4)
+		m.RLock()
+		fmt.Print("d")
+		m.RUnlock()
+	}()
+	time.Sleep(time.Second * 3)
+	fmt.Println()
+}
+'''
+
+Lưu ý rằng ví dụ trên chỉ nhằm mục đích giải thích.
+Nó dùng các lời gọi `time.Sleep` để đồng bộ hóa đồng thời,
+đây là __thực hành không tốt đối với mã production__.
+
+    === thực hành không tốt đối với mã production :: concurrent-common-mistakes.tmd#sleep
+
+Các giá trị `sync.Mutex` và `sync.RWMutex` cũng có thể dùng để tạo thông báo,
+dù có nhiều cách khác tốt hơn để làm cùng việc đó.
+Dưới đây là ví dụ tạo thông báo bằng một giá trị `sync.Mutex`.
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+func main() {
+	var m sync.Mutex
+	m.Lock()
+	go func() {
+		time.Sleep(time.Second)
+		fmt.Println("Hi")
+		m.Unlock() // phát thông báo
+	}()
+	m.Lock() // chờ thông báo
+	fmt.Println("Bye")
+}
+'''
+
+Trong ví dụ trên, văn bản `Hi` được bảo đảm in ra
+trước văn bản `Bye`.
+Để tìm hiểu các bảo đảm về thứ tự bộ nhớ do
+các giá trị `sync.Mutex` và `sync.RWMutex` cung cấp,
+hãy đọc __các bảo đảm về thứ tự bộ nhớ trong Go__.
+
+    === các bảo đảm về thứ tự bộ nhớ trong Go :: memory-model.tmd#mutex
+
+@@@ #cond
+###========== Kiểu `sync.Cond`
+
+Kiểu `sync.Cond` cung cấp một cách hiệu quả
+để gửi thông báo giữa các goroutine.
+
+Mỗi giá trị `sync.Cond` chứa một trường `sync.Locker` có tên `L`.
+Giá trị trường này thường thuộc kiểu `*sync.Mutex` hoặc `*sync.RWMutex`.
+
+Kiểu `*sync.Cond` có __ba method__:
+`Wait()`, `Signal()` và `Broadcast()`.
+
+    === ba method :: https://golang.org/pkg/sync/#Cond
+
+Mỗi giá trị `sync.Cond` cũng duy trì một hàng đợi FIFO (vào trước, ra trước) gồm các goroutine đang chờ.
+Với một giá trị `sync.Cond` có thể lấy địa chỉ `c`,
+*
+   phải gọi `c.Wait()` khi `c.L` đang bị khóa,
+   nếu không, lời gọi `c.Wait()` sẽ gây panic.
+   Một lời gọi `c.Wait()` sẽ
+   *.
+      trước tiên đưa goroutine gọi hiện tại vào
+      hàng đợi goroutine đang chờ do `c` duy trì,
+   *.
+      sau đó gọi `c.L.Unlock()` để mở khóa, tức là nhả khóa `c.L`.
+   *.
+      {
+      rồi đưa goroutine gọi hiện tại sang trạng thái chờ.
+      // <sup>(1)</sup>
+
+      //
+      (Một goroutine khác sẽ đánh thức goroutine gọi này
+      bằng cách gọi `c.Signal()` hoặc `c.Broadcast()` sau đó.)
+
+      Khi goroutine gọi được đánh thức và trở lại trạng thái chạy,
+      `c.L.Lock()` sẽ được gọi (trong lời gọi `c.Wait()` tiếp tục chạy)
+      để thử khóa và giữ khóa `c.L` lại.
+      Lời gọi `c.Wait()` sẽ kết thúc sau khi
+      lời gọi `c.L.Lock()` trả về.
+      }
+
+*
+   lời gọi `c.Signal()` sẽ đánh thức goroutine đầu tiên trong hàng đợi
+   (đồng thời xóa goroutine đó khỏi hàng đợi) do `c` duy trì,
+   nếu hàng đợi không rỗng.
+*
+   lời gọi `c.Broadcast()` sẽ đánh thức tất cả goroutine trong hàng đợi
+   (đồng thời xóa chúng khỏi hàng đợi) do `c` duy trì,
+   nếu hàng đợi không rỗng.
+
+
+Lưu ý rằng `c.Wait()`, `c.Signal()` và `c.Broadcast()`
+lần lượt là cách viết tắt của `(&c).Wait()`, `(&c).Signal()`
+và `(&c).Broadcast()`.
+
+`c.Signal()` và `c.Broadcast()` thường được dùng để thông báo trạng thái của một điều kiện đã thay đổi.
+Thông thường, nên gọi `c.Wait()` trong một vòng lặp kiểm tra điều kiện đã thỏa mãn hay chưa.
+
+{ %%
+^$$(1)$$ Đây là trường hợp phổ biến nhất,
+giả sử `c.Signal()` và `c.Broadcast()` không được gọi
+trong khoảng thời gian ngắn giữa bước 2 và bước 3.
+
+*
+   Nếu gọi `c.Signal()` trong khoảng thời gian ngắn giữa bước 2 và bước 3,
+   goroutine gọi `c.Wait()` có thể không chuyển sang trạng thái chờ.
+*
+   Nếu gọi `c.Broadcast()` trong khoảng thời gian ngắn giữa bước 2 và bước 3,
+   chắc chắn goroutine gọi `c.Wait()` sẽ không chuyển sang trạng thái chờ.
+
+}
+
+Trong trường hợp sử dụng `sync.Cond` theo thông lệ, thường có
+một goroutine chờ thay đổi của một điều kiện nhất định,
+còn một số goroutine khác thay đổi điều kiện và gửi thông báo.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+)
+
+func main() {
+	rand.Seed(time.Now().UnixNano()) // cần thiết trước Go 1.20
+
+	const N = 10
+	var values [N]string
+
+	cond := sync.NewCond(&sync.Mutex{})
+
+	for i := 0; i < N; i++ {
+		d := time.Second * time.Duration(rand.Intn(10)) / 10
+		go func(i int) {
+			time.Sleep(d) // mô phỏng khối lượng công việc
+
+			// Phải thay đổi dữ liệu khi
+			// cond.L đang bị khóa.
+			cond.L.Lock()
+			values[i] = string('a' + i)
+
+			// Gửi thông báo khi khóa cond.L đang bị khóa.
+			cond.Broadcast()
+			cond.L.Unlock()
+
+			// Có thể đặt "cond.Broadcast()"
+			// ở đây, khi khóa cond.L đã được mở.
+			//cond.Broadcast()
+		}(i)
+	}
+
+	// Phải gọi hàm này khi
+	// cond.L đang bị khóa.
+	checkCondition := func() bool {
+		fmt.Println(values)
+		for i := 0; i < N; i++ {
+			if values[i] == "" {
+				return false
+			}
+		}
+		return true
+	}
+
+	cond.L.Lock()
+	defer cond.L.Unlock()
+	for !checkCondition() {
+		// Phải gọi khi cond.L đang bị khóa.
+		cond.Wait()
+	}
+}
+'''
+
+Một kết quả đầu ra có thể là:
+@@@ .output
+'''
+[         ]
+[     f    ]
+[  c   f    ]
+[  c   f  h  ]
+[ b c   f  h  ]
+[a b c   f  h  j]
+[a b c   f g h i j]
+[a b c  e f g h i j]
+[a b c d e f g h i j]
+'''
+
+Vì trong ví dụ này chỉ có một goroutine (goroutine main) đang chờ được đánh thức,
+có thể thay lời gọi `cond.Broadcast()` bằng `cond.Signal()`.
+Như các comment gợi ý,
+không bắt buộc phải gọi `cond.Broadcast()` và `cond.Signal()`
+khi `cond.L` đang bị khóa.
+
+Để tránh data race,
+chỉ được sửa đổi từng phần trong mười phần của điều kiện do người dùng định nghĩa
+khi `cond.L` đang bị khóa.
+Cũng phải gọi hàm `checkCondition` và method `cond.Wait`
+khi `cond.L` đang bị khóa.
+
+Thực ra, trong ví dụ cụ thể ở trên, trường `cond.L` cũng có thể là một giá trị `*sync.RWMutex`,
+và có thể sửa từng phần trong mười phần của điều kiện do người dùng định nghĩa khi đang giữ khóa đọc của `cond.L`,
+như đoạn mã sau:
+
+@@@ .line-numbers
+''' go
+...
+	cond := sync.NewCond(&sync.RWMutex{})
+	cond.L.Lock()
+
+	for i := 0; i < N; i++ {
+		d := time.Second * time.Duration(rand.Intn(10)) / 10
+		go func(i int) {
+			time.Sleep(d)
+			cond.L.(*sync.RWMutex).RLock()
+			values[i] = string('a' + i)
+			cond.L.(*sync.RWMutex).RUnlock()
+			cond.Signal()
+		}(i)
+	}
+...
+'''
+
+Trong ví dụ trên, giá trị `sync.RWMutex` được dùng theo cách khác thường.
+Một số goroutine giữ khóa đọc để sửa các phần tử của mảng,
+còn goroutine main dùng khóa ghi để đọc các phần tử của mảng.
+
+Điều kiện do người dùng định nghĩa được một giá trị `Cond` theo dõi có thể là rỗng.
+Trong trường hợp đó, giá trị `Cond` chỉ được dùng để gửi thông báo.
+Ví dụ, chương trình sau sẽ in `abc` hoặc `bac`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"sync"
+)
+
+func main() {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	cond := sync.NewCond(&sync.Mutex{})
+	cond.L.Lock()
+	go func() {
+		cond.L.Lock()
+		go func() {
+			cond.L.Lock()
+			cond.Broadcast()
+			cond.L.Unlock()
+		}()
+		cond.Wait()
+		fmt.Print("a")
+		cond.L.Unlock()
+		wg.Done()
+	}()
+	cond.Wait()
+	fmt.Print("b")
+	cond.L.Unlock()
+	wg.Wait()
+	fmt.Println("c")
+}
+'''
+
+Nếu cần, nhiều giá trị `sync.Cond` có thể dùng chung một `sync.Locker`.
+Tuy nhiên, những trường hợp như vậy hiếm gặp trong thực tế.
+

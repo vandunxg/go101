@@ -1,0 +1,122 @@
+### Cách sao chép slice?
+
+###======== Các cách thực hiện
+
+Có một số cách để làm việc này.
+
+###========== Cách 1: dùng `make` và `copy`
+
+''' Go
+	cloned := make(SliceType, len(aSlice))
+	copy(cloned, aSlice)
+'''
+
+Lưu ý:
+*  Từ Go toolchain v1.15, cách này được tối ưu riêng để các phần tử của slice được sao chép không bị đặt về zero value trong lời gọi `make`.
+*  Capacity của slice được sao chép không được căn chỉnh theo kích thước memory class.
+   //(Kích thước memory class được đề cập trong __Go Optimizations 101__.)
+       === Go Optimizations 101 `` https://go101.org/optimizations/0.3-memory-allocations.html
+
+Vì hai lý do trên, đây là cách nhanh nhất.
+
+Nhược điểm của cách này:
+*. Nếu slice nguồn `aSlice` là nil, slice được sao chép sẽ không nil. Điều này đôi khi quan trọng.
+*. Cách này hơi dài dòng (cần hai dòng).
+*. Không thể dùng cách này làm biểu thức con trong câu lệnh.
+*. Nếu `SliceType` được khai báo trong package khác, cần import package chứa kiểu `SliceType`.
+
+###========== Cách 2: dạng dài dòng hơn của cách 1
+
+''' Go
+	var cloned SliceType
+	if aSlice != nil {
+		cloned = make(SliceType, len(aSlice))
+		copy(cloned, aSlice)
+	}
+'''
+
+Ngoài nhược điểm đầu tiên của cách 1, cách dài dòng này có các ưu và nhược điểm tương tự cách 1.
+
+###========== Cách 3: dùng `make` và `append`
+
+''' Go
+	append(make(SliceType, 0, len(aSlice)), aSlice...)
+'''
+
+Có thể dùng cách này làm biểu thức con trong câu lệnh.
+
+Lưu ý:
+*  Lời gọi `make` sẽ __đặt các phần tử của slice được sao chép về zero value một cách không cần thiết__,
+       === unnecessarily... `` https://github.com/golang/go/issues/46079
+*  Với toolchain chính thức, capacity của slice được sao chép được căn chỉnh theo kích thước memory class.
+   Điều này có thể khiến cách này còn chậm hơn.
+   //(Kích thước memory class được đề cập trong __Go Optimizations 101__.)
+
+Nhược điểm của cách này:
+*. Vì hai lý do trên, hiện tại đây là cách chậm nhất.
+*. Nếu slice nguồn `aSlice` là nil, slice được sao chép sẽ không nil. Điều này đôi khi quan trọng.
+*. Nếu `SliceType` được khai báo trong package khác, cần import package chứa kiểu `SliceType`.
+
+###========== Cách 4: dùng `append`
+
+''' Go
+	append(SliceType(nil), aSlice...) // cách 1
+	// hoặc
+	append(SliceType{}, aSlice...) // cách 2
+'''
+
+Tương tự cách trước, có thể dùng cách này làm biểu thức con trong câu lệnh.
+
+Lưu ý:
+*  Cách này không đặt các phần tử về zero value một cách không cần thiết, nên có hiệu năng tốt.
+*  Với toolchain chính thức, capacity của slice được sao chép được căn chỉnh theo kích thước memory class.
+   Vì vậy, cách này không phải lúc nào cũng nhanh bằng cách 1.
+   //(Kích thước memory class được đề cập trong __Go Optimizations 101__.)
+
+Nhược điểm của cách này:
+*. Vì hai lý do trên, cách này chậm hơn các cách khác.
+   -  Với cách 1, nếu slice nguồn `aSlice` là một slice rỗng nhưng không nil, slice được sao chép sẽ là nil.
+   -  Với cách 2, nếu slice nguồn `aSlice` là nil, slice được sao chép sẽ không nil.
+*. Nếu `SliceType` được khai báo trong package khác, cần import package chứa kiểu `SliceType`.
+
+###========== Cách 5: dùng `append` một cách khéo léo
+
+''' Go
+	append(aSlice[:0:0], aSlice...)
+'''
+
+Cách này cải thiện cách trước bằng việc tránh hai nhược điểm đã nêu ở trên,
+tức là:
+*  Nếu slice nguồn `aSlice` là một slice rỗng nhưng không nil, slice được sao chép cũng là một slice rỗng nhưng không nil.
+*  Nếu slice nguồn `aSlice` là nil, slice được sao chép cũng là nil.
+*  Không cần import package chứa kiểu `SliceType`.
+
+Đây có thể là cách triển khai gọn nhất mà vẫn có hiệu năng tốt.
+Cách này gần như hoàn hảo, nhưng có một nhược điểm (có thể không đáng kể):
+nếu slice nguồn `aSlice` là một slice rỗng nhưng không nil,
+thì slice được sao chép (cũng là một slice rỗng nhưng không nil) tham chiếu cùng khối bộ nhớ chứa phần tử nền với slice nguồn. Điều này có thể ngăn cản (hoặc trì hoãn) việc thu gom khối bộ nhớ chứa phần tử
+khi slice nguồn không còn được sử dụng.
+
+Có thể loại bỏ nhược điểm nhỏ này bằng cách __cải thiện phần triển khai Go runtime chính thức__.
+Nhưng đến nay, cải tiến đó vẫn chưa được thực hiện.
+
+    === improving... :: https://github.com/golang/go/issues/68488#issuecomment-2267179883
+
+###========== Cách 6: dùng `slices.Clone` (từ Go 1.21)
+
+''' Go
+import "slices"
+
+	slices.Clone(aSlice)
+'''
+
+Triển khai hiện tại của `slices.Clone` chỉ đơn giản dùng cách 5.
+Vì vậy, nó có các ưu và nhược điểm tương tự cách 5.
+Ngoài ra còn một nhược điểm: cần import package chuẩn "slices".
+
+###======== Vậy nên?
+
+Không có một cách nào hoàn hảo để sao chép slice trong Go.
+Hãy chọn cách phù hợp nhất với tình huống của bạn.
+
+

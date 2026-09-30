@@ -1,0 +1,247 @@
+
+### Lời cảm ơn
+
+Trước hết, xin cảm ơn toàn thể cộng đồng Go.
+Nếu không có một cộng đồng năng động và luôn sẵn lòng phản hồi,
+cuốn sách này đã không thể hoàn thành.
+
+Tôi xin gửi lời cảm ơn đặc biệt đến Ian Lance Taylor.
+Ian đã nhiệt tình trả lời vô số câu hỏi nhàm chán của tôi
+trên nhóm go-nuts và trình theo dõi issue của dự án Go.
+Những câu trả lời của Ian giúp tôi tháo gỡ nhiều điều từng chưa hiểu rõ khi sử dụng Go.
+
+Tôi xin cảm ơn những người đã tham gia
+vào các chủ đề hỏi đáp của tôi trên nhóm go-nuts và go-dev:
+Axel Wagner,
+Keith Randall,
+Russ Cox,
+Robert Griesemer,
+Jan Mercl,
+Konstantin Khomoutov,
+Brad Fitzpatrick,
+Alan Donovan,
+Minux Ma,
+Dave Cheney,
+Volker Dobler,
+Caleb Spare,
+Matt Harden,
+Roger Peppe,
+Michael Jones,
+peterGo,
+Pietro Gagliardi,
+Paul Jolly,
+Oleg Sidorov,
+và Rob 'Commander' Pike,
+cùng nhiều người khác.
+
+Tôi cũng học hỏi được rất nhiều từ trình theo dõi issue của dự án Go.
+Xin cảm ơn những người thường xuyên hoạt động
+trên trình theo dõi issue của dự án Go, trong đó có:
+Ian Lance Taylor,
+Robert Griesemer,
+Brad Fitzpatrick,
+Russ Cox,
+Matthew Dempsky,
+Keith Randall,
+Bryan C. Mills,
+Joe Tsai,
+Minux Ma,
+Josh Bleecher Snyder,
+Axel Wagner,
+Daniel Martí,
+Dave Cheney,
+Austin Clements,
+Andrew Bonventre,
+Damian Gryski,
+Alberto Donizetti,
+Emmanuel T Odeke,
+Filippo Valsorda,
+Dominik Honnef,
+và Rob Pike,
+cùng nhiều người khác.
+
+Xin cảm ơn Martin Möhrmann đã chỉ ra một lỗi
+trong một bài viết về Go của tôi trên reddit.
+
+
+Tôi cũng muốn cảm ơn tất cả gopher từng có ảnh hưởng đến cuốn Go 101,
+dù trực tiếp hay gián tiếp, dù cố ý hay vô tình.
+
+Xin cảm ơn tất cả những người đóng góp cho Go 101 đã giúp cải thiện các bài viết, gồm:
+ipinak,
+Amir Khazaie,
+Ziqi Zhao,
+Artur Kirillov,
+Arinto Murdopo,
+Andreas Pannewitz,
+Jason-Huang,
+Joel Rebello,
+Julia Wong,
+Wenbin Zhang,
+Farid Gh,
+Valentin Deleplace,
+nofrish,
+Peter Matseykanets,
+KimMachineGun,
+Yoshinori Kawasaki,
+mooncaker816,
+Sangwon Seo,
+Shaun (wrfly),
+Stephan Renatus,
+Yang Shu,
+stemar94,
+berkant (yadkit),
+Thomas Bower,
+Patryk Małek,
+kucharskim,
+Rodrigue Koffi,
+Jhuliano Skittberg Moreno,
+youmoo,
+ahadc,
+Kevin,
+jojo (hjb912),
+Gordon Wang,
+Steve Zhang,
+cerlestes,
+Bai Kai,
+Gleb Sozinov,
+Jake Montgomery,
+Erik Dubbelboer,
+Afriza N. Arief,
+Maxim Neverov,
+Asim Himani,
+sulinehk,
+Grachev Mikhail,
+halochou,
+HaiwenZhu,
+Alisha Sonawalla,
+SheldonZhong,
+wens.wq,
+xamenyap,
+Emmanuel Hayford,
+Sam Berry,
+binderclip,
+Oleg Atamanenko,
+Amargin,
+Tony Bai,
+lanastasov,
+liukaifei,
+Abirdcfly,
+Tahir Raza,
+Bububuger,
+lniwn,
+GFZRZK,
+bhakiyakalimuthu,
+黎显图,
+Crazy Yang,
+Ilya Markin,
+Yang Yang,
+sdjdd,
+N0mansky,
+Samir Ettali,
+GeXiao,
+ZXH,
+bestgopher,
+9r0k,
+Streppel,
+wieghx,
+SourceLink,
+Oleh,
+Ibrahim Mohammed,
+shu-ming,
+Genaro-Chris,
+Ying-Han Chen,
+Sina-Ghaderi,
+Kaijie Chen,
+huydang284,
+Soule Bah,
+Alex Pashkov,
+Dai Jie,
+Souhail,
+Phan Phu Thanh,
+Frank Meyer,
+hhoke,
+V0idk,
+LiuHe,
+Rathawut Lertsuksakda,
+ffmiyo,
+Arun Kumar,
+Bo Tao,
+KONY,
+Michael Winser,
+eNV25,
+opennota,
+luozhiyun,
+Huang Chao,
+Guilherme C. Matuella,
+Boy Baukema,
+Cuong Manh Le,
+chenxu zhao,
+Roman Ilchyshyn,
+Andy Wong,
+Luo Peng,
+Vitaly Zdanevich,
+Harsh Mangalam,
+Djim Molenkamp,
+ch0ngsheng,
+Alexandr Primak,
+cortes-,
+Yussif Mohammed,
+Wei-Cheng Yeh,
+W.T. Chang,
+darkCavalier11,
+jordancurve,
+1Mark,
+Caio Leonhardt,
+Aleksandr Shalimov,
+DashJay,
+Gabriel Crispino,
+Ammar Kasem,
+nekidb,
+ursatong,
+Eric (kuchaguangjie),
+Cheng (mazeyqian),
+DrejT,
+Wildan S. Nahar,
+Rahul,
+zlqpzww,
+iridescentGray,
+balagrivine,
+linyejoe2,
+Segebre,
+KentLynn,
+RemiTan,
+Christopher Clure,
+Andrew W. Phillips,
+Ethan Wang,
+Rodney Shen,
+Oleksandr Redko,
+solidsniper,
+cùng nhiều người khác.
+
+Tôi xin lỗi nếu đã quên nhắc đến ai đó trong các danh sách trên.
+Cộng đồng Go có rất nhiều gopher tốt bụng và sáng tạo,
+nên hẳn tôi đã bỏ sót một vài người.
+
+Xin cảm ơn các tác giả của những gói JavaScript
+__Bootstrap framework`` https://getbootstrap.com/docs/3.3/__,
+__jQuery library`` https://jquery.com__,
+__code prettify`` https://github.com/google/code-prettify__ và
+__prism syntax highlighting`` https://prismjs.com/__
+đã hỗ trợ website go101.org.
+Xin cảm ơn các tác giả của những dự án
+__go-epub`` https://github.com/bmaupin/go-epub__ và
+__calibre`` https://calibre-ebook.com/__
+đã tạo các ebook Go 101.
+
+Xin cảm ơn Adam Chalkley vì một gợi ý hữu ích về việc tạo ebook.
+
+Xin gửi lời cảm ơn đặc biệt đến
+__Renee French`` https://reneefrench.blogspot.com__
+và Rob Pike.
+Hình minh họa sống động trên bìa các phiên bản điện tử và bản in
+của cuốn sách này được lấy từ
+__một slide của Rob`` https://talks.golang.org/2012/waza.slide#19__.
+Renee là tác giả của các linh vật gopher đáng yêu xuất hiện trong hình.
+
+

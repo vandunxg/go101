@@ -1,0 +1,61 @@
+
+##### channel 1
+
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	c := make(chan int, 1)
+	for done := false; !done; {
+		select {
+		default:
+			print(1)
+			done = true
+		case <-c:
+			print(2)
+			c = nil
+		case c <- 1:
+			print(3)
+		}
+	}
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+321
+21
+1
+"""
+
+
+@@@ #answer
+{
+Đáp án: 321
+
+Chạy thử trên __ Go playground`` https://go.dev/play/p/eR8C9vzWIwH __.
+
+Điểm chính:
+*
+   Ở bước lặp thứ nhất, chỉ thao tác `c <- 1` không bị chặn.
+   Vì vậy, nhánh `case` cuối cùng được chọn.
+*
+   Ở bước lặp thứ hai, chỉ thao tác `<-c` không bị chặn.
+   Vì vậy, nhánh `case` đầu tiên được chọn.
+*
+   Ở bước lặp thứ ba, cả hai thao tác trên channel đều bị chặn.
+   Vì vậy, nhánh `default` được chọn.
+
+
+}
+
+

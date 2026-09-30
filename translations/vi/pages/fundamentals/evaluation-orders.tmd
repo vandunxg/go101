@@ -1,0 +1,575 @@
+### Thứ tự đánh giá biểu thức
+
+Bài viết này giải thích thứ tự đánh giá __biểu thức__
+trong nhiều tình huống khác nhau.
+
+    === biểu thức :: expressions-and-statements.tmd
+
+###========== Biểu thức được đánh giá sau các biểu thức mà nó phụ thuộc
+
+Điều này khá dễ hiểu.
+Một ví dụ hiển nhiên là biểu thức được đánh giá sau các biểu thức con của nó.
+Ví dụ, trong lời gọi hàm `f(x, y[n])`,
+*
+   `f()` được đánh giá sau các biểu thức mà nó phụ thuộc,
+   bao gồm `f`, `x` và `y[n]`.
+*
+   biểu thức `y[n]` được đánh giá sau
+   các biểu thức `n` và `y`.
+
+Hãy đọc __thứ tự khởi tạo các phần tử mã chương trình__
+để xem ví dụ khác về thứ tự khởi tạo biến cấp package.
+
+    === thứ tự khởi tạo các phần tử mã chương trình :: packages-and-imports.tmd#initialization-order
+
+@@@ #package-level-variables
+###========== Thứ tự khởi tạo các biến cấp package
+
+Khi một package được nạp lúc chạy, Go runtime
+sẽ cố gắng khởi tạo các biến cấp package chưa được khởi tạo
+và không phụ thuộc vào biến chưa khởi tạo nào,
+theo thứ tự khai báo,
+cho đến khi không còn biến nào được khởi tạo trong quá trình đó.
+Một chương trình Go biên dịch thành công sẽ không còn
+biến chưa khởi tạo sau khi quá trình này kết thúc.
+
+Các biến cấp package được khai báo dưới dạng blank identifier
+được xử lý như mọi biến khác trong quá trình khởi tạo.
+
+Ví dụ, trong chương trình sau,
+biến `a` phụ thuộc vào `b`,
+còn các biến `c` và `_` phụ thuộc vào `a`.
+Do đó
+*.
+   Biến được khởi tạo đầu tiên là `b`,
+   vì đây là biến cấp package đầu tiên không phụ thuộc vào biến cấp package nào khác.
+*.
+   Biến được khởi tạo thứ hai là `a`.
+   Sau khi `b` được khởi tạo,
+   `a` là biến cấp package đầu tiên
+   không phụ thuộc vào biến cấp package chưa khởi tạo nào.
+*.
+   Các biến được khởi tạo thứ ba và thứ tư là `_` và `c`.
+   Sau khi `a` và `b` được khởi tạo,
+   cả `_` lẫn `c` đều không phụ thuộc vào biến cấp package chưa khởi tạo nào.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+var (
+	_ = f()
+	a = b / 2
+	b = 6
+	c = f()
+)
+
+func f() int {
+	a++
+	return a
+}
+
+func main() {
+	fmt.Println(a, b, c) // 5 6 5
+}
+'''
+
+Chương trình trên in ra `5 6 5`.
+
+{ %%
+@@@ .line-numbers
+''' go
+package main
+
+var (
+	_ = f("w", x)
+	x = f("x", z)
+	y = f("y")
+	z = f("z")
+)
+
+func f(s string, deps ...int) int {
+	print(s)
+	return 0
+}
+
+func main() {
+	f("\n")
+}
+'''
+
+(Lưu ý: trước Go Toolchain 1.13, Go compiler tiêu chuẩn
+__href="https://github.com/golang/go/issues/22326">đã không triển khai đúng quy tắc này__.
+Nếu biên dịch chương trình trên bằng Go compiler tiêu chuẩn phiên bản 1.12,
+nó sẽ in ra `zxwy`.)
+}
+
+{ %%
+https://github.com/golang/go/issues/31292
+https://github.com/golang/go/commit/451cf3e2cd8950571f436896a3987343f8c2d7f6
+}
+
+Nhiều biến ở vế trái của khai báo biến được khởi tạo bằng một biểu thức nhiều giá trị
+duy nhất ở vế phải sẽ được khởi tạo cùng lúc. Ví dụ, với khai báo biến cấp package
+`var x, y = f()`, các biến `x` và `y` được khởi tạo cùng lúc. Nói cách khác,
+không có biến nào khác được khởi tạo xen giữa chúng.
+
+Khai báo biến cấp package có nhiều biểu thức giá trị nguồn
+sẽ được tách thành nhiều khai báo chỉ có một giá trị nguồn
+trước khi khởi tạo tất cả biến cấp package. Ví dụ,
+
+@@@ .line-numbers
+''' go
+var m, n = expr1, expr2
+'''
+
+tương đương với
+
+@@@ .line-numbers
+''' go
+var m = expr1
+var n = expr2
+'''
+
+Nếu giữa các biến tồn tại phụ thuộc ẩn,
+thứ tự khởi tạo giữa những biến đó không được xác định.
+Trong ví dụ sau (được chép từ Go specification),
+*
+   chắc chắn biến `a` được khởi tạo sau `b`,
+*
+   nhưng không xác định được `x` được khởi tạo trước `b`, giữa `b` và `a`, hay sau `a`,
+*
+   và cũng không xác định được hàm `sideEffect()` được gọi lúc nào (trước
+   hay sau khi `x` được khởi tạo).
+
+@@@ .line-numbers
+''' go
+// x có phụ thuộc ẩn vào a và b
+var x = I(T{}).ab()
+// Giả sử sideEffect không liên quan đến x, a và b.
+var _ = sideEffect()
+var a = b
+var b = 42
+
+type I interface    { ab() []int }
+type T struct{}
+func (T) ab() []int { return []int{a, b} }
+'''
+
+Lưu ý, Go specification không quy định bắt buộc thứ tự biên dịch các tệp nguồn
+trong một package. Vì vậy, hãy tránh đặt các biến cấp package có quan hệ phụ thuộc phức tạp
+trong những tệp nguồn khác nhau của cùng package; nếu không, các Go compiler khác nhau
+có thể khởi tạo biến thành các giá trị khác nhau.
+
+Ngoài ra, một số phiên bản Go Toolchain không triển khai chính xác
+các quy tắc nêu trên. Ví dụ:
+
+*
+   __một bug`` https://github.com/golang/go/issues/66575__ trong Go Toolchain 1.22.0 - 1.22.4.
+*
+   __một bug`` https://github.com/golang/go/issues/66585__ trong các phiên bản Go Toolchain trước 1.23.
+
+###========== Thứ tự đánh giá toán hạng trong các phép toán logic
+
+Trong biểu thức boolean `a && b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
+nếu biểu thức toán hạng bên trái `a` được đánh giá là `true`.
+Vì vậy, nếu cần đánh giá `b`, việc đó diễn ra sau khi đánh giá `a`.
+
+Trong biểu thức boolean `a || b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
+nếu biểu thức toán hạng bên trái `a` được đánh giá là `false`.
+Vì vậy, nếu cần đánh giá `b`, việc đó diễn ra sau khi đánh giá `a`.
+
+###========== Thứ tự thông thường
+
+Đối với các phép đánh giá bên trong thân hàm, Go specification quy định:
+
+>
+   ...,
+   khi đánh giá toán hạng của biểu thức, phép gán hoặc câu lệnh return,
+   mọi lời gọi hàm, lời gọi method và thao tác giao tiếp (channel)
+   đều được đánh giá theo thứ tự từ trái sang phải trong mã nguồn.
+
+Thứ tự vừa mô tả được gọi là **// thứ tự thông thường //**.
+
+Lưu ý, phép chuyển đổi giá trị tường minh `T(v)` không phải là lời gọi hàm.
+
+Ví dụ, trong biểu thức `[]int{x, fa(), fb(), y}`, giả sử `x` và `y` là hai biến,
+`fa` và `fb` là hai hàm, thì lời gọi `fa()`
+được đảm bảo đánh giá (thực thi) trước `fb()`.
+Tuy nhiên, Go specification không xác định các thứ tự sau:
+*
+   thứ tự đánh giá `x` (hoặc `y`) và `fa()` (hoặc `fb()`),
+*
+   thứ tự đánh giá `x`, `y`, `fa` và `fb`.
+
+Một ví dụ khác là phép gán sau, được minh họa trong Go specification.
+
+@@@ .disable-line-numbers111
+''' go
+y[z.f()], ok = g(h(a, b), i()+x[j()], <-c), k()
+'''
+
+trong đó
+*
+   `c` là biểu thức channel và được đánh giá thành một giá trị channel,
+*
+   `g`, `h`, `i`, `j` và `k` là các biểu thức hàm,
+*
+   `f` là method của biểu thức `z`.
+
+Kết hợp với quy tắc ở mục trước, compiler phải đảm bảo các thứ tự đánh giá sau khi chạy.
+*
+   Các lời gọi hàm, lời gọi method và thao tác giao tiếp channel
+   diễn ra theo thứ tự `z.f()`→`h()`→`i()`→`j()`→`<-c`→`g()`→`k()`.
+*
+   `h()` được đánh giá sau khi đánh giá các biểu thức `h`, `a` và `b`.
+*
+   `y[]` được đánh giá sau khi đánh giá `z.f()`.
+*
+   `z.f()` được đánh giá sau khi đánh giá biểu thức `z`.
+*
+   `x[]` được đánh giá sau khi đánh giá `j()`.
+
+Tuy nhiên, các thứ tự sau (và nhiều thứ tự khác) không được xác định.
+*
+   Thứ tự đánh giá `y`, `z`, `g`, `h`, `a`, `b`, `x`, `i`, `j`, `c` và `k`.
+*
+   Thứ tự đánh giá `y[]`, `x[]` và `<-c`.
+
+Theo thứ tự thông thường, ta biết các biến `x`, `m` và `n` được khai báo dưới đây
+(cũng được minh họa trong Go specification) sẽ được khởi tạo với các giá trị không xác định duy nhất.
+
+@@@ .line-numbers
+''' go
+	a := 1
+	f := func() int { a++; return a }
+
+	// x có thể là [1, 2] hoặc [2, 2]: thứ tự đánh giá
+	// giữa a và f() không được xác định.
+	x := []int{a, f()}
+
+	// m có thể là {2: 1} hoặc {2: 2}: thứ tự đánh giá
+	// giữa hai phép gán phần tử map
+	// không được xác định.
+	m := map[int]int{a: 1, a: 2}
+
+	// n có thể là {2: 3} hoặc {3: 3}: thứ tự đánh giá
+	// giữa key và value không được xác định.
+	n := map[int]int{a: f()}
+'''
+
+@@@ #value-assignment
+###========== Thứ tự đánh giá và gán trong câu lệnh gán
+
+Ngoài các quy tắc đã nêu, Go specification còn quy định thêm về thứ tự đánh giá biểu thức
+và thứ tự thực hiện từng phép gán trong một câu lệnh gán:
+
+>
+   Phép gán diễn ra qua hai giai đoạn.
+   Trước tiên, các toán hạng của biểu thức chỉ mục và phép gián tiếp con trỏ
+   (bao gồm phép gián tiếp con trỏ ngầm định trong selector) ở vế trái,
+   cùng các biểu thức ở vế phải, đều được đánh giá theo thứ tự thông thường.
+   Sau đó, các phép gán được thực hiện theo thứ tự từ trái sang phải.
+
+Sau đây, ta gọi giai đoạn đầu là giai đoạn đánh giá và giai đoạn thứ hai là giai đoạn thực hiện.
+
+Go specification không nói rõ các phép gán trong giai đoạn thứ hai
+có thể ảnh hưởng đến kết quả đánh giá biểu thức thu được trong giai đoạn đầu hay không;
+điều này từng gây ra __một số__ __tranh cãi__.
+Vì vậy, bài viết này giải thích thêm về thứ tự đánh giá trong phép gán giá trị.
+
+    === một số :: https://github.com/golang/go/issues/23188#issuecomment-403951267
+    === tranh cãi :: https://github.com/golang/go/issues/15620
+
+Trước hết, cần làm rõ rằng các phép gán trong giai đoạn thứ hai
+không ảnh hưởng đến kết quả đánh giá biểu thức thu được ở cuối giai đoạn đầu.
+
+Để thuận tiện cho phần giải thích sau, ta giả định rằng
+giá trị container (slice hoặc map) của biểu thức chỉ mục đích gán luôn có thể lấy địa chỉ.
+Nếu không, có thể hình dung giá trị container đã được lưu vào
+và thay bằng một giá trị container tạm thời có thể lấy địa chỉ trước khi bắt đầu giai đoạn thứ hai.
+
+Khi giai đoạn đánh giá kết thúc và ngay trước khi giai đoạn thực hiện bắt đầu,
+mỗi biểu thức đích ở vế trái của phép gán
+đã được đánh giá thành dạng cơ bản. Các biểu thức đích khác nhau có dạng cơ bản khác nhau.
+*
+   Nếu biểu thức đích là blank identifier, dạng cơ bản của nó vẫn là blank identifier.
+*
+   Nếu biểu thức đích là biểu thức chỉ mục container (array, slice hoặc map) `c[k]`,
+   dạng cơ bản là `(*cAddr)[k]`, trong đó `cAddr` là con trỏ trỏ đến `c`.
+*
+   Với trường hợp khác, biểu thức đích phải cho ra một giá trị có thể lấy địa chỉ;
+   dạng cơ bản của nó là phép giải tham chiếu địa chỉ của kết quả đánh giá biểu thức đích.
+
+Giả sử `a` và `b` là hai biến cùng kiểu, có thể lấy địa chỉ. Phép gán sau
+
+@@@ .line-numbers
+''' go
+	a, b = b, a
+'''
+
+sẽ được thực hiện theo các bước sau:
+
+@@@ .line-numbers
+''' go
+// Giai đoạn đánh giá:
+P0 := &a; P1 := &b
+R0 := b; R1 := a 
+
+// Dạng cơ bản: *P0, *P1 = R0, R1
+
+// Giai đoạn thực hiện:
+*P0 = R0
+*P1 = R1
+'''
+
+Đây là ví dụ khác, trong đó `x[0]` thay đổi thay vì `x[1]`.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+	x := []int{0, 0}
+	i := 0
+	i, x[i] = 1, 2
+	fmt.Println(x) // [2 0]
+'''
+
+Các bước thực thi đã tách riêng cho dòng // 3 // được minh họa dưới đây:
+
+@@@ .line-numbers
+''' go
+// Giai đoạn đánh giá:
+P0 := &i; P1 := &x; T2 := i
+R0 := 1; R1 := 2
+// Lúc này, T2 == 0
+
+// Dạng cơ bản: *P0, (*P1)[T2] = R0, R1
+
+// Giai đoạn thực hiện:
+*P0 = R0
+(*P1)[T2] = R1
+'''
+
+Một ví dụ phức tạp hơn một chút.
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m := map[string]int{"Go": 0}
+	s := []int{1, 1, 1}; olds := s
+	n := 2
+	p := &n
+	s, m["Go"], *p, s[n] = []int{2, 2, 2}, s[1], m["Go"], 5
+	fmt.Println(m, s, n) // map[Go:1] [2 2 2] 0
+	fmt.Println(olds)    // [1 1 5]
+}
+'''
+
+Các bước thực thi đã tách riêng cho dòng // 10 // được minh họa dưới đây:
+
+@@@ .line-numbers
+''' go
+// Giai đoạn đánh giá:
+P0 := &s; PM1 := &m; K1 := "Go"; P2 := p; PS3 := &s; T3 := 2
+R0 := []int{2, 2, 2}; R1 := s[1]; R2 := m["Go"]; R3 := 5
+// Lúc này, R1 == 1, R2 == 0
+
+// Dạng cơ bản:
+//     *P0, (*PM1)[K1], *P2, (*PS3)[T3] = R0, R1, R2, R3
+
+// Giai đoạn thực hiện:
+*P0 = R0
+(*PM1)[K1] = R1
+*P2 = R2
+(*PS3)[T3] = R3
+'''
+
+Ví dụ sau xoay vòng tất cả phần tử trong slice đi một vị trí.
+
+@@@ .line-numbers
+''' go
+	x := []int{2, 3, 5, 7, 11}
+	t := x[0]
+	var i int
+	for i, x[i] = range x {}
+	x[i] = t
+	fmt.Println(x) // [3 5 7 11 2]
+'''
+
+Một ví dụ khác:
+
+@@@ .line-numbers
+''' go
+	x := []int{123}
+	x, x[0] = nil, 456        // sẽ không panic
+	x, x[0] = []int{123}, 789 // sẽ panic
+'''
+
+Dù hợp lệ, không nên dùng phép gán nhiều giá trị phức tạp trong Go,
+vì chúng khó đọc và ảnh hưởng tiêu cực đến tốc độ biên dịch lẫn hiệu năng thực thi.
+
+Như đã đề cập ở trên,
+Go specification không quy định mọi thứ tự trong phép gán giá trị,
+do đó một số đoạn mã viết không cẩn thận có thể cho kết quả khác nhau.
+Trong ví dụ sau, thứ tự đánh giá hai biểu thức
+`x+1` và `f(&x)` không được xác định.
+Vì vậy, ví dụ có thể in ra `100 99` hoặc `1 99`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	f := func (p *int) int {
+		*p = 99
+		return *p
+	}
+
+	x := 0
+	y, z := x+1, f(&x)
+	fmt.Println(y, z)
+}
+'''
+
+Ví dụ sau cũng cho kết quả không xác định duy nhất.
+Tùy cách triển khai compiler, kết quả có thể là `1 7 2`, `1 8 2` hoặc `1 9 2`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	x, y := 0, 7
+	f := func() int {
+		x++
+		y++
+		return x
+	}
+	fmt.Println(f(), y, f())
+}
+'''
+
+###========== Thứ tự đánh giá biểu thức trong khối mã `switch-case`
+
+Thứ tự đánh giá biểu thức trong khối mã `switch-case` đã được __mô tả trước đó__.
+Ở đây chỉ nêu một ví dụ.
+Nói đơn giản, trước khi đi vào khối mã của một nhánh,
+các biểu thức `case` được đánh giá và so sánh lần lượt với biểu thức `switch`,
+cho đến khi có phép so sánh cho kết quả `true`.
+
+    === mô tả trước đó :: control-flows.tmd#switch-case
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	f := func(n int) int {
+		fmt.Printf("f(%v) is called.\n", n)
+		return n
+	}
+
+	switch x := f(3); x + f(4) {
+	default:
+	case f(5):
+	case f(6), f(7), f(8):
+	case f(9), f(10):
+	}
+}
+'''
+
+Khi chạy, các lời gọi `f()` được đánh giá theo thứ tự
+từ trên xuống dưới và từ trái sang phải,
+cho đến khi có phép so sánh cho kết quả `true`.
+Vì vậy, trong ví dụ này, `f(8)`, `f(9)` và `f(10)`
+sẽ không được đánh giá.
+
+Kết quả:
+@@@ .output
+'''
+f(3) is called.
+f(4) is called.
+f(5) is called.
+f(6) is called.
+f(7) is called.
+'''
+
+###========== Thứ tự đánh giá biểu thức trong khối mã `select-case`
+
+Khi thực thi khối mã `select-case`, trước khi đi vào khối mã của một nhánh,
+tất cả toán hạng channel của các phép nhận và các toán hạng của câu lệnh gửi
+trong khối mã `select-case` đều được đánh giá đúng một lần,
+theo thứ tự trong mã nguồn (từ trên xuống dưới, từ trái sang phải).
+
+Lưu ý, biểu thức đích được gán bởi một phép nhận trong `case`
+chỉ được đánh giá nếu phép nhận đó được chọn sau này.
+
+Trong ví dụ sau, biểu thức `*fptr("aaa")` sẽ không bao giờ được đánh giá,
+vì phép nhận tương ứng `<-fchan("bbb", nil)` sẽ không được chọn.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	c := make(chan int, 1)
+	c <- 0
+	fchan := func(info string, c chan int) chan int {
+		fmt.Println(info)
+		return c
+	}
+	fptr := func(info string) *int {
+		fmt.Println(info)
+		return new(int)
+	}
+
+	select {
+	case *fptr("aaa") = <-fchan("bbb", nil): // chờ
+	case *fptr("ccc") = <-fchan("ddd", c):   // không chờ
+	case fchan("eee", nil) <- *fptr("fff"):  // chờ
+	case fchan("ggg", nil) <- *fptr("hhh"):  // chờ
+	}
+}
+'''
+
+Kết quả của chương trình trên:
+@@@ .output
+'''
+bbb
+ddd
+eee
+fff
+ggg
+hhh
+ccc
+'''
+
+Lưu ý, biểu thức `*fptr("ccc")` là biểu thức cuối cùng được đánh giá trong ví dụ trên.
+Nó được đánh giá sau khi phép nhận tương ứng `<-fchan("ddd", c)` được chọn.
+
+{ %%
+
+var y, z = string(x),  f()
+
+and
+
+var y = string(x)
+var z = f()
+
+Those two code snippets are equivalent in the package block. They are not guaranteed to be equivalent within a function body.
+
+https://github.com/golang/go/issues/43216#issuecomment-750923219
+}

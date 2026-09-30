@@ -1,0 +1,33 @@
+
+### Làm thế nào để duyệt các byte trong một string?
+
+Trong Go, string được giả định là mã hóa theo UTF-8.
+Dùng `for-range` trên một string sẽ lấy các rune (mã điểm Unicode) trong string.
+Vậy làm thế nào để lấy từng byte trong một string?
+Có hai cách để thực hiện việc này.
+Hiệu năng của hai cách này về cơ bản là tương đương.
+
+###======= Cách 1: dùng vòng lặp `for;;`
+
+''' Go
+	for i := 0; i < len(aString); i++ {
+		byteElement := aString[i]
+		... // dùng byteElement
+	}
+'''
+
+###======= Cách 2: dùng vòng lặp `for-range`
+
+Trình biên dịch Go chính thức tối ưu đặc biệt để phép chuyển đổi `[]byte(aString)` không cần cấp phát bộ nhớ
+hay sao chép các byte của string, nếu có thể chứng minh rằng slice byte kết quả (của phép chuyển đổi)
+không được dùng đồng thời. Ví dụ, phép chuyển đổi đặt sau từ khóa `range` không cấp phát bộ nhớ
+và không sao chép các byte của string.
+
+''' Go
+	for _, byteElement := range []byte(aString) {
+		... // dùng byteElement
+	}
+'''
+
+
+

@@ -1,0 +1,455 @@
+### Khối bộ nhớ
+
+Go là ngôn ngữ hỗ trợ quản lý bộ nhớ tự động,
+chẳng hạn như cấp phát bộ nhớ và garbage collection tự động.
+Nhờ đó, lập trình viên Go có thể lập trình mà không phải tự xử lý các chi tiết quản lý bộ nhớ rườm rà bên dưới.
+Điều này không chỉ thuận tiện và giúp tiết kiệm nhiều thời gian,
+mà còn giúp lập trình viên tránh được nhiều lỗi sơ ý.
+
+Lập trình viên Go không nhất thiết phải biết chi tiết triển khai quản lý bộ nhớ để viết mã Go,
+nhưng hiểu một số khái niệm và nắm được một số đặc điểm trong cách trình biên dịch Go chuẩn và runtime quản lý bộ nhớ
+sẽ rất hữu ích để viết mã Go có chất lượng cao.
+
+Bài viết này giải thích một số khái niệm và nêu một số đặc điểm trong cách trình biên dịch Go chuẩn và runtime
+cấp phát khối bộ nhớ và thực hiện garbage collection.
+Bài viết không đề cập đến những khía cạnh khác của quản lý bộ nhớ,
+chẳng hạn như yêu cầu cấp phát hay giải phóng bộ nhớ.
+
+@@@ #memory-block
+###========== Khối bộ nhớ
+
+Khối bộ nhớ là một vùng nhớ liên tục dùng để chứa __các phần giá trị__ khi chương trình chạy.
+Các khối bộ nhớ có thể có kích thước khác nhau để chứa những phần giá trị khác nhau.
+Một khối bộ nhớ có thể đồng thời chứa nhiều phần giá trị,
+nhưng mỗi phần giá trị chỉ có thể nằm trọn trong một khối bộ nhớ,
+bất kể phần giá trị đó lớn đến đâu.
+Nói cách khác, một phần giá trị không bao giờ trải qua nhiều khối bộ nhớ.
+
+    === các phần giá trị :: value-part.tmd
+
+Có nhiều lý do khiến một khối bộ nhớ có thể chứa nhiều phần giá trị. Một số lý do:
+*
+   Một giá trị struct thường có nhiều field. Vì vậy, khi cấp phát một khối bộ nhớ cho
+   giá trị struct, khối đó cũng chứa (các phần trực tiếp của) những giá trị field này.
+*
+   Một giá trị array thường có nhiều phần tử. Vì vậy, khi cấp phát một khối bộ nhớ cho
+   giá trị array, khối đó cũng chứa (các phần trực tiếp của) những giá trị phần tử trong array.
+*
+   Các dãy phần tử nền của hai slice có thể cùng nằm trên một khối bộ nhớ,
+   thậm chí hai dãy phần tử còn có thể chồng lấp lên nhau.
+
+###========== Một giá trị tham chiếu đến các khối bộ nhớ chứa những phần giá trị của nó
+
+Ta đã biết một phần giá trị có thể tham chiếu đến một phần giá trị khác.
+Ở đây, ta mở rộng định nghĩa về tham chiếu: mọi phần giá trị nằm trong một khối bộ nhớ
+đều được xem là tham chiếu đến khối đó.
+Do đó, nếu một phần giá trị `v` được một phần giá trị khác tham chiếu,
+thì phần giá trị kia cũng gián tiếp tham chiếu đến khối bộ nhớ chứa `v`.
+
+@@@ #when-to-allocate
+###========== Khi nào khối bộ nhớ được cấp phát?
+
+Trong Go, khối bộ nhớ có thể được cấp phát trong các trường hợp sau, cùng những trường hợp khác:
+*
+   Gọi tường minh các hàm dựng sẵn `new` và `make`.
+   Mỗi lần gọi `new` luôn cấp phát đúng một khối bộ nhớ.
+   Một lần gọi `make` cấp phát nhiều khối bộ nhớ để chứa
+   phần trực tiếp và các phần nền của giá trị slice, map hoặc channel được tạo ra.
+*
+   Tạo map, slice và hàm ẩn danh bằng các literal tương ứng.
+   Mỗi thao tác như vậy có thể cấp phát nhiều hơn một khối bộ nhớ.
+*
+   Khai báo biến.
+*
+   Gán giá trị không phải interface cho giá trị interface
+   (khi giá trị không phải interface đó không phải là giá trị con trỏ).
+*
+   Nối các string không phải hằng số.
+*
+   Chuyển string thành slice byte hoặc rune, và ngược lại,
+   trừ __một số trường hợp tối ưu hóa đặc biệt của trình biên dịch__.
+*
+   Chuyển số nguyên thành string.
+*
+   Gọi hàm dựng sẵn `append` (khi capacity của slice gốc không đủ lớn).
+*
+   Thêm một cặp key-element mới vào map (khi hash table nền cần được thay đổi kích thước).
+
+    === một số trường hợp tối ưu hóa đặc biệt của trình biên dịch :: string.tmd#conversion-optimizations
+
+@@@ #where-to-allocate
+###========== Khối bộ nhớ được cấp phát ở đâu?
+
+Trong mọi chương trình Go được biên dịch bằng trình biên dịch Go chuẩn chính thức,
+mỗi goroutine duy trì một stack khi chạy; stack là một vùng nhớ.
+Stack đóng vai trò như một pool bộ nhớ để cấp phát một số khối bộ nhớ.
+Trước Go Toolchain 1.19, kích thước ban đầu của stack luôn là
+8KiB trên Windows và 2KiB trên các nền tảng khác.
+Từ Go Toolchain 1.19, kích thước ban đầu được điều chỉnh __thích ứng__.
+Stack của goroutine sẽ tăng hoặc giảm kích thước khi cần trong quá trình goroutine chạy.
+Kích thước stack tối thiểu là 8KiB trên Windows và 2KiB trên các nền tảng khác.
+
+    === thích ứng :: https://docs.google.com/document/d/1YDlGIdVTPnmUiTAavlZxBI1d9pwGQgZT7IKFKlIXohQ
+
+//
+(Lưu ý, có một giới hạn toàn cục về kích thước stack mà mỗi goroutine có thể đạt tới.
+Nếu goroutine vượt quá giới hạn khi stack tăng kích thước, chương trình sẽ bị crash.
+Theo Go Toolchain 1.25.n, kích thước stack tối đa mặc định
+là 1 GB trên hệ thống 64-bit và 250 MB trên hệ thống 32-bit.
+Ta có thể gọi hàm `SetMaxStack` trong package chuẩn `runtime/debug` để thay đổi giới hạn này.
+Ngoài ra, theo cách triển khai hiện tại của trình biên dịch Go chuẩn chính thức,
+kích thước stack tối đa thực tế được cho phép là lũy thừa lớn nhất của 2
+không vượt quá giá trị MaxStack được thiết lập.
+Vì vậy, với cấu hình mặc định, kích thước stack tối đa thực tế được cho phép
+là 512 MiB trên hệ thống 64-bit và 128 MiB trên hệ thống 32-bit.)
+
+Khối bộ nhớ có thể được cấp phát trên stack.
+Khối bộ nhớ được cấp phát trên stack của một goroutine chỉ có thể được dùng (tham chiếu)
+bên trong chính goroutine đó.
+Đây là tài nguyên chỉ thuộc về goroutine đó.
+Không an toàn nếu tham chiếu đến chúng từ goroutine khác.
+Một goroutine có thể truy cập hoặc sửa đổi các phần giá trị nằm trong khối bộ nhớ
+được cấp phát trên stack của nó
+mà không cần dùng kỹ thuật đồng bộ dữ liệu nào.
+
+//(Để biết những khối bộ nhớ nào sẽ được cấp phát trên stack,
+hãy đọc chương "Stack and Escape Analysis" trong sách
+__Go Optimizations 101__.)
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+Heap là một khái niệm ảo, chỉ có một heap trong mỗi chương trình.
+Nếu một khối bộ nhớ không được cấp phát trên stack của bất kỳ goroutine nào,
+ta nói khối bộ nhớ đó được cấp phát trên heap.
+Các phần giá trị nằm trong những khối bộ nhớ được cấp phát trên heap
+có thể được nhiều goroutine sử dụng.
+Nói cách khác, chúng có thể được sử dụng đồng thời.
+Khi cần, việc sử dụng chúng phải được đồng bộ hóa.
+
+Heap là nơi cấp phát bộ nhớ theo hướng thận trọng.
+Nếu trình biên dịch phát hiện một khối bộ nhớ sẽ được tham chiếu xuyên qua nhiều goroutine,
+hoặc không thể dễ dàng xác nhận khối đó có an toàn để đặt trên stack của một goroutine hay không,
+thì khối bộ nhớ sẽ được cấp phát trên heap khi chạy.
+Điều này có nghĩa là một số giá trị có thể được cấp phát an toàn trên stack
+vẫn có thể được cấp phát trên heap.
+
+{ %%
+Với trình biên dịch Go chuẩn,
+https://docs.google.com/document/d/1CxgUBPlx9iJzkz9JWkb6tIpTe5q32QDmz8l0BouG0Cw/preview
+
+Các khối bộ nhớ rất lớn có luôn được cấp phát trên heap không?
+https://github.com/golang/go/issues/20021
+
+Các giá trị được tham chiếu bởi những giá trị cấp phát trên heap sẽ không bao giờ được cấp phát trên stack.
+}
+
+Thực tế, stack không phải thành phần bắt buộc để chương trình Go hoạt động.
+Go compiler/runtime có thể cấp phát mọi khối bộ nhớ trên heap.
+Stack được hỗ trợ chỉ để chương trình Go chạy hiệu quả hơn:
+*
+   Cấp phát khối bộ nhớ trên stack nhanh hơn nhiều so với trên heap.
+*
+   Khối bộ nhớ cấp phát trên stack không cần được garbage collection.
+*
+   Khối bộ nhớ trên stack thân thiện với CPU cache hơn khối trên heap.
+
+Nếu một khối bộ nhớ được cấp phát ở đâu đó, ta cũng có thể nói các phần giá trị nằm trong khối đó
+được cấp phát tại cùng nơi.
+
+Nếu một số phần giá trị của biến cục bộ được khai báo trong hàm được cấp phát trên heap,
+ta nói các phần giá trị đó (và biến) thoát lên heap.
+Dùng Go Toolchain, ta có thể chạy `go build -gcflags -m` để kiểm tra
+những giá trị cục bộ (các phần giá trị) nào sẽ thoát lên heap khi chạy.
+Như đã nói ở trên, escape analyzer hiện tại của trình biên dịch Go chuẩn vẫn chưa hoàn hảo;
+nhiều phần giá trị cục bộ có thể được cấp phát an toàn trên stack
+vẫn thoát lên heap.
+
+Một phần giá trị đang hoạt động, được cấp phát trên heap và vẫn đang được sử dụng
+phải được ít nhất một phần giá trị cấp phát trên stack tham chiếu đến.
+Nếu giá trị thoát lên heap là một biến cục bộ đã khai báo và giả sử kiểu của nó là `T`,
+Go runtime sẽ tạo (một khối bộ nhớ chứa)
+một con trỏ ngầm định kiểu `*T` trên stack của goroutine hiện tại.
+Giá trị con trỏ lưu địa chỉ của khối bộ nhớ được cấp phát cho biến trên heap
+(hay địa chỉ của biến cục bộ kiểu `T`).
+Go compiler cũng thay mọi chỗ sử dụng biến bằng
+phép giải tham chiếu giá trị con trỏ tại thời điểm biên dịch.
+Giá trị con trỏ `*T` trên stack có thể được đánh dấu là không còn sống từ một thời điểm sau đó,
+khiến quan hệ tham chiếu từ nó đến giá trị `T` trên heap biến mất.
+Quan hệ tham chiếu từ giá trị `*T` trên stack đến giá trị `T` trên heap
+đóng vai trò quan trọng trong quá trình garbage collection sẽ được mô tả bên dưới.
+
+Tương tự, ta có thể xem mỗi biến cấp package được cấp phát trên heap,
+và biến đó được tham chiếu bởi một con trỏ ngầm định được cấp phát trong vùng nhớ toàn cục.
+Thực tế, con trỏ ngầm định tham chiếu đến phần trực tiếp của biến cấp package,
+còn phần trực tiếp của biến tham chiếu đến một số phần giá trị khác.
+
+Một khối bộ nhớ được cấp phát trên heap có thể đồng thời được nhiều phần giá trị
+trên các stack khác nhau tham chiếu đến.
+
+Một số đặc điểm:
+*
+   Nếu một field của giá trị struct thoát lên heap,
+   thì toàn bộ giá trị struct cũng thoát lên heap.
+*
+   Nếu một phần tử của giá trị array thoát lên heap,
+   thì toàn bộ array cũng thoát lên heap.
+*
+   Nếu một phần tử của giá trị slice thoát lên heap,
+   thì mọi phần tử của slice cũng thoát lên heap.
+*
+   Nếu một giá trị (phần giá trị) `v` được tham chiếu bởi một giá trị (phần giá trị) thoát lên heap,
+   thì giá trị (phần giá trị) `v` cũng thoát lên heap.
+
+
+Khối bộ nhớ được tạo bằng cách gọi hàm `new` có thể được cấp phát trên heap hoặc stack.
+Điều này khác với C++.
+
+Khi kích thước stack của một goroutine thay đổi (do tăng hoặc giảm stack),
+một vùng nhớ mới sẽ được cấp phát cho stack.
+Vì vậy, các khối bộ nhớ cấp phát trên stack rất có thể sẽ bị di chuyển hoặc đổi địa chỉ.
+Do đó, các con trỏ tham chiếu đến những khối bộ nhớ này cũng phải được điều chỉnh;
+bản thân các con trỏ đó cũng phải được cấp phát trên stack.
+Dưới đây là một ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+// The following directive is to prevent
+// calls to the function f being inlined.
+//go:noinline
+func f(i int) byte {
+	var a [1<<20]byte // make stack grow
+	return a[i]
+}
+
+func main(){
+	var x int
+	println(&x)
+	f(100)
+	println(&x)
+}
+'''
+
+Ta sẽ thấy hai địa chỉ được in ra khác nhau (với trình biên dịch Go chuẩn v1.25.n).
+
+{ %%
+Một đặc điểm quan trọng khác cần biết: để có thể thực hiện các thao tác atomic trên word 64-bit
+trên kiến trúc 32-bit, địa chỉ của mọi khối bộ nhớ được cấp phát trên heap
+được đảm bảo căn chỉnh theo biên 8 byte.
+}
+
+@@@ #when-can-collect
+###========== Khi nào khối bộ nhớ có thể được thu gom?
+
+Khối bộ nhớ chứa các phần trực tiếp của biến cấp package sẽ không bao giờ bị thu gom.
+
+Toàn bộ stack của một goroutine sẽ được thu gom khi goroutine kết thúc.
+Vì vậy, không cần thu gom riêng từng khối bộ nhớ trên stack.
+Garbage collector không thu gom stack.
+
+Một khối bộ nhớ được cấp phát trên heap chỉ có thể được thu gom an toàn khi
+nó không còn được tham chiếu (trực tiếp hoặc gián tiếp)
+bởi bất kỳ phần giá trị nào trên stack của các goroutine và trong vùng nhớ toàn cục.
+Ta gọi những khối bộ nhớ như vậy là khối bộ nhớ không còn được sử dụng.
+Garbage collector sẽ thu gom những khối bộ nhớ không còn được sử dụng trên heap.
+
+Ví dụ sau cho thấy khi nào một số khối bộ nhớ có thể được thu gom:
+@@@ .line-numbers
+''' go
+package main
+
+var p *int
+
+func main() {
+	done := make(chan bool)
+	// "done" will be used in main and the following
+	// new goroutine, so it will be allocated on heap.
+
+	go func() {
+		x, y, z := 123, 456, 789
+		_ = z  // z can be allocated on stack safely.
+		p = &x // For x and y are both ever referenced
+		p = &y // by the global p, so they will be both
+		       // allocated on heap.
+
+		// Now, x is not referenced by anyone, so
+		// its memory block can be collected now.
+
+		p = nil
+		// Now, y is also not referenced by anyone,
+		// so its memory block can be collected now.
+
+		done <- true
+	}()
+
+	<-done
+	// Now the above goroutine exits, the done channel
+	// is not used any more, a smart compiler may
+	// think it can be collected now.
+
+	// ...
+}
+'''
+
+Đôi khi, trình biên dịch thông minh, chẳng hạn trình biên dịch Go chuẩn,
+có thể tối ưu hóa khiến một số tham chiếu bị loại bỏ sớm hơn ta nghĩ.
+Ví dụ sau minh họa trường hợp đó.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	// Assume the length of the slice is so large
+	// that its elements must be allocated on heap.
+	bs := make([]byte, 1 << 31)
+
+	// A smart compiler can detect that the
+	// underlying part of the slice bs will never be
+	// used later, so that the underlying part of the
+	// slice bs can be garbage collected safely now.
+
+	fmt.Println(len(bs))
+}
+'''
+
+Hãy đọc __các phần giá trị__ để tìm hiểu
+cấu trúc nội bộ của giá trị slice.
+
+Ngoài ra, đôi khi ta muốn bảo đảm slice `bs` không bị garbage collection
+cho đến khi `fmt.Println` được gọi.
+Khi đó, ta có thể gọi `runtime.KeepAlive` để báo cho garbage collector biết
+rằng slice `bs` và các phần giá trị được nó tham chiếu vẫn đang được sử dụng.
+
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+import "runtime"
+
+func main() {
+	bs := make([]int, 1000000)
+
+	fmt.Println(len(bs))
+
+	// A runtime.KeepAlive(bs) call is also
+	// okay for this specified example.
+	runtime.KeepAlive(&bs)
+}
+'''
+
+@@@ #how-to-detect
+###========== Làm thế nào để phát hiện các khối bộ nhớ không còn được sử dụng?
+
+Trình biên dịch Go chuẩn hiện tại (v1.25.n) sử dụng garbage collector
+mark-sweep ba màu, chạy đồng thời.
+Bài viết này chỉ giải thích sơ lược thuật toán.
+
+Một chu kỳ garbage collection (GC) gồm hai giai đoạn: đánh dấu và quét.
+Trong giai đoạn đánh dấu, bộ thu gom (thực tế là một nhóm goroutine) dùng thuật toán ba màu
+để phân tích những khối bộ nhớ nào không còn được sử dụng.
+
+Trích dẫn sau lấy từ __một bài viết trên Go blog__
+và đã được chỉnh sửa đôi chút để dễ hiểu hơn.
+
+    === một bài viết trên Go blog :: https://blog.golang.org/go15gc
+
+>  Khi một chu kỳ GC bắt đầu, mọi khối bộ nhớ trên heap đều có màu trắng.
+   GC duyệt tất cả root — các đối tượng mà ứng dụng có thể truy cập trực tiếp,
+   chẳng hạn biến toàn cục và những đối tượng trên stack — rồi tô chúng màu xám.
+   Sau đó, GC chọn một đối tượng màu xám, tô đen đối tượng đó rồi quét nó để tìm con trỏ đến các đối tượng khác.
+   Nếu lượt quét tìm thấy con trỏ đến một khối bộ nhớ màu trắng, khối đó sẽ được tô xám.
+   Quá trình này lặp lại cho đến khi không còn đối tượng màu xám nào.
+   Khi đó, các khối bộ nhớ (trên heap) màu trắng được xác định là không thể truy cập và có thể được tái sử dụng.
+
+//
+(Để biết vì sao thuật toán dùng ba màu thay vì hai màu, hãy tìm "write barrier golang".
+Ở đây chỉ cung cấp hai tài liệu tham khảo: __loại bỏ việc quét lại stack STW__ và __mbarrier.go__.)
+
+    === loại bỏ việc quét lại stack STW :: https://github.com/golang/proposal/blob/master/design/17503-eliminate-rescan.md
+    === mbarrier.go :: https://golang.org/src/runtime/mbarrier.go
+
+Trong giai đoạn quét, các khối bộ nhớ không còn được sử dụng đã đánh dấu sẽ được thu gom.
+
+Một khối bộ nhớ không còn được sử dụng có thể chưa được trả lại cho OS ngay sau khi thu gom,
+để có thể được tái sử dụng cho các phần giá trị mới.
+Bạn không cần lo lắng: Go runtime chính thức sử dụng bộ nhớ tiết kiệm hơn nhiều runtime Java.
+
+Thuật toán GC không nén bộ nhớ, vì vậy nó không di chuyển các khối bộ nhớ để sắp xếp lại chúng.
+
+@@@ #when-to-collect
+###========== Khi nào một chu kỳ garbage collection mới bắt đầu?
+
+Quá trình garbage collection tiêu tốn nhiều CPU và một phần tài nguyên bộ nhớ.
+Do đó, GC không chạy liên tục.
+Một chu kỳ GC mới chỉ được kích hoạt khi một số chỉ số lúc chạy đạt điều kiện nhất định.
+Cách xác định các điều kiện đó là vấn đề của bộ điều tiết nhịp GC (GC pacer).
+
+
+Cách triển khai GC pacer của Go runtime chuẩn chính thức vẫn được cải tiến qua từng phiên bản.
+Vì vậy, khó mô tả chính xác cách triển khai mà vẫn giữ thông tin luôn cập nhật.
+Ở đây, tôi chỉ liệt kê một số tài liệu tham khảo về chủ đề này:
+
+*
+   Về __các biến môi trường `GOGC` và `GOMEMLIMIT`__ (lưu ý biến môi trường `GOMEMLIMIT` chỉ được hỗ trợ từ Go 1.19).
+*
+   __Hướng dẫn về Go Garbage Collector`` https://go.dev/doc/gc-guide__.
+*
+   __Thiết kế lại GC Pacer`` https://github.com/golang/proposal/blob/master/design/44167-gc-pacer-redesign.md__.
+*
+   Chương "Garbage Collection" trong sách __Go Optimizations 101__ của tôi (đây là sách có trả phí).
+
+    === ... các biến môi trường :: https://golang.org/pkg/runtime/#hdr-Environment_Variables
+    === ... Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+{ %%
+Go runtime xem các khối bộ nhớ không còn được sử dụng trên heap là rác và sẽ thu gom chúng để tái sử dụng hoặc giải phóng bộ nhớ.
+Garbage collector không chạy liên tục; nó bắt đầu khi đạt đến một ngưỡng nhất định.
+Vì vậy, một khối bộ nhớ không còn được sử dụng có thể không bị thu gom ngay khi nó trở nên không còn được sử dụng.
+Thay vào đó, nó sẽ được thu gom sau đó.
+Hiện tại (Go Toolchain v1.25.n), ngưỡng này được điều khiển bởi
+biến môi trường __href="https://golang.org/pkg/runtime/#hdr-Environment_Variables">GOGC__:
+>
+   Biến GOGC đặt tỷ lệ phần trăm mục tiêu ban đầu cho garbage collection.
+   Một chu kỳ GC được kích hoạt khi tỷ lệ giữa dữ liệu vừa cấp phát và
+   dữ liệu còn sống sau lần thu gom trước đạt đến tỷ lệ phần trăm này.
+   Giá trị mặc định là GOGC=100. Đặt GOGC=off sẽ tắt hoàn toàn garbage collector.
+
+
+Giá trị của biến môi trường này quyết định tần suất garbage collection,
+và có thể được thay đổi khi chạy bằng cách gọi hàm
+__href="https://golang.org/pkg/runtime/debug/#SetGCPercent">runtime/debug.SetGCPercent__.
+Giá trị nhỏ hơn khiến garbage collection diễn ra thường xuyên hơn.
+Giá trị phần trăm âm sẽ tắt garbage collection tự động.
+
+Go Toolchain 1.19 giới thiệu một chiến lược lập lịch mới:
+chiến lược __href="https://go.dev/doc/gc-guide#Memory_limit">giới hạn bộ nhớ__.
+Có thể cấu hình chiến lược này bằng biến môi trường `GOMEMLIMIT`
+hoặc thông qua hàm __href="https://golang.org/pkg/runtime/debug/#SetMemoryLimit">runtime/debug.SetMemoryLimit__.
+Giới hạn bộ nhớ đặt mức tối đa cho tổng lượng bộ nhớ mà Go runtime nên sử dụng.
+Nói cách khác, nếu tổng bộ nhớ Go runtime đang dùng vượt quá giới hạn,
+một chu kỳ garbage collection mới sẽ bắt đầu.
+Đây là giới hạn mềm; chương trình Go sẽ không thoát khi vượt quá giới hạn.
+Giá trị mặc định của giới hạn bộ nhớ là `math.MaxInt64`,
+trên thực tế sẽ vô hiệu hóa chiến lược này.
+Lưu ý, đặt giới hạn quá thấp có thể khiến garbage collector chạy thường xuyên.
+Khi tình huống này xảy ra, cách triển khai runtime chính thức cố gắng giới hạn mức sử dụng CPU
+của garbage collector dưới 50%.
+
+Có thể bắt đầu một chu kỳ garbage collection theo cách thủ công bằng cách gọi hàm
+__href="https://golang.org/pkg/runtime/#GC">runtime.GC__.
+
+Một điểm nữa cần lưu ý: với Go runtime chính thức hiện tại (v1.25.n),
+__href="https://github.com/golang/go/blob/895b7c85addfffe19b66d8ca71c31799d6e55990/src/runtime/proc.go#L4481-L4486">một
+chu kỳ garbage collection mới sẽ tự động bắt đầu nếu trong hai phút chưa có lần garbage collection nào chạy__.
+
+Không chiến lược lập lịch garbage collection nào hiện được hỗ trợ đủ tốt để xử lý mọi trường hợp sử dụng,
+do đó các phiên bản Go runtime chính thức sau này có thể sẽ hỗ trợ thêm chiến lược khác.
+
+}

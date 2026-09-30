@@ -1,0 +1,82 @@
+##### const 2
+
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+const X = 3
+
+func main() {
+	const (
+		X = X + X
+		Y
+	)
+	
+	println(X, Y)
+}
+'''
+}
+
+Lựa chọn:
+
+""" go101-quiz
+6 6
+6 12
+"""
+
+
+@@@ #answer
+{
+Đáp án: 6 12
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/xnB620_y0kc __.
+
+Điểm chính:
+*
+   Đặc tả Go nêu: Trong danh sách khai báo const đặt trong ngoặc đơn, có thể lược bỏ danh sách biểu thức ở mọi ConstSpec trừ ConstSpec đầu tiên. Danh sách rỗng tương đương với việc thay bằng văn bản danh sách biểu thức không rỗng đứng trước nó cùng với kiểu của danh sách đó, nếu có.
+*
+   Một định danh cục bộ sẽ che khuất định danh toàn cục cùng tên.
+
+
+Khai báo hằng số trong mã câu đố tương đương với khai báo sau:
+
+@@@ .line-numbers
+''' go
+	const (
+		X = X + X // ở đây cả hai "X" đều là X toàn cục
+		Y = X + X // ở đây cả hai "X" đều là X cục bộ
+	)
+'''
+
+X cục bộ được tính bằng 6 tại thời điểm biên dịch,
+nên hằng số Y được tính bằng 12 (cũng tại thời điểm biên dịch).
+
+Lưu ý rằng, __ kết quả đầu ra là `6 6` khi dùng Go toolchain v1.17-`` https://github.com/golang/go/issues __.
+Lỗi này đã được sửa từ Go toolchain v1.18.
+
+Tương tự, kể từ Go toolchain 1.18, chương trình sau in ra `0 0`.
+Trước Go toolchain 1.18, nó in ra `1 2` (do lỗi).
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	const (
+		iota = iota
+		X
+		Y
+	)
+	println(X, Y)
+}
+'''
+
+
+
+}

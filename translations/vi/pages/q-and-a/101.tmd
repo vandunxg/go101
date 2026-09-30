@@ -1,0 +1,30 @@
+
+#################### Hỏi đáp về lập trình ngôn ngữ Go
+
+Mục lục:
+
+""" html
+<!-- index starts (don't remove) -->
+"""
+
+*  __Cách chuẩn hóa chuỗi để tiết kiệm bộ nhớ?
+       === ...`` canonicalize-strings.tmd
+*  __Cách lấy địa chỉ của các byte trong một chuỗi?
+       === ...`` take-string-byte-addresses.tmd
+*  __Cách tạo slice byte theo cách không an toàn (không xóa giá trị các phần tử byte)?
+       === ...`` make-dirty-byte-slices.tmd
+*  __Cách duyệt các rune trong một chuỗi?
+       === ...`` iterate-runes-in-a-string.tmd
+*  __Cách duyệt các phần tử byte trong một chuỗi?
+       === ...`` iterate-bytes-in-a-string.tmd
+*  __Cách sao chép slice?
+       === ...`` clone-slices.tmd
+*  __Cách tạo slice?
+       === ...`` create-slices.tmd
+*  __Cách xóa hiệu quả một số phần tử liên tiếp trong slice mà vẫn giữ nguyên thứ tự phần tử?
+       === ...`` delete-contiguous-slice-elements.tmd
+
+
+""" html
+<!-- index ends (don't remove) -->
+"""

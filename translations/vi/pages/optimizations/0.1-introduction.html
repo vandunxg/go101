@@ -1,0 +1,72 @@
+<p id="f-0-1-introduction-md"></p>
+<h1>Giới thiệu Go Optimizations 101</h1>
+
+<p>Cuốn sách này chia sẻ các mẹo thực tế và gợi ý giúp tối ưu hiệu năng của mã Go.
+Những nội dung trong sách dựa trên cách triển khai chính thức của Go compiler và runtime.</p>
+
+<p>Cuộc sống luôn có những điều phải đánh đổi, và thế giới lập trình cũng vậy.
+Trong lập trình, chúng ta thường xuyên cân bằng giữa khả năng đọc, khả năng bảo trì, hiệu quả phát triển và hiệu năng của mã, đồng thời cũng phải cân nhắc những đánh đổi bên trong từng yếu tố đó.
+Ví dụ, tối ưu hiệu năng thường đòi hỏi phải đánh đổi giữa mức tiết kiệm bộ nhớ, tốc độ thực thi và độ phức tạp khi triển khai.</p>
+
+<p>Trong các dự án thực tế, phần lớn đoạn mã không cần đạt hiệu năng tối đa.
+Ưu tiên khả năng bảo trì và khả năng đọc thường quan trọng hơn việc tiết kiệm từng byte hay từng microsecond.
+Cuốn sách này tập trung tối ưu những phần quan trọng mà hiệu năng thực sự có ý nghĩa.
+Hãy lưu ý rằng một số gợi ý có thể khiến mã dài hơn hoặc chỉ mang lại cải thiện đáng kể trong những tình huống cụ thể.</p>
+
+<p>Nội dung cuốn sách gồm:</p>
+
+<ul>
+<li>cách sử dụng ít tài nguyên CPU hơn.</li>
+<li>cách sử dụng ít bộ nhớ hơn.</li>
+<li>cách giảm số lần cấp phát bộ nhớ.</li>
+<li>cách kiểm soát vị trí cấp phát bộ nhớ.</li>
+<li>cách giảm áp lực lên garbage collection.</li>
+</ul>
+
+<p>Cuốn sách này không giải thích cách sử dụng các công cụ phân tích hiệu năng như pprof,
+cũng không đi sâu nghiên cứu chi tiết cách triển khai compiler và runtime.
+Cuốn sách cũng không giới thiệu cách sử dụng <a href="https://go.dev/doc/pgo">profile-guided optimization (tối ưu hóa dựa trên profile)</a>.
+Không nội dung nào trong sách sử dụng con trỏ unsafe hoặc cgo.
+Cuốn sách cũng không bàn về thuật toán.
+Nói cách khác, cuốn sách đưa ra một số gợi ý tối ưu hóa theo cách rõ ràng, dễ hiểu,
+phục vụ việc lập trình Go nói chung hằng ngày.</p>
+
+<p>Trừ khi có ghi chú riêng, các ví dụ mã trong cuốn sách được kiểm thử và chạy trên một máy tính xách tay có môi trường như sau:</p>
+
+<pre><code>go version go1.24rc1 linux/amd64
+goos: linux
+goarch: amd64
+cpu: Intel(R) Core(TM) i5-4210U CPU @ 1.70GHz
+</code></pre>
+
+<p>Một số thông tin về thời gian benchmark được lược bỏ khỏi kết quả để giữ cho các dòng benchmark ngắn gọn.</p>
+
+<p>Lưu ý:</p>
+
+<ul>
+<li>Một số gợi ý được đề cập trong sách áp dụng được trên mọi nền tảng và mọi dòng CPU, nhưng một số khác chỉ phù hợp với các nền tảng và dòng CPU nhất định. Vì vậy, hãy benchmark chúng trong môi trường giống với môi trường production của bạn trước khi áp dụng.</li>
+<li>Một số chi tiết triển khai của Go compiler và runtime tiêu chuẩn chính thức có thể thay đổi theo từng phiên bản; điều đó có nghĩa là một số gợi ý trong sách có thể không còn hiệu quả với các phiên bản Go toolchain trong tương lai.</li>
+<li>Cuốn sách cuối cùng sẽ được mở mã nguồn theo từng chương.</li>
+</ul>
+
+<h2>Về tác giả</h2>
+
+<p>Tapir là tác giả cuốn sách này.
+Ông cũng là tác giả cuốn <a href="https://go101.org/article/101.html">Go 101</a>.
+Ông dự định viết thêm một số cuốn sách khác trong series <strong>Go 101</strong>.
+Mời bạn đón đọc.</p>
+
+<p>Tapir từng là (và có thể sẽ lại là) một nhà phát triển game độc lập.
+Bạn có thể tìm các trò chơi của ông tại đây: <a href="https://tapirgames.com">tapirgames.com</a>.</p>
+
+<h2>Về GoTV</h2>
+
+<p>Trong quá trình viết cuốn sách này, tác giả sử dụng công cụ <a href="https://go101.org/apps-and-libs/gotv.html">GoTV</a>
+để quản lý việc cài đặt nhiều phiên bản Go toolchain và kiểm tra
+sự khác biệt về hành vi giữa các phiên bản Go toolchain.</p>
+
+<h2>Phản hồi</h2>
+
+<p>Bạn có thể góp phần cải thiện cuốn sách bằng cách gửi các nội dung cần chỉnh sửa đến danh sách issue của Go 101 (<a href="https://github.com/go101/go101">https://github.com/go101/go101</a>) để báo mọi loại lỗi, chẳng hạn như lỗi chính tả, lỗi ngữ pháp, cách diễn đạt chưa chính xác, giải thích sai, mô tả chưa rõ, lỗi trong mã, v.v.</p>
+
+<p>Bạn cũng có thể gửi phản hồi đến tài khoản X của Go 101: @zigo_101 (<a href="https://x.com/zigo_101">https://x.com/zigo_101</a>).</p>

@@ -1,0 +1,639 @@
+### Các bảo đảm về thứ tự bộ nhớ trong Go
+
+###=========== Về thứ tự bộ nhớ
+
+Nhiều compiler (khi biên dịch) và bộ xử lý CPU (khi chạy chương trình)
+thường thực hiện một số tối ưu hóa bằng cách điều chỉnh thứ tự các lệnh,
+khiến thứ tự thực thi lệnh có thể khác với
+thứ tự được thể hiện trong mã nguồn.
+Việc sắp xếp lại thứ tự lệnh cũng thường được gọi là __thứ tự bộ nhớ__.
+
+    === thứ tự bộ nhớ :: https://en.wikipedia.org/wiki/Memory_ordering
+
+Chắc chắn việc sắp xếp lại thứ tự lệnh không thể tùy ý.
+Yêu cầu cơ bản đối với việc sắp xếp lại lệnh bên trong một goroutine cụ thể là
+goroutine đó không thể phát hiện việc sắp xếp lại
+nếu nó không chia sẻ dữ liệu với các goroutine khác.
+Nói cách khác, từ góc nhìn của goroutine đó,
+nó có thể xem thứ tự thực thi lệnh luôn
+giống với thứ tự được quy định trong mã nguồn,
+ngay cả khi việc sắp xếp lại lệnh thực sự diễn ra bên trong nó.
+
+Tuy nhiên, nếu một số goroutine chia sẻ dữ liệu,
+việc sắp xếp lại thứ tự lệnh bên trong một goroutine
+có thể bị các goroutine khác quan sát thấy,
+và ảnh hưởng đến hành vi của tất cả các goroutine đó.
+Chia sẻ dữ liệu giữa các goroutine là việc phổ biến trong lập trình đồng thời.
+Nếu bỏ qua các kết quả do việc sắp xếp lại thứ tự lệnh gây ra,
+hành vi của chương trình đồng thời có thể phụ thuộc vào compiler và CPU,
+và thường bất thường.
+
+    === Mô hình bộ nhớ Go 1 :: https://golang.org/ref/mem
+
+Sau đây là một chương trình Go không chuyên nghiệp, không tính đến việc sắp xếp lại thứ tự lệnh.
+Chương trình được mở rộng từ một ví dụ trong tài liệu chính thức
+__Mô hình bộ nhớ Go 1__.
+@@@ .line-numbers
+''' go
+package main
+
+import "log"
+import "runtime"
+
+var a string
+var done bool
+
+func setup() {
+	a = "hello, world"
+	done = true
+	if done {
+		log.Println(len(a)) // luôn in 12 nếu được in
+	}
+}
+
+func main() {
+	go setup()
+
+	for !done {
+		runtime.Gosched()
+	}
+	log.Println(a) // dự kiến in: hello, world
+}
+'''
+
+Chương trình này rất có thể sẽ hoạt động như mong đợi,
+tức là in ra chuỗi `hello, world`.
+Tuy nhiên, hành vi của chương trình phụ thuộc vào compiler và CPU.
+Nếu chương trình được biên dịch bằng một compiler khác,
+hoặc bằng phiên bản compiler mới hơn, hoặc chạy trên kiến trúc khác,
+chuỗi `hello, world` có thể không được in ra,
+hoặc một chuỗi khác với `hello, world` có thể được in ra.
+Nguyên nhân là compiler và CPU có thể hoán đổi thứ tự thực thi
+của hai dòng đầu tiên trong hàm `setup`,
+khiến tác động cuối cùng của hàm `setup` có thể trở thành
+@@@ .line-numbers
+''' go
+func setup() {
+	done = true
+	a = "hello, world"
+	if done {
+		log.Println(len(a))
+	}
+}
+'''
+
+Goroutine `setup` trong chương trình trên không thể quan sát việc sắp xếp lại,
+nên dòng `log.Println(len(a))` sẽ luôn in `12`
+(nếu dòng này được thực thi trước khi chương trình thoát).
+Tuy nhiên, goroutine `main` có thể quan sát việc sắp xếp lại,
+đó là lý do chuỗi được in ra có thể không phải `hello, world`.
+
+Ngoài vấn đề bỏ qua việc sắp xếp lại thứ tự bộ nhớ, chương trình còn có data race.
+Không có bất kỳ cơ chế đồng bộ nào khi sử dụng các biến
+`a` và `done`.
+Vì vậy, ví dụ trên chứa đầy lỗi lập trình đồng thời.
+Một lập trình viên Go chuyên nghiệp không nên mắc những lỗi này.
+
+Ta có thể dùng lệnh `go build -race` do Go Toolchain cung cấp
+để build chương trình, sau đó chạy executable được tạo ra nhằm kiểm tra
+chương trình có data race hay không.
+
+###=========== Mô hình bộ nhớ Go
+
+Đôi khi, để bảo đảm tính đúng đắn của chương trình,
+ta cần bảo đảm rằng việc thực thi một số dòng mã trong một goroutine
+phải xảy ra trước (hoặc sau) việc thực thi một số dòng mã trong goroutine khác
+(theo góc nhìn của một trong hai goroutine đó).
+Việc sắp xếp lại thứ tự lệnh có thể gây rắc rối trong những trường hợp như vậy.
+Ta nên làm gì để ngăn một số cách sắp xếp lại lệnh có thể xảy ra?
+
+Các kiến trúc CPU khác nhau cung cấp những lệnh fence khác nhau
+để ngăn các kiểu sắp xếp lại thứ tự lệnh khác nhau.
+Một số ngôn ngữ lập trình cung cấp các hàm tương ứng
+để chèn những lệnh fence này vào mã nguồn.
+Tuy nhiên, việc hiểu và sử dụng đúng các lệnh fence
+làm tăng độ khó của lập trình đồng thời.
+
+Triết lý thiết kế của Go là dùng càng ít tính năng càng tốt
+để hỗ trợ càng nhiều trường hợp sử dụng càng tốt, đồng thời
+bảo đảm hiệu năng thực thi mã tổng thể đủ tốt.
+Vì vậy, các package dựng sẵn và package chuẩn của Go không cung cấp cách trực tiếp
+để sử dụng lệnh fence của CPU.
+Trên thực tế, lệnh fence của CPU được dùng để triển khai mọi kiểu kỹ thuật đồng bộ mà Go hỗ trợ.
+Do đó, ta nên dùng những kỹ thuật đồng bộ này để bảo đảm thứ tự thực thi mã như mong muốn.
+
+Phần còn lại của bài viết này sẽ liệt kê một số thứ tự thực thi mã được bảo đảm
+(và không được bảo đảm) trong Go, được đề cập hoặc không được đề cập trong
+__Mô hình bộ nhớ Go 1__ và các tài liệu Go chính thức khác.
+
+Trong các mô tả dưới đây, khi nói
+sự kiện `A` được bảo đảm xảy ra trước sự kiện `B`,
+điều đó có nghĩa là mọi goroutine tham gia vào hai sự kiện này sẽ quan sát thấy rằng
+bất kỳ câu lệnh nào xuất hiện trước sự kiện `A` trong mã nguồn
+đều được thực thi trước
+bất kỳ câu lệnh nào xuất hiện sau sự kiện `B` trong mã nguồn.
+Với các goroutine không liên quan khác,
+thứ tự mà chúng quan sát được có thể khác với mô tả vừa nêu.
+
+{ %%
+###----------- Các bảo đảm về thứ tự liên quan đến hàm `init`
+
+Thứ tự thực thi các hàm `init` trong một chương trình được bảo đảm như sau:
+
+Bài viết __package code và các package được import__
+đã giới thiệu thứ tự thực thi các hàm `init` trong một chương trình.
+Dưới đây là các thứ tự được bảo đảm:
+*
+   Việc tất cả hàm `init` trong các package phụ thuộc của một package hoàn tất
+   xảy ra trước khi bất kỳ hàm `init` nào trong package đó bắt đầu.
+*
+   Việc tất cả hàm `init` trong một chương trình hoàn tất
+   xảy ra trước khi hàm entry `main` của chương trình bắt đầu.
+
+    === package code và các package được import :: packages-and-imports.tmd#initialization-order
+
+Trên thực tế, còn có hai bảo đảm về thứ tự khác:
+*
+   Việc khởi tạo tất cả biến ở cấp package trong một package hoàn tất
+   xảy ra trước khi bất kỳ hàm `init` nào trong package đó bắt đầu.
+*
+   Việc tất cả hàm `init` trong các package phụ thuộc của một package hoàn tất
+   xảy ra trước khi bất kỳ biến nào ở cấp package đó được khởi tạo.
+
+Quá trình tải package chỉ liên quan đến một goroutine.
+
+}
+
+@@@ #goroutine
+###----------- Việc tạo goroutine xảy ra trước khi goroutine đó thực thi
+
+Trong hàm sau,
+phép gán `x, y = 123, 789` sẽ được thực thi trước lời gọi `fmt.Println(x)`,
+và lời gọi `fmt.Println(x)` sẽ được thực thi trước lời gọi `fmt.Println(y)`.
+
+@@@ .line-numbers
+''' go
+var x, y int
+func f1() {
+	x, y = 123, 789
+	go func() {
+		fmt.Println(x)
+		go func() {
+			fmt.Println(y)
+		}()
+	}()
+}
+'''
+
+Tuy nhiên, thứ tự thực thi của ba thao tác trong hàm sau không xác định.
+Hàm này có data race.
+
+@@@ .line-numbers
+''' go
+var x, y int
+func f2() {
+	go func() {
+		// Có thể in 0, 123 hoặc một giá trị khác.
+		fmt.Println(x)
+	}()
+	go func() {
+		// Có thể in 0, 789 hoặc một giá trị khác.
+		fmt.Println(y)
+	}()
+	x, y = 123, 789
+}
+'''
+
+@@@ #channel
+###----------- Các bảo đảm về thứ tự liên quan đến thao tác channel
+
+{ %%
+Các bảo đảm sau không được đề cập trong Mô hình bộ nhớ Go 1,
+nhưng theo tôi, chúng là hiển nhiên.
+*
+   Một thao tác gửi lên channel xảy ra trước khi thao tác gửi hoàn tất.
+*
+   Một thao tác nhận từ channel xảy ra trước khi thao tác nhận hoàn tất.
+*
+   Hai thao tác gửi trên một channel không thể hoàn tất cùng lúc.
+*
+   Hai thao tác nhận trên một channel không thể hoàn tất cùng lúc.
+
+}
+
+Mô hình bộ nhớ Go 1 liệt kê ba bảo đảm về thứ tự liên quan đến channel sau đây.
+*.
+   Lần gửi thành công thứ **// n //** lên một channel xảy ra trước
+   khi lần nhận thành công thứ **// n //** từ channel đó hoàn tất,
+   bất kể channel đó có buffer hay không có buffer.
+*.
+   Lần nhận thành công thứ **// n //** từ một channel có dung lượng **// m //**
+   xảy ra trước khi lần gửi thành công thứ (**// n+m //**) lên channel đó hoàn tất.
+   Cụ thể, nếu channel đó không có buffer (`m == 0`),
+   lần nhận thành công thứ **// n //** từ channel đó xảy ra
+   trước khi lần gửi thành công thứ **// n //** lên channel hoàn tất.
+*.
+   Việc đóng một channel xảy ra trước khi thao tác nhận hoàn tất nếu
+   thao tác nhận trả về zero value vì channel đã đóng.
+
+
+Trên thực tế, thời điểm hoàn tất của lần gửi thành công thứ **// n //** lên một channel và
+thời điểm hoàn tất của lần nhận thành công thứ **// n //** từ cùng channel đó
+là cùng một sự kiện.
+
+Sau đây là ví dụ minh họa một số thứ tự thực thi mã được bảo đảm
+khi sử dụng channel không có buffer.
+@@@ .line-numbers
+''' go
+func f3() {
+	var a, b int
+	var c = make(chan bool)
+
+	go func() {
+		a = 1
+		c <- true
+		if b != 1 { // không thể xảy ra
+			panic("b != 1") // sẽ không bao giờ xảy ra
+		}
+	}()
+
+	go func() {
+		b = 1
+		<-c
+		if a != 1  { // không thể xảy ra
+			panic("a != 1") // sẽ không bao giờ xảy ra
+		}
+	}()
+}
+'''
+
+Với hai goroutine mới được tạo, các thứ tự sau được bảo đảm:
+*
+   Việc thực thi phép gán `b = 1` chắc chắn kết thúc
+   trước khi điều kiện `b != 1` được đánh giá.
+*
+   Việc thực thi phép gán `a = 1` chắc chắn kết thúc
+   trước khi điều kiện `a != 1` được đánh giá.
+
+
+Vì vậy, hai lời gọi `panic` trong ví dụ trên sẽ không bao giờ được thực thi.
+Tuy nhiên, các lời gọi `panic` trong ví dụ sau có thể được thực thi.
+
+@@@ .line-numbers
+''' go
+func f4() {
+	var a, b, x, y int
+	c := make(chan bool)
+
+	go func() {
+		a = 1
+		c <- true
+		x = 1
+	}()
+
+	go func() {
+		b = 1
+		<-c
+		y = 1
+	}()
+
+	// Goroutine này có nhiều data race.
+	// Đừng viết mã như thế này.
+	go func() {
+		if x == 1 {
+			if a != 1 { // có thể xảy ra
+				panic("a != 1") // có thể xảy ra
+			}
+			if b != 1 { // có thể xảy ra
+				panic("b != 1") // có thể xảy ra
+			}
+		}
+
+		if y == 1 {
+			if a != 1 { // có thể xảy ra
+				panic("a != 1") // có thể xảy ra
+			}
+			if b != 1 { // có thể xảy ra
+				panic("b != 1") // có thể xảy ra
+			}
+		}
+	}()
+}
+'''
+
+Goroutine thứ ba ở đây không liên quan đến các thao tác trên channel `c`.
+Không có gì bảo đảm rằng nó sẽ quan sát được các thứ tự mà hai goroutine mới đầu tiên quan sát được.
+Vì vậy, bất kỳ lời gọi `panic` nào trong số bốn lời gọi đều có thể được thực thi.
+
+Trên thực tế, hầu hết các bản triển khai compiler đều bảo đảm rằng bốn lời gọi `panic`
+trong ví dụ trên sẽ không bao giờ được thực thi,
+nhưng tài liệu Go chính thức không đưa ra bảo đảm nào như vậy.
+Vì thế, mã trong ví dụ trên không tương thích xuyên compiler hoặc xuyên phiên bản compiler.
+Ta nên tuân theo tài liệu Go chính thức để viết mã Go chuyên nghiệp.
+
+Sau đây là ví dụ sử dụng channel có buffer.
+@@@ .line-numbers
+''' go
+func f5() {
+	var k, l, m, n, x, y int
+	c := make(chan bool, 2)
+
+	go func() {
+		k = 1
+		c <- true
+		l = 1
+		c <- true
+		m = 1
+		c <- true
+		n = 1
+	}()
+
+	go func() {
+		x = 1
+		<-c
+		y = 1
+	}()
+}
+'''
+
+Các thứ tự sau được bảo đảm:
+*
+   Việc thực thi `k = 1` kết thúc trước
+   việc thực thi `y = 1`.
+*
+   Việc thực thi `x = 1` kết thúc trước
+   việc thực thi `n = 1`.
+
+Tuy nhiên, không có gì bảo đảm rằng việc thực thi `x = 1` xảy ra trước
+việc thực thi `l = 1` và `m = 1`,
+và cũng không có gì bảo đảm rằng việc thực thi `l = 1` và `m = 1`
+xảy ra trước việc thực thi `y = 1`.
+
+Sau đây là ví dụ về việc đóng channel.
+Trong ví dụ này, việc thực thi `k = 1`
+được bảo đảm kết thúc trước việc thực thi `y = 1`,
+nhưng không được bảo đảm kết thúc trước việc thực thi `x = 1`,
+@@@ .line-numbers
+''' go
+func f6() {
+	var k, x, y int
+	c := make(chan bool, 1)
+
+	go func() {
+		c <- true
+		k = 1
+		close(c)
+	}()
+
+	go func() {
+		<-c
+		x = 1
+		<-c
+		y = 1
+	}()
+}
+'''
+
+{ %%
+Hai bảo đảm trên có thể không đúng.
+
+Còn có hai bảo đảm hiển nhiên khác về thứ tự liên quan đến channel.
+Nhưng trên thực tế, chúng không hữu ích nhiều khi lập trình Go.
+*.
+   Việc lần gửi thành công thứ **n** trên một channel hoàn tất xảy ra trước
+   khi lần gửi thành công thứ (**n+1**) trên channel đó hoàn tất.
+*.
+   Việc lần nhận thành công thứ **n** trên một channel hoàn tất xảy ra trước
+   khi lần nhận thành công thứ (**n+1**) trên channel đó hoàn tất.
+
+}
+
+@@@ #mutex
+###----------- Các bảo đảm về thứ tự liên quan đến mutex
+
+Sau đây là các bảo đảm về thứ tự liên quan đến mutex trong Go.
+*.
+   Với một giá trị có thể lấy địa chỉ `m` thuộc kiểu `Mutex` hoặc `RWMutex`
+   trong package chuẩn `sync`, lần gọi phương thức `m.Unlock()` thành công thứ **// n //**
+   xảy ra trước khi lần gọi phương thức `m.Lock()` thứ (**// n+1 //**) trả về.
+*.
+   Với một giá trị có thể lấy địa chỉ `rw` thuộc kiểu `RWMutex`,
+   nếu lần gọi `rw.Lock()` thứ **// n //** đã trả về,
+   thì lần gọi `rw.Unlock()` thành công thứ **// n //** của nó xảy ra
+   trước khi bất kỳ lời gọi `rw.RLock()` nào trả về, với điều kiện lời gọi đó
+   được bảo đảm xảy ra sau khi lần gọi `rw.Lock()` thứ **// n //** trả về.
+*.
+   Với một giá trị có thể lấy địa chỉ `rw` thuộc kiểu `RWMutex`,
+   nếu lần gọi `rw.RLock()` thứ **// n //** đã trả về,
+   thì lần gọi `rw.RUnlock()` thành công thứ **// m //** của nó,
+   trong đó `m <= n`, xảy ra trước khi bất kỳ lời gọi
+   `rw.Lock()` nào trả về, với điều kiện lời gọi đó
+   được bảo đảm xảy ra sau khi lần gọi `rw.RLock()` thứ **// n //** trả về.
+
+Trong ví dụ sau, các thứ tự dưới đây được bảo đảm:
+*
+   Việc thực thi `a = 1` kết thúc trước
+   việc thực thi `b = 1`.
+   *.
+      Việc thực thi `m = 1` kết thúc trước
+      việc thực thi `n = 1`.
+   *.
+      Việc thực thi `x = 1` kết thúc trước
+      việc thực thi `y = 1`.
+
+@@@ .line-numbers
+''' go
+func fab() {
+	var a, b int
+	var l sync.Mutex // hoặc sync.RWMutex
+
+	l.Lock()
+	go func() {
+		l.Lock()
+		b = 1
+		l.Unlock()
+	}()
+	go func() {
+		a = 1
+		l.Unlock()
+	}()
+}
+
+func fmn() {
+	var m, n int
+	var l sync.RWMutex
+
+	l.RLock()
+	go func() {
+		l.Lock()
+		n = 1
+		l.Unlock()
+	}()
+	go func() {
+		m = 1
+		l.RUnlock()
+	}()
+}
+
+func fxy() {
+	var x, y int
+	var l sync.RWMutex
+
+	l.Lock()
+	go func() {
+		l.RLock()
+		y = 1
+		l.RUnlock()
+	}()
+	go func() {
+		x = 1
+		l.Unlock()
+	}()
+}
+'''
+
+Lưu ý: theo tài liệu Go chính thức,
+đoạn mã sau không bảo đảm việc thực thi `p = 1` kết thúc trước việc thực thi `q = 1`,
+mặc dù hầu hết compiler đều đưa ra bảo đảm như vậy.
+
+@@@ .line-numbers
+''' go
+var p, q int
+func fpq() {
+	var l sync.Mutex
+	p = 1
+	l.Lock()
+	l.Unlock()
+	q = 1
+}
+'''
+
+###----------- Các bảo đảm về thứ tự do giá trị `sync.WaitGroup` tạo ra
+
+Tại một thời điểm nhất định, giả sử bộ đếm do
+giá trị `sync.WaitGroup` có thể lấy địa chỉ `wg` quản lý khác 0.
+Nếu sau thời điểm đó có một nhóm lời gọi phương thức `wg.Add(n)`,
+và ta có thể bảo đảm chỉ lời gọi hoàn tất cuối cùng trong nhóm
+mới làm bộ đếm do `wg` quản lý giảm về 0,
+thì mỗi lời gọi trong nhóm được bảo đảm xảy ra trước khi
+một lời gọi phương thức `wg.Wait` được gọi sau thời điểm đó trả về.
+
+Lưu ý, `wg.Done()` tương đương với `wg.Add(-1)`.
+
+Hãy đọc __phần giải thích về kiểu `sync.WaitGroup`__
+để biết cách sử dụng giá trị `sync.WaitGroup`.
+
+    === phần giải thích ... :: concurrent-synchronization-more.tmd#waitgroup
+
+###----------- Các bảo đảm về thứ tự do giá trị `sync.Once` tạo ra
+
+Hãy đọc __phần giải thích về kiểu `sync.Once`__ để biết
+các bảo đảm về thứ tự do giá trị `sync.Once` tạo ra và cách sử dụng chúng.
+
+    === phần giải thích ... :: concurrent-synchronization-more.tmd#once
+
+###----------- Các bảo đảm về thứ tự do giá trị `sync.Cond` tạo ra
+
+Việc mô tả rõ ràng các bảo đảm về thứ tự do giá trị `sync.Cond` tạo ra
+hơi khó.
+Hãy đọc __phần giải thích về kiểu `sync.Cond`__
+để biết cách sử dụng giá trị `sync.Cond`.
+
+    === phần giải thích ... :: concurrent-synchronization-more.tmd#cond
+
+@@@ #atomic
+###----------- Các bảo đảm về thứ tự liên quan đến thao tác atomic
+
+Kể từ Go 1.19, tài liệu Mô hình bộ nhớ Go 1 chính thức quy định rằng
+tất cả thao tác atomic được thực thi trong chương trình Go hoạt động như thể
+chúng được thực thi theo một thứ tự nhất quán tuần tự nào đó.
+Nếu thao tác atomic B quan sát được tác động của thao tác atomic A,
+thì A được đồng bộ trước B.
+
+Theo mô tả trên, trong đoạn mã sau, thao tác ghi atomic lên biến `b`
+được bảo đảm xảy ra trước thao tác đọc atomic trên cùng biến trả về kết quả `1`.
+Do đó, thao tác ghi lên biến `a` cũng được bảo đảm xảy ra trước
+thao tác đọc trên cùng biến.
+Vì vậy, chương trình sau được bảo đảm in ra `2`.
+
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"sync/atomic"
+)
+
+func main() {
+	var a, b int32 = 0, 0
+
+	go func() {
+		a = 2
+		atomic.StoreInt32(&b, 1)
+	}()
+
+	for {
+		if n := atomic.LoadInt32(&b); n == 1 {
+			// Dòng sau luôn in ra 2.
+			fmt.Println(a)
+			break
+		}
+		runtime.Gosched()
+	}
+}
+'''
+
+Hãy đọc __bài viết này__ để biết cách thực hiện thao tác atomic.
+
+    === bài viết này :: concurrent-atomic-operation.tmd
+
+@@@ #finalizer
+###----------- Các bảo đảm về thứ tự liên quan đến finalizer
+
+Lời gọi `runtime.SetFinalizer(x, f)` xảy ra trước lời gọi finalizer `f(x)`.
+
+{ %%
+
+Cần làm: về các kết quả của data race.
+
+
+https://groups.google.com/forum/#!topic/golang-nuts/j1NcF0O6ouw
+
+https://groups.google.com/forum/#!msg/golang-nuts/mSD7u1oEhSk/NFkQTOM5AwAJ
+
+https://github.com/golang/go/issues/19182
+https://news.ycombinator.com/item?id=13686863
+Do các thao tác atomic phức tạp và tinh vi khi sử dụng đúng cách, không nên dùng chúng
+để đồng bộ các giá trị. Mutex được ưu tiên hơn.
+Một số thành viên nhóm Go từng lấy làm tiếc vì package atomic được công khai
+thành một package chuẩn, và cho rằng package này chỉ nên được sử dụng bên trong
+các package chuẩn và mã runtime.
+
+https://github.com/golang/go/issues/5045
+https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
+https://bartoszmilewski.com/2008/11/05/who-ordered-memory-fences-on-an-x86/
+https://preshing.com/20130922/acquire-and-release-fences/
+https://en.wikipedia.org/wiki/Memory_barrier
+https://groups.google.com/forum/#!topic/golang-nuts/AoO3aivfA_E
+https://peeterjoot.wordpress.com/2009/12/04/intel-memory-ordering-fence-instructions-and-atomic-operations/
+
+https://github.com/golang/go/issues/5045#issuecomment-292673178
+Thao tác atomic trong C++ và thứ tự bộ nhớ
+https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
+Thứ tự bộ nhớ
+https://en.wikipedia.org/wiki/Memory_ordering
+Cmd/compile: hồi quy Go 1.8: vòng lặp sync/atomic bị loại bỏ
+https://news.ycombinator.com/item?id=13686863
+
+https://groups.google.com/forum/#!msg/golang-nuts/AoO3aivfA_E/zFjhu8XvngMJ
+Chúng tôi thường không muốn sync/atomic được sử dụng chút nào
+Kinh nghiệm đã nhiều lần cho chúng tôi thấy rằng
+rất, rất ít người có thể viết mã đúng
+khi sử dụng thao tác atomic… Nếu chúng tôi nghĩ đến các package nội bộ
+khi thêm package sync/atomic, có lẽ chúng tôi đã dùng cách đó.
+Giờ thì không thể xóa package này vì cam kết tương thích Go 1.
+
+https://groups.google.com/forum/#!topic/golang-nuts/AoO3aivfA_E
+}

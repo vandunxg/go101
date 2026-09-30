@@ -1,0 +1,211 @@
+### Làm thế nào để lấy địa chỉ các byte trong một string?
+
+Ta đều biết các byte của string không thể lấy địa chỉ,
+vì vậy trình biên dịch Go sẽ báo lỗi với biểu thức như `&aString[i]`.
+
+###==== Dùng `unsafe.StringData`
+
+Trước Go 1.22 (và từ Go 1.20), cách duy nhất để lấy địa chỉ các byte của string
+là dùng `unsafe`:
+
+''' Go
+package main
+
+import (
+	"unsafe"
+)
+
+var h = "Hello "
+var w = "world!"
+
+func commonUnderlyingBytes(x, y string) bool {
+	return &[]byte(x)[4] == &[]byte(y)[4]
+}
+
+func main() {
+	var s = h + w
+	//var p = &s[4] // error: cannot take address of s[4]
+	var p = unsafe.StringData(s[4:])
+	println(p, string(*p)) // 0xc00004470c o
+}
+'''
+
+###==== Dùng `reflect.Value.UnsafePointer`
+
+Từ Go 1.23, method `reflect.Value.UnsafePointer` hỗ trợ các giá trị string.
+Vì vậy, ta có thể dùng nó để lấy địa chỉ các byte của string.
+
+''' Go
+package main
+
+import (
+	"reflect"
+)
+
+var h = "Hello "
+var w = "world!"
+
+func commonUnderlyingBytes(x, y string) bool {
+	return &[]byte(x)[4] == &[]byte(y)[4]
+}
+
+func main() {
+	var s = h + w
+	//var p = &s[4] // error: cannot take address of s[4]
+	var p = (*byte)(reflect.ValueOf(s[4:]).UnsafePointer())
+	println(p, string(*p)) // 0xc000104eec o
+}
+'''
+
+Cả hai cách trên đều liên quan đến `unsafe.Pointer`. Cách tiếp theo thì không.
+
+###==== Chuyển string thành byte slice rồi lấy địa chỉ các phần tử của byte slice
+
+Từ Go toolchain 1.22, một __tối ưu hóa__ đã được áp dụng để không cần cấp phát bộ nhớ
+và sao chép byte trong một số phép chuyển đổi `[]byte(aString)` (khi trình biên dịch chứng minh được
+rằng các byte trong kết quả chuyển đổi sẽ không bao giờ bị sửa đổi).
+
+    === một tối ưu hóa `` https://github.com/golang/go/issues/2205
+
+Ta có thể tận dụng tối ưu hóa này để lấy địa chỉ các byte của một string:
+chuyển string thành byte slice rồi gián tiếp lấy địa chỉ các byte trong byte slice.
+Ví dụ sau minh họa cách dùng:
+
+''' Go
+package main
+
+var h = "Hello "
+var w = "world!"
+
+func takeAddressOfFirstByte(s string) *byte {
+	return &[]byte(s)[0]
+}
+
+func commonUnderlyingBytes(x, y string) bool {
+	return len(x) != 0 && len(y) != 0 &&
+		takeAddressOfFirstByte(x) == takeAddressOfFirstByte(y)
+}
+
+func main() {
+	var s = h + w
+
+	var p1 = &[]byte(s)[4]
+	println(p1, string(*p1))
+	
+	var p2 = &[]byte(s)[4]
+	println(p2, string(*p2))
+
+	println(p1 == p2)
+	
+	var s2 = s
+	println(commonUnderlyingBytes(s[4:], s2[4:]))
+}
+'''
+
+Chạy chương trình với Go toolchain phiên bản 1.21 và 1.22: __#gotv__
+
+'''
+$ gotv 1.21. run aa.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.12/bin/go run demo1.go
+0xc00003c6c4 o
+0xc00003c6a4 o
+false
+false
+$ gotv 1.22. run aa.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.5/bin/go run demo1.go
+0xc0000426ec o
+0xc0000426ec o
+true
+true
+'''
+
+Khoan đã! Điều này có nghĩa là giờ ta có thể sửa nội dung string sao?
+Đừng lo. Câu trả lời chắc chắn là không.
+Trình biên dịch có thể phát hiện thành công những lần thử như vậy
+và vô hiệu hóa tối ưu hóa cho các phép chuyển đổi liên quan,
+như đoạn code sau minh họa:
+
+''' Go
+package main
+
+var h = "Hello "
+var w = "world!"
+
+func main() {
+	var s = h + w
+
+	var p1 = &[]byte(s)[4]
+	println(p1, string(*p1))
+	
+	var p2 = &[]byte(s)[4]
+	*p2 = 'X' // modify the byte
+	println(p2, string(*p2))
+
+	println(p1 == p2)
+}
+'''
+
+Hành vi này giống nhau giữa Go toolchain v1.21 và v1.22. __#gotv__
+
+'''
+$ gotv 1.21. run aa.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.12/bin/go run demo2.go
+0xc00003c6d4 o
+0xc00003c6b4 X
+false
+$ gotv 1.22. run aa.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.5/bin/go run demo2.go
+0xc0000426f0 o
+0xc0000426cc X
+false
+'''
+
+Vì vậy, để cách này hoạt động, ta tuyệt đối không được sửa các byte trong byte slice kết quả,
+kể cả khi chỉ có khả năng chúng bị sửa đổi.
+
+Mẹo này có hữu ích trong thực tế không? Theo tôi, câu trả lời là có.
+Nếu một trong hai string được tạo ra từ string còn lại (thông qua thao tác lấy substring),
+thì để tìm tiền tố chung của chúng, hàm `CommonStringPrefix1` sau đây có hiệu năng cao hơn
+hàm `CommonStringPrefix2` (ta không biết liệu có quan hệ tạo thành giữa hai string hay không).
+
+''' Go
+func CommonStringPrefix1(x, y string) int {
+	if len(x) == 0 || len(y) == 0 {
+		return 0
+	}
+	if &[]byte(x)[0] == &[]byte(y)[0] {
+		if len(x) <= len(y) {
+			return len(x)
+		} else {
+			return len(y)
+		}
+	}
+	return CommonStringPrefix2(x, y)
+}
+
+func CommonStringPrefix2(x, y string) int {
+	var min = len(x)
+	if len(y) < len(x) {
+		min = len(y)
+	}
+	x2, y2 := x[:min], y[:min]
+	if len(x2) == len(y2) {
+		for i := 0; i < len(x2); i++ {
+			if x2[i] != y2[i] {
+				return i
+			}
+		}
+	}
+	return min
+}
+'''
+
+---
+
+{ %%
+@@@ #gotv
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ dùng để cài đặt và sử dụng
+nhiều bản Go toolchain song song một cách thuận tiện.  
+}
+
+
