@@ -1,0 +1,534 @@
+<p id="f-0-3-memory-allocations-md"></p>
+<h1>Cấp phát bộ nhớ</h1>
+
+<h2>Khối bộ nhớ</h2>
+
+<p>Các đơn vị cấp phát bộ nhớ cơ bản được gọi là khối bộ nhớ.
+Một khối bộ nhớ là một vùng nhớ liên tục.
+Như đã đề cập, khi chạy, một phần giá trị được chứa trong một khối bộ nhớ duy nhất.</p>
+
+<p>Một khối bộ nhớ có thể chứa nhiều phần giá trị.
+Kích thước của một khối bộ nhớ không được nhỏ hơn kích thước của bất kỳ phần giá trị nào mà nó chứa.</p>
+
+<p>Khi một khối bộ nhớ đang chứa một phần giá trị, ta có thể nói phần giá trị đó đang tham chiếu đến khối bộ nhớ.</p>
+
+<p>Các thao tác cấp phát bộ nhớ sẽ tiêu tốn một phần tài nguyên CPU để tìm các khối bộ nhớ phù hợp.
+Vì vậy, càng tạo nhiều khối bộ nhớ (để cấp phát bộ nhớ), càng tiêu tốn nhiều tài nguyên CPU.
+Trong lập trình, nên cố gắng tránh những lần cấp phát bộ nhớ không cần thiết để mã thực thi hiệu quả hơn.</p>
+
+<h2>Nơi cấp phát bộ nhớ</h2>
+
+<p>Go runtime có thể tìm một khối bộ nhớ trên stack (một loại vùng nhớ) của một goroutine hoặc trên heap (loại vùng nhớ còn lại) của toàn bộ chương trình để chứa một số phần giá trị. Quá trình tìm này được gọi là một lần cấp phát (memory allocation).</p>
+
+<p>Cách quản lý stack và heap khá khác nhau.
+Trong hầu hết trường hợp, tìm một khối bộ nhớ trên stack rẻ hơn nhiều so với trên heap.</p>
+
+<p>Thu gom các khối bộ nhớ trên stack cũng rẻ hơn nhiều so với thu gom các khối bộ nhớ trên heap.
+Thực tế, các khối bộ nhớ trên stack không cần được thu gom.
+Stack của một goroutine thực sự có thể được xem như một khối bộ nhớ duy nhất,
+và nó sẽ được thu gom toàn bộ khi goroutine kết thúc.</p>
+
+<p>Mặt khác, khi tất cả các phần giá trị được một khối bộ nhớ heap chứa không còn được sử dụng (nói cách khác, không còn phần giá trị còn sống nào tham chiếu đến khối bộ nhớ), khối bộ nhớ đó sẽ được xem là rác và cuối cùng sẽ tự động được thu gom trong các chu kỳ garbage collection lúc chạy; việc này có thể tiêu tốn một phần tài nguyên CPU (garbage collection sẽ được trình bày chi tiết trong một chương sau).
+Nói chung, càng cấp phát nhiều khối bộ nhớ trên heap, áp lực lên garbage collection càng lớn.</p>
+
+<p>Vì cấp phát trên heap đắt hơn nhiều, chỉ các lần cấp phát bộ nhớ trên heap đóng góp vào các metrics cấp phát trong kết quả benchmark code Go.
+Nhưng cần lưu ý rằng cấp phát trên stack vẫn có chi phí, dù chi phí đó thường nhỏ hơn tương đối nhiều.</p>
+
+<p>Module escape analysis của Go compiler có thể phát hiện một số phần giá trị chỉ được một goroutine sử dụng và cố gắng để những phần giá trị đó được cấp phát trên stack khi chạy nếu các điều kiện bổ sung nhất định được thỏa mãn. Cấp phát bộ nhớ trên stack và escape analysis sẽ được giải thích chi tiết hơn trong chương tiếp theo.</p>
+
+<h2>Các trường hợp cấp phát bộ nhớ</h2>
+
+<p>Nói chung, mỗi thao tác sau sẽ thực hiện ít nhất một lần cấp phát.</p>
+
+<ul>
+<li>khai báo variable.</li>
+<li>gọi hàm dựng sẵn <code>new</code>.</li>
+<li>gọi hàm dựng sẵn <code>make</code>.</li>
+<li>sửa đổi slice và map bằng composite literal.</li>
+<li>chuyển integer thành string.</li>
+<li>nối string bằng cách sử dụng <code>+</code>.</li>
+<li>chuyển đổi giữa string và byte slice, và ngược lại.</li>
+<li>chuyển string thành rune slice.</li>
+<li>đưa value vào interface (chuyển các value không phải interface thành interface).</li>
+<li>append các element vào một slice khi capacity của slice không đủ lớn.</li>
+<li>thêm các entry mới vào map khi array nền (dùng để lưu các entry) của map không đủ lớn để lưu các entry mới.</li>
+</ul>
+
+<p>Tuy nhiên, Go compiler chuẩn chính thức thực hiện một số tối ưu hóa code đặc biệt,
+khiến một số thao tác được liệt kê ở trên không thực hiện cấp phát trong một số trường hợp.
+Những tối ưu hóa này sẽ được giới thiệu ở phần sau của cuốn sách.</p>
+
+<h2>Lãng phí bộ nhớ do các khối bộ nhớ được cấp phát lớn hơn nhu cầu</h2>
+
+<p>Kích thước của các khối bộ nhớ khác nhau có thể khác nhau. Nhưng chúng không tùy ý.
+Trong cách triển khai Go runtime chuẩn chính thức, đối với các khối bộ nhớ được cấp phát trên heap,</p>
+
+<ul>
+<li><a href="https://github.com/golang/go/blob/master/src/runtime/sizeclasses.go">một số size class của khối bộ nhớ</a> (không quá 32768 byte) được định nghĩa trước. Theo phiên bản Go compiler chuẩn chính thức 1.24.x, các size class nhỏ nhất là 8, 16, 24, 32, 48, 64, 80 và 96 byte.</li>
+<li>Đối với các khối bộ nhớ lớn hơn 32768 byte, mỗi khối luôn gồm nhiều memory page. Kích thước memory page được Go runtime chuẩn chính thức sử dụng (các phiên bản 1.24) là 8192 byte.</li>
+</ul>
+
+<p>Vì vậy,</p>
+
+<ul>
+<li>để cấp phát một khối bộ nhớ (heap) cho value có kích thước nằm trong khoảng <code>[33, 48]</code>, kích thước của khối bộ nhớ thường (ít nhất phải) là 48. Nói cách khác, có thể lãng phí tối đa 15 byte (nếu kích thước value là 33).</li>
+<li>để tạo một byte slice có 32769 element trên heap, kích thước của khối bộ nhớ chứa các element của slice là 40960 (32768 + 8192, 5 memory page). Nói cách khác, 8191 byte bị lãng phí.</li>
+</ul>
+
+<p>Nói cách khác, các khối bộ nhớ thường lớn hơn nhu cầu. Những chiến lược này được thiết kế để quản lý bộ nhớ dễ dàng và hiệu quả, nhưng đôi khi có thể gây lãng phí một ít bộ nhớ (đúng vậy, đó là một sự đánh đổi).</p>
+
+<p>Điều này có thể được chứng minh bằng chương trình sau:</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;testing&quot;
+import &quot;unsafe&quot;
+
+var t *[5]int64
+var s []byte
+
+func f(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		t = &amp;[5]int64{}
+	}
+}
+
+func g(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		s = make([]byte, 32769)
+	}
+}
+
+func main() {
+	println(unsafe.Sizeof(*t))      // 40
+	rf := testing.Benchmark(f)
+	println(rf.AllocedBytesPerOp()) // 48
+	rg := testing.Benchmark(g)
+	println(rg.AllocedBytesPerOp()) // 40960
+}
+</code></pre>
+
+<p>Một ví dụ khác:</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;testing&quot;
+
+var s = []byte{32: 'b'} // len(s) == 33
+var r string
+
+func Concat(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		r = string(s) + string(s)
+	}
+}
+
+func main() {
+	br := testing.Benchmark(Concat)
+	println(br.AllocsPerOp())       // 3
+	println(br.AllocedBytesPerOp()) // 176
+}
+</code></pre>
+
+<p>Có 3 lần cấp phát được thực hiện bên trong function <code>Concat</code>.
+Hai lần trong số đó do các chuyển đổi từ byte slice sang string <code>string(s)</code> gây ra,
+và kích thước của hai khối bộ nhớ chứa các byte nền của hai string kết quả đều là 48
+(đây là size class nhỏ nhất không nhỏ hơn 33).
+Lần cấp phát thứ ba do phép nối string gây ra,
+và kích thước của khối bộ nhớ kết quả là 80
+(size class nhỏ nhất không nhỏ hơn 66).
+Ba lần cấp phát này tổng cộng cấp phát 176 (48+48+80) byte.
+Cuối cùng, 14 byte bị lãng phí.
+Và 44 (15 + 15 + 14) byte bị lãng phí trong quá trình thực thi function <code>Concat</code>.</p>
+
+<p>Trong ví dụ trên, kết quả của các chuyển đổi <code>string(s)</code> được sử dụng tạm thời trong phép nối string.
+Theo cách triển khai Go compiler/runtime chuẩn chính thức hiện tại (các phiên bản 1.24), các byte của string được cấp phát trên heap (xem các section bên dưới để biết chi tiết).
+Sau khi phép nối hoàn tất, các khối bộ nhớ chứa các byte của string trở thành rác bộ nhớ và cuối cùng sẽ được thu gom.</p>
+
+<h2>Giảm số lần cấp phát bộ nhớ và tiết kiệm bộ nhớ</h2>
+
+<p>Càng thực hiện ít lần cấp phát bộ nhớ (khối bộ nhớ), càng tiêu tốn ít tài nguyên CPU và càng giảm áp lực lên garbage collection.</p>
+
+<p>Ngày nay, bộ nhớ rẻ, nhưng điều này không đúng với bộ nhớ được các nhà cung cấp cloud computing bán.
+Vì vậy, nếu chạy chương trình trên cloud server, chương trình Go tiết kiệm càng nhiều bộ nhớ thì càng tiết kiệm nhiều tiền.</p>
+
+<p>Sau đây là một số gợi ý để giảm số lần cấp phát bộ nhớ và tiết kiệm bộ nhớ trong lập trình.</p>
+
+<h2>Tránh cấp phát không cần thiết bằng cách cấp phát đủ ngay từ đầu</h2>
+
+<p>Chúng ta thường sử dụng hàm dựng sẵn <code>append</code> để thêm một số element vào slice.
+Trong statement <code>r = append(s, elements...)</code>,
+nếu capacity còn trống của <code>s</code> không đủ lớn để chứa tất cả element được append,
+Go runtime sẽ cấp phát một khối bộ nhớ mới để chứa tất cả element của slice kết quả <code>r</code>.</p>
+
+<p>Nếu cần gọi hàm <code>append</code> nhiều lần để thêm các element,
+tốt nhất nên bảo đảm slice cơ sở có capacity đủ lớn,
+để tránh một số lần cấp phát không cần thiết trong toàn bộ quá trình thêm element.</p>
+
+<p>Ví dụ, để gộp một số slice thành một slice, implementation <code>MergeWithTwoLoops</code> sau đây hiệu quả hơn implementation <code>MergeWithOneLoop</code>,
+vì implementation trước thực hiện ít lần cấp phát hơn và copy ít value hơn.</p>
+
+<pre><code class="language-Go">package allocations
+
+import &quot;testing&quot;
+
+func getData() [][]int {
+	return [][]int{
+		{1, 2},
+		{9, 10, 11},
+		{6, 2, 3, 7},
+		{11, 5, 7, 12, 16},
+		{8, 5, 6},
+	}
+}
+
+func MergeWithOneLoop(data ...[]int) []int {
+	var r []int
+	for _, s := range data {
+		r = append(r, s...)
+	}
+	return r
+}
+
+func MergeWithTwoLoops(data ...[]int) []int {
+	n := 0
+	for _, s := range data {
+		n += len(s)
+	}
+	r := make([]int, 0, n)
+	for _, s := range data {
+		r = append(r, s...)
+	}
+	return r
+}
+
+func Benchmark_MergeWithOneLoop(b *testing.B) {
+	data := getData()
+	b.ResetTimer()
+	for i := 0; i &lt; b.N; i++ {
+		_ = MergeWithOneLoop(data...)
+	}
+}
+
+func Benchmark_MergeWithTwoLoops(b *testing.B) {
+	data := getData()
+	b.ResetTimer()
+	for i := 0; i &lt; b.N; i++ {
+		_ = MergeWithTwoLoops(data...)
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_MergeWithOneLoop-4   636.6 ns/op  352 B/op  4 allocs/op
+Benchmark_MergeWithTwoLoops-4  268.4 ns/op  144 B/op  1 allocs/op
+
+</code></pre>
+
+<p>Kết quả benchmark cho thấy các lần cấp phát ảnh hưởng rất nhiều đến hiệu năng thực thi code.</p>
+
+<p>Hãy in một số log để xem mỗi lần trong 4 lần cấp phát xảy ra khi nào trong một lần gọi function <code>MergeWithOneLoop</code>.</p>
+
+<pre><code class="language-go">package main
+
+import &quot;fmt&quot;
+
+func getData() [][]int {
+	return [][]int{
+		{1, 2},
+		{9, 10, 11},
+		{6, 2, 3, 7},
+		{11, 5, 7, 12, 16},
+		{8, 5, 6},
+	}
+}
+
+const format = &quot;Allocate from %v to %v (when append slice#%v).\n&quot;
+
+func MergeWithOneLoop(data [][]int) []int {
+	var oldCap int
+	var r []int
+	for i, s := range data {
+		r = append(r, s...)
+		if oldCap == cap(r) {
+			continue
+		}
+		fmt.Printf(format, oldCap, cap(r), i)
+		oldCap = cap(r)
+	}
+	return r
+}
+
+func main() {
+	MergeWithOneLoop(getData())
+}
+</code></pre>
+
+<p>Các output (đối với Go compiler chuẩn chính thức v1.24.n):</p>
+
+<pre><code>Allocate from 0 to 2 (when append slice#0).
+Allocate from 2 to 6 (when append slice#1).
+Allocate from 6 to 12 (when append slice#2).
+Allocate from 12 to 24 (when append slice#3).
+</code></pre>
+
+<p>Từ output, ta có thể thấy chỉ lần gọi <code>append</code> cuối cùng không thực hiện cấp phát.</p>
+
+<p>Thực tế, function <code>Merge_TwoLoops</code> về lý thuyết có thể còn nhanh hơn.
+Theo phiên bản Go compiler chuẩn chính thức 1.24, lần gọi <code>make</code> trong function <code>Merge_TwoLoop</code> sẽ đưa tất cả element vừa tạo về zero, <a href="https://go101.org/blog/2022-12-30-go-builtin-slice-manipulations-are-incomplete.html">điều này thực sự không cần thiết</a>. Các tối ưu hóa compiler trong những phiên bản tương lai có thể tránh thao tác zero này.</p>
+
+<p>Nhân tiện, implementation của function <code>Merge_TwoLoops</code> ở trên có một điểm chưa hoàn thiện.
+Nó không xử lý trường hợp integer overflow.
+Implementation sau đây tốt hơn.</p>
+
+<pre><code class="language-Go">func Merge_TwoLoops(data ...[][]byte) []byte {
+	n := 0
+	for _, s := range data {
+		if k := n + len(s); k &lt; n {
+			panic(&quot;slice length overflows&quot;)
+		} else {
+			n = k
+		}
+	}
+	r := make([]int, 0, n)
+	...
+}
+</code></pre>
+
+<h2>Tránh cấp phát nếu có thể</h2>
+
+<p>Cấp phát ít hơn thì tốt hơn, nhưng không cấp phát gì là tốt nhất.</p>
+
+<p>Ví dụ sau đây cho thấy thêm sự khác biệt về hiệu năng giữa hai implementation.
+Một implementation không thực hiện cấp phát nào, implementation còn lại thực hiện một lần cấp phát.</p>
+
+<pre><code class="language-Go">package allocations
+
+import &quot;testing&quot;
+
+func buildOriginalData() []int {
+	s := make([]int, 1024)
+	for i := range s {
+		s[i] = i
+	}
+	return s
+}
+
+func check(v int) bool {
+	return v%2 == 0
+}
+
+func FilterOneAllocation(data []int) []int {
+	var r = make([]int, 0, len(data))
+	for _, v := range data {
+		if check(v) {
+			r = append(r, v)
+		}
+	}
+	return r
+}
+
+func FilterNoAllocations(data []int) []int {
+	var k = 0
+	for i, v := range data {
+		if check(v) {
+			data[i] = data[k]
+			data[k] = v
+			k++
+		}
+	}
+	return data[:k]
+}
+
+
+func Benchmark_FilterOneAllocation(b *testing.B) {
+	data := buildOriginalData()
+	b.ResetTimer()
+	for i := 0; i &lt; b.N; i++ {
+		_ = FilterOneAllocation(data)
+	}
+}
+
+func Benchmark_FilterNoAllocations(b *testing.B) {
+	data := buildOriginalData()
+	b.ResetTimer()
+	for i := 0; i &lt; b.N; i++ {
+		_ = FilterNoAllocations(data)
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_FilterOneAllocation-4  3711 ns/op   8192 B/op  1 allocs/op
+Benchmark_FilterNoAllocations-4   903.3 ns/op    0 B/op  0 allocs/op
+</code></pre>
+
+<p>Từ kết quả benchmark, ta có thể thấy implementation <code>FilterNoAllocations</code> có hiệu năng tốt hơn.
+(Tất nhiên, nếu không được phép sửa đổi dữ liệu đầu vào, ta phải chọn một implementation có thực hiện cấp phát.)</p>
+
+<h2>Tiết kiệm bộ nhớ và giảm số lần cấp phát bằng cách kết hợp các khối bộ nhớ</h2>
+
+<p>Đôi khi, ta có thể cấp phát một khối bộ nhớ lớn để chứa nhiều phần giá trị thay vì cấp phát một khối bộ nhớ nhỏ cho mỗi phần giá trị.
+Việc này sẽ giảm nhiều lần cấp phát bộ nhớ, do đó tiêu tốn ít tài nguyên CPU hơn và giảm áp lực lên GC ở một mức độ nào đó.
+Đôi khi, việc này có thể giảm lãng phí bộ nhớ, nhưng không phải lúc nào cũng vậy.</p>
+
+<p>Hãy xem một ví dụ:</p>
+
+<pre><code class="language-Go">package allocations
+
+import &quot;testing&quot;
+
+const N = 100
+
+type Book struct {
+	Title  string
+	Author string
+	Pages  int
+}
+
+//go:noinline
+func CreateBooksOnOneLargeBlock(n int) []*Book {
+	books := make([]Book, n)
+	pbooks := make([]*Book, n)
+	for i := range pbooks {
+		pbooks[i] = &amp;books[i]
+	}
+	return pbooks
+}
+
+//go:noinline
+func CreateBooksOnManySmallBlocks(n int) []*Book {
+	books := make([]*Book, n)
+	for i := range books {
+		books[i] = new(Book)
+	}
+	return books
+}
+
+func Benchmark_CreateBooksOnOneLargeBlock(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		_ = CreateBooksOnOneLargeBlock(N)
+	}
+}
+
+func Benchmark_CreateBooksOnManySmallBlocks(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		_ = CreateBooksOnManySmallBlocks(N)
+	}
+}
+</code></pre>
+
+<p>Chạy benchmark, ta nhận được:</p>
+
+<pre><code>Benchmark_CreateOnOneLargeBlock-4     4372 ns/op  4992 B/op    2 allocs/op
+Benchmark_CreateOnManySmallBlocks-4  18017 ns/op  5696 B/op  101 allocs/op
+</code></pre>
+
+<p>Từ các kết quả, ta có thể thấy việc cấp phát nhiều phần giá trị nhỏ trên một khối bộ nhớ lớn</p>
+
+<ol>
+<li>tiêu tốn ít thời gian CPU hơn nhiều.</li>
+<li>tiêu tốn ít bộ nhớ hơn một chút.</li>
+</ol>
+
+<p>Kết luận đầu tiên dễ hiểu. Hai thao tác cấp phát tốn ít thời gian hơn nhiều so với 101 thao tác cấp phát.</p>
+
+<p>Kết luận thứ hai thực ra đã được giải thích trước đó.
+Như đã đề cập, khi kích thước của một value (phần giá trị) nhỏ không khớp chính xác với bất kỳ size class khối bộ nhớ nào được Go runtime chuẩn chính thức hỗ trợ, một khối bộ nhớ lớn hơn nhu cầu một chút sẽ được cấp phát cho value (phần giá trị) nhỏ nếu value (phần giá trị) nhỏ được tạo riêng lẻ.
+Kích thước của type <code>Book</code> là 40 byte (trên kiến trúc 64-bit), trong khi size class khối bộ nhớ nhỏ nhất lớn hơn 40 là 48. Vì vậy, cấp phát riêng lẻ một value <code>Book</code> sẽ lãng phí 8 byte.</p>
+
+<p>Thực tế, kết luận thứ hai chỉ đúng trong một số điều kiện.
+Cụ thể, kết luận này không đúng khi value N nằm trong khoảng từ 820 đến 852.
+Đặc biệt, khi N == 820, kết quả benchmark cho thấy việc cấp phát nhiều phần giá trị nhỏ trên một khối bộ nhớ lớn tiêu tốn nhiều hơn 3.5% bộ nhớ.</p>
+
+<pre><code>Benchmark_CreateOnOneLargeBlock-4     30491 ns/op  47744 B/op    2 allocs/op
+Benchmark_CreateOnManySmallBlocks-4  145204 ns/op  46144 B/op  821 allocs/op
+</code></pre>
+
+<p>Tại sao function <code>CreateBooksOnOneLargeBlock</code> lại tiêu tốn nhiều bộ nhớ hơn khi N == 820?
+Vì nó cần cấp phát một khối bộ nhớ có kích thước tối thiểu là 32800 (820 * 40), lớn hơn size class khối bộ nhớ nhỏ nhất 32768. Vì vậy, khối bộ nhớ cần 5 memory page, có tổng kích thước là 40960 (8192 * 5). Nói cách khác, 8160 (40960 - 32800) byte bị lãng phí.</p>
+
+<p>Mặc dù đôi khi lãng phí nhiều bộ nhớ hơn, nói chung, cấp phát nhiều phần giá trị nhỏ trên một khối bộ nhớ lớn tương đối tốt hơn so với cấp phát mỗi phần trên một khối bộ nhớ riêng biệt. Điều này đặc biệt đúng khi thời gian sống của các phần giá trị nhỏ gần như nhau; trong trường hợp đó, cấp phát nhiều phần giá trị nhỏ trên một khối bộ nhớ lớn thường có thể tránh phân mảnh bộ nhớ một cách hiệu quả.</p>
+
+<h2>Dùng value cache pool để tránh một số lần cấp phát</h2>
+
+<p>Đôi khi, ta cần thường xuyên cấp phát và loại bỏ các value của một type cụ thể theo thời gian. Tái sử dụng các value đã cấp phát để tránh rất nhiều lần cấp phát là một ý hay.</p>
+
+<p>Ví dụ, có rất nhiều non-player character (NPC) trong game RTS.
+Một số lượng lớn NPC sẽ được tạo và hủy theo thời gian trong một phiên chơi game.
+Code liên quan có dạng</p>
+
+<pre><code class="language-Go">type NPC struct {
+	name       [64]byte
+	nameLen    uint16
+	blood      uint16
+	properties uint32
+	x, y       float64
+}
+
+func SpawnNPC(name string, x, y float64) *NPC {
+	var npc = newNPC()
+	npc.nameLen = uint16(copy(npc.name[:], name))
+	npc.x = x
+	npc.y = y
+	return npc
+}
+
+func newNPC() *NPC {
+	return &amp;NPC{}
+}
+
+func releaseNPC(npc *NPC) {
+}
+</code></pre>
+
+<p>Vì Go hỗ trợ GC tự động, function <code>releaseNPC</code> có thể không làm gì.
+Tuy nhiên, implementation như vậy sẽ dẫn đến một số lượng lớn lần cấp phát trong quá trình chơi game và gây áp lực lớn lên garbage collection, khiến khó bảo đảm FPS (frames per second) tốt.</p>
+
+<p>Thay vào đó, ta có thể dùng một cache pool để giảm số lần cấp phát, như code dưới đây.</p>
+
+<pre><code class="language-Go">import &quot;container/list&quot;
+
+var npcPool = struct {
+	sync.Mutex
+	*list.List
+}{
+	List: list.New(),
+}
+
+func newNPC() *NPC {
+	npcPool.Lock()
+	defer npcPool.Unlock()
+	if npcPool.Len() == 0 {
+		return &amp;NPC{}
+	}
+	return npcPool.Remove(npcPool.Front()).(*NPC)
+}
+
+func releaseNPC(npc *NPC) {
+	npcPool.Lock()
+	defer npcPool.Unlock()
+	*npc = NPC{} // đặt NPC đã release về zero
+	npcPool.PushBack(npc)
+}
+</code></pre>
+
+<p>Bằng cách sử dụng pool (còn gọi là free list), số lần cấp phát các value <code>NPC</code> sẽ giảm đáng kể,
+điều này rất hữu ích để duy trì FPS (frames per second) mượt mà khi chơi game.</p>
+
+<p>Nếu cache pool chỉ được sử dụng trong một goroutine,
+thì không cần synchronization để xử lý concurrency trong implementation.</p>
+
+<p>Ta cũng có thể đặt kích thước tối đa cho pool để tránh pool chiếm quá nhiều bộ nhớ.</p>
+
+<p>Package chuẩn <code>sync</code> cung cấp type <code>Pool</code> với các chức năng tương tự nhưng có một số khác biệt về thiết kế:</p>
+
+<ul>
+<li>một object rảnh trong <code>sync.Pool</code> sẽ tự động được garbage collection thu gom nếu được phát hiện là không được sử dụng trong hai chu kỳ garbage collection liên tiếp. Điều này có nghĩa kích thước tối đa của một <code>sync.Pool</code> là động và phụ thuộc vào nhu cầu lúc chạy.</li>
+<li>type và kích thước của các object trong một <code>sync.Pool</code> có thể khác nhau. Tuy nhiên, best practice là bảo đảm các object được đưa vào cùng một <code>sync.Pool</code> có cùng type và cùng kích thước.</li>
+</ul>
+
+<p>Cá nhân tôi thấy thiết kế của <code>sync.Pool</code> hiếm khi đáp ứng được nhu cầu trong thực tế.
+Vì vậy, tôi thường sử dụng các implementation value cache pool tùy chỉnh trong những project Go của mình.</p>

@@ -1,0 +1,51 @@
+
+##### Toán tử 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+var x, y = true, false
+
+func o(b bool) bool {
+	print(b)
+	return !b
+}
+
+func main() {
+	_ = x || o(x)
+	_ = y && o(y)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+true
+false
+truefalse
+(Không in gì)
+"""
+
+
+@@@ #answer
+{
+Đáp án: (Không in gì)
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/N4RCHuFudY- __.
+
+Các điểm chính:
+*
+   Khi đánh giá `a || b`, biểu thức `a` được đánh giá trước, và biểu thức `b` chỉ được đánh giá nếu `a` được đánh giá là `false`.
+*
+   Khi đánh giá `a && b`, biểu thức `a` được đánh giá trước, và biểu thức `b` chỉ được đánh giá nếu `a` được đánh giá là `true`.
+
+
+
+}

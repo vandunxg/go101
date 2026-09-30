@@ -1,0 +1,63 @@
+
+<h1>Các compiler của Go sẽ tự động chèn một số dấu chấm phẩy vào code</h1>
+
+<p>Hãy xem một chương trình nhỏ:</p>
+
+<pre><code class="language-Go">package main
+
+func foo() bool {
+	return false
+}
+
+func main() {
+	switch foo()
+	{
+	case false: println(&quot;False&quot;)
+	case true: println(&quot;True&quot;)
+	}
+}
+</code></pre>
+
+<p>Output của chương trình trên là gì? Hãy suy nghĩ một lúc.</p>
+
+<p>~</p>
+
+<p>~</p>
+
+<p>~</p>
+
+<p><code>False</code>? Không, nó in ra <code>True</code>.
+Ngạc nhiên không? Chẳng phải function <code>foo</code> luôn return <code>false</code> sao?</p>
+
+<p>Đúng là function <code>foo</code> luôn return <code>false</code>, nhưng điều đó không liên quan ở đây.</p>
+
+<p>Các compiler sẽ tự động chèn một số dấu chấm phẩy vào code trên như sau:</p>
+
+<pre><code class="language-Go">package main
+
+func foo() bool {
+	return false;
+};
+
+func main() {
+	switch foo();
+	{
+	case false: println(&quot;False&quot;);
+	case true: println(&quot;True&quot;);
+	};
+};
+</code></pre>
+
+<p>Bây giờ, có thể thấy rõ rằng biểu thức <code>switch</code> (<code>true</code>) đã bị lược bỏ.
+Khối <code>switch</code> thực sự tương đương với:</p>
+
+<pre><code class="language-Go">	switch foo(); true
+	{
+	case false: println(&quot;False&quot;);
+	case true: println(&quot;True&quot;);
+	};
+</code></pre>
+
+<p>Đó là lý do chương trình in ra <code>True</code>.</p>
+
+<p>Để biết các quy tắc tự chèn dấu chấm phẩy chi tiết, vui lòng đọc <a href="https://go101.org/article/line-break-rules.html">bài viết này</a>.</p>

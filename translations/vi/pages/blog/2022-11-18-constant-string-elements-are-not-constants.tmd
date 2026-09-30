@@ -1,0 +1,107 @@
+
+### Thật đáng tiếc khi các phần tử byte của các string constant trong Go không phải là constant. Và đó lại là một điều may mắn
+
+Chương trình Go sau có compile được không?
+
+''' Go
+package main
+
+const S = "Go"
+
+const G = S[0]
+
+func main() {}
+'''
+
+Nhiều gopher có thể nghĩ rằng nó sẽ compile được.
+Nhưng nó không compile được.
+Bởi vì các giá trị phần tử của một string luôn không phải là constant trong Go,
+ngay cả khi string đó là một constant.
+
+Thật đáng tiếc là Go 1.0 đã không quy định rằng các phần tử của string constant cũng là các constant.
+
+Để duy trì backward-compatibility, điều đáng tiếc này khó có thể khắc phục.
+Ví dụ, hiện tại chương trình sau compile được.
+Nó in ra `185` (-71 + 256).
+
+''' Go
+package main
+
+const S = "Go" // S[0] == 71
+
+func main() {
+	println(-S[0])
+}
+'''
+
+Nhưng nếu các phần tử của string constant trở thành các constant, thì chương trình sẽ không compile được,
+vì type của `-S[0]` là `byte` (còn gọi là `uint8`), trong khi `-71` tràn khỏi phạm vi của `byte`.
+
+Đó là một điều đáng tiếc, nhưng cũng là một điều may mắn.
+
+Nếu các phần tử của string constant là các constant, thì sẽ có các ambiguity khi parsing trong thời đại custom generics của Go.
+Kể từ Go 1.18, dòng sau sẽ được xem là một khai báo generic type,
+trong đó `S` là một type parameter còn `[4]*int` là type constraint của nó.
+
+''' Go
+type T [S [4]*int] struct{}
+'''
+
+Tuy nhiên, nếu các phần tử của string constant là các constant,
+thì `S [4]` có thể được xem là một giá trị constant kiểu `byte` nếu `S` là một string constant.
+Trong giai đoạn parsing, compiler không biết identifier `int` biểu thị điều gì.
+Một type hay một integer constant?
+Nếu nó biểu thị một integer constant,
+và `S [4]` có thể được xem là một giá trị constant kiểu `byte`,
+thì dòng trên là một khai báo array type thông thường hợp lệ.
+
+May mắn là hiện nay compiler của Go biết rằng `S [4]` sẽ không bao giờ là constant,
+nên nó luôn coi dòng trên không phải là một khai báo array type thông thường.
+Ở đây không xảy ra ambiguity nào.
+Nếu các phần tử của string constant là các constant, cú pháp khai báo type parameter rút gọn sẽ không thể thực hiện được.
+
+Có __một proposal__ cho phép Go hỗ trợ các array constant (và các composite value constant khác).
+Tuy nhiên, thiết kế custom generics của Go gần như đã khiến proposal đó không thể thành hiện thực.
+Bởi vì, tương tự, đoạn code sau sẽ dẫn đến các ambiguity khi parsing
+nếu các value của array có thể được khai báo là constant.
+
+''' Go
+const A = [2]int{1, 2}
+type BoolArray [A [1] * int]bool
+'''
+
+    === một proposal `` https://github.com/golang/go/issues/6386
+
+### Nhân tiện, các substring cũng không bao giờ là constant
+
+Dòng code sau không compile được trong Go:
+
+''' Go
+const _ = "Google"[:2]
+'''
+
+Thay vào đó, dòng sau compile được:
+
+''' Go
+var _ = "Google"[:2]
+'''
+
+Dựa trên thực tế này, chương trình sau sẽ in ra `128 0` (lý do được giải thích __tại đây__).
+
+''' Go
+package main
+
+const S = "Go"
+
+var a byte = 64 << len(S) / 2
+var b byte = 64 << len(S[:]) / 2
+
+func main() {
+	println(a, b) // 128 0
+}
+'''
+
+Vì vậy, __việc biến các substring của các string constant thành constant cũng sẽ phá vỡ backward-compatibility__.
+
+    === tại đây `` https://go101.org/quizzes/operator-3.html
+    === việc biến các substring... `` https://github.com/golang/go/issues/28591#issuecomment-697357430

@@ -1,0 +1,38 @@
+<p id="f-333-about-go-generics-md"></p>
+<h1>Về generics tùy chỉnh của Go</h1>
+
+<p>Mục đích chính của generics tùy chỉnh là tránh việc lặp lại code,
+hay nói cách khác, tăng khả năng tái sử dụng code.</p>
+
+<p>Trong một số tình huống, generics cũng có thể giúp code gọn gàng hơn và API đơn giản hơn
+(nhưng không phải lúc nào cũng vậy).</p>
+
+<p>Trong một số tình huống, generics cũng có thể cải thiện hiệu năng thực thi code
+(một lần nữa, không phải lúc nào cũng vậy).</p>
+
+<p>Trước phiên bản 1.18, đối với nhiều lập trình viên Go, việc thiếu generics tùy chỉnh đã gây ra khó khăn khi lập trình Go trong một số tình huống.</p>
+
+<p>Quả thực, những khó khăn do thiếu generics tùy chỉnh gây ra đã được giảm nhẹ ở một mức độ nhất định nhờ những thực tế sau đây.</p>
+
+<ul>
+<li>Kể từ phiên bản 1.0, Go đã hỗ trợ generics dựng sẵn, bao gồm một số dạng generic type dựng sẵn (chẳng hạn như map và channel) và các function generic (<code>new</code>, <code>make</code>, <code>len</code>, <code>close</code>, v.v.).</li>
+<li>Go hỗ trợ tốt reflection (thông qua các interface và package chuẩn <code>reflect</code>).</li>
+<li>Code lặp lại có thể được generate tự động bằng một số tool (chẳng hạn directive comment <code>//go:generate</code> được Go toolchain chính thức hỗ trợ).</li>
+</ul>
+
+<p>Tuy nhiên, những khó khăn đó vẫn tồn tại trong nhiều use case.
+Nhu cầu về generics tùy chỉnh ngày càng lớn.
+Cuối cùng, nhóm Go core đã quyết định hỗ trợ generics tùy chỉnh trong Go.</p>
+
+<p>Vì đủ loại lý do, bao gồm việc cân nhắc khả năng tương thích ngược về syntax/semantics và những khó khăn trong triển khai, nhóm Go core đã chọn <a href="https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md">đề xuất type parameters</a> để triển khai generics tùy chỉnh.</p>
+
+<p>Phiên bản Go đầu tiên hỗ trợ generics tùy chỉnh là 1.18.</p>
+
+<p>Đề xuất type parameters cố gắng giải quyết nhiều vấn đề về tái sử dụng code, nhưng không phải tất cả.
+Và xin lưu ý rằng hiện tại (Go 1.25), chưa phải mọi tính năng được đề cập trong đề xuất type parameters đều đã được triển khai. Thiết kế và việc triển khai generics tùy chỉnh sẽ tiếp tục phát triển và được cải tiến trong các phiên bản Go tương lai. Và xin lưu ý rằng đề xuất này không phải là giới hạn trên của generics tùy chỉnh trong Go.</p>
+
+<p>Bất chấp những hạn chế (tạm thời hoặc vĩnh viễn) trong thiết kế và triển khai generics tùy chỉnh hiện tại của Go,
+tôi cũng nhận thấy có một số chi tiết được xử lý khéo léo và đẹp đẽ trong phần triển khai.</p>
+
+<p>Mặc dù generics tùy chỉnh của Go không thể giải quyết mọi vấn đề về tái sử dụng code,
+cá nhân tôi tin rằng generics tùy chỉnh của Go sẽ được sử dụng rộng rãi trong việc lập trình Go trong tương lai.</p>

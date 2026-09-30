@@ -1,0 +1,653 @@
+<p id="f-5-BCE-md"></p>
+<h1>BCE (Loại bỏ kiểm tra giới hạn)</h1>
+
+<p>Go là một ngôn ngữ an toàn bộ nhớ. Khi indexing element của array/slice/string và thực hiện các thao tác subslice, Go runtime sẽ kiểm tra xem các index liên quan có nằm ngoài phạm vi hay không. Nếu một index nằm ngoài phạm vi, một panic sẽ được tạo ra để ngăn index không hợp lệ gây hại. Đây được gọi là kiểm tra giới hạn.</p>
+
+<p>Các kiểm tra giới hạn giúp code của chúng ta chạy an toàn; mặt khác, chúng cũng khiến code của chúng ta chạy chậm hơn một chút.
+Đây là một đánh đổi mà một ngôn ngữ an toàn phải chấp nhận.</p>
+
+<p>Kể từ Go toolchain v1.7, Go compiler tiêu chuẩn đã bắt đầu hỗ trợ BCE (loại bỏ kiểm tra giới hạn). BCE có thể tránh một số kiểm tra giới hạn không cần thiết, nhờ đó Go compiler tiêu chuẩn có thể tạo ra các chương trình hiệu quả hơn.</p>
+
+<p>Phần sau liệt kê một số ví dụ để cho thấy BCE hoạt động trong những trường hợp nào và không hoạt động trong những trường hợp nào.</p>
+
+<p>Chúng ta có thể dùng compiler option <code>-d=ssa/check_bce</code> để hiển thị những dòng code cần kiểm tra giới hạn.</p>
+
+<h2 id="example-1">Ví dụ 1</h2>
+
+<p>Một ví dụ đơn giản:</p>
+
+<pre><code class="language-Go">// example1.go
+package main
+
+func f1a(s []struct{}, index int) {
+	_ = s[index] // line 5: Found IsInBounds
+	_ = s[index]
+	_ = s[index:]
+	_ = s[:index+1]
+}
+
+func f1b(s []byte, index int) {
+	s[index-1] = 'a' // line 12: Found IsInBounds
+	_ = s[:index]
+}
+
+func f1c(a [5]int) {
+	_ = a[0]
+	_ = a[4]
+}
+
+func f1d(s []int) {
+	if len(s) &gt; 2 {
+	    _, _, _ = s[0], s[1], s[2]
+	}
+}
+
+func f1g(s []int) {
+	middle := len(s) / 2
+	_ = s[:middle]
+	_ = s[middle:]
+}
+
+func main() {}
+</code></pre>
+
+<p>Hãy chạy nó với compiler option <code>-d=ssa/check_bce</code>:</p>
+
+<pre><code>$ go run -gcflags=&quot;-d=ssa/check_bce&quot; example1.go
+./example1.go:5:7: Found IsInBounds
+./example1.go:12:3: Found IsInBounds
+</code></pre>
+
+<p>Output cho thấy chỉ có hai dòng code cần kiểm tra giới hạn trong đoạn code ví dụ trên.</p>
+
+<p>Lưu ý rằng: các Go toolchain có version nhỏ hơn 1.21 không loại bỏ được các kiểm tra giới hạn trong function <code>f1g</code>.</p>
+
+<p>Cũng lưu ý rằng, cho đến hiện tại (Go toolchain v1.24.n), official standard compiler không thực hiện BCE cho một operation trong generic function nếu operation đó liên quan đến type parameters và generic function không bao giờ được instantiate.
+Ví dụ, command <code>go run -gcflags=-d=ssa/check_bce bar.go</code> sẽ không report gì.</p>
+
+<pre><code class="language-Go">// bar.go
+package bar
+
+func foo[E any](s []E) {
+	_ = s[0] // line 5
+	_ = s[1] // line 6
+	_ = s[2] // line 7
+}
+
+// var _ = foo[bool]
+</code></pre>
+
+<p>Tuy nhiên, nếu bật dòng khai báo variable, compiler sẽ report:</p>
+
+<pre><code>./bar.go:5:7: Found IsInBounds
+./bar.go:6:7: Found IsInBounds
+./bar.go:7:7: Found IsInBounds
+./bar.go:4:6: Found IsInBounds
+</code></pre>
+
+<h2 id="example-2">Ví dụ 2</h2>
+
+<p>Tất cả các kiểm tra giới hạn trong việc indexing element của slice và các thao tác subslice được hiển thị trong ví dụ sau đều được loại bỏ.</p>
+
+<pre><code class="language-Go">// example2.go
+package main
+
+func f2a(s []int) {
+	for i := range s {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f2b(s []int) {
+	for i := 0; i &lt; len(s); i++ {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f2c(s []int) {
+	for i := len(s) - 1; i &gt;= 0; i-- {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f2d(s []int) {
+	for i := len(s); i &gt; 0; {
+		i--
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func f2e(s []int) {
+	for i := 0; i &lt; len(s) - 1; i += 2 {
+		_ = s[i]
+		_ = s[i:len(s)]
+		_ = s[:i+1]
+	}
+}
+
+func main() {}
+</code></pre>
+
+<p>Hãy chạy nó, chúng ta sẽ thấy không có output.
+Đúng vậy, official standard Go compiler thông minh đến mức nhận ra rằng mọi kiểm tra giới hạn trong đoạn code ví dụ trên đều có thể được loại bỏ.</p>
+
+<pre><code>$ go run -gcflags=&quot;-d=ssa/check_bce&quot; example2.go
+</code></pre>
+
+<p>Lưu ý: trước v1.24, official standard Go compiler không loại bỏ được các kiểm tra giới hạn trong hai loop sau.</p>
+
+<pre><code class="language-Go">func f2g(s []int) {
+	for i := len(s) - 1; i &gt;= 0; i-- {
+		_ = s[:i+1]
+	}
+}
+
+func f2h(s []int) {
+	for i := 0; i &lt;= len(s) - 1; i++ {
+		_ = s[:i+1]
+	}
+}
+</code></pre>
+
+<h2 id="example-3">Ví dụ 3</h2>
+
+<p>Chúng ta nên cố gắng evaluate element indexing hoặc subslice operation với index lớn nhất càng sớm càng tốt để giảm số lượng kiểm tra giới hạn.</p>
+
+<p>Trong ví dụ sau, nếu expression <code>s[3]</code> được evaluate mà không panic, thì các kiểm tra giới hạn cho <code>s[0]</code>, <code>s[1]</code> và <code>s[2]</code> có thể được loại bỏ.</p>
+
+<pre><code class="language-Go">// example3.go
+package main
+
+func f3a(s []int32) int32 {
+	return s[0] | // Found IsInBounds (line 5)
+		s[1] | // Found IsInBounds
+		s[2] | // Found IsInBounds
+		s[3]   // Found IsInBounds
+}
+
+func f3b(s []int32) int32 {
+	return s[3] | // Found IsInBounds (line 12)
+		s[0] |
+		s[1] |
+		s[2]
+}
+
+func main() {
+}
+</code></pre>
+
+<p>Hãy chạy nó, ta nhận được:</p>
+
+<pre><code>./example3.go:5:10: Found IsInBounds
+./example3.go:6:4: Found IsInBounds
+./example3.go:7:4: Found IsInBounds
+./example3.go:8:4: Found IsInBounds
+./example3.go:12:10: Found IsInBounds
+</code></pre>
+
+<p>Từ output, chúng ta có thể thấy function <code>f3a</code> có 4 kiểm tra giới hạn, nhưng function <code>f3b</code> chỉ có một kiểm tra.</p>
+
+<h2 id="example-4">Ví dụ 4</h2>
+
+<p>Kể từ Go toolchain v1.19, kiểm tra giới hạn trong function <code>f5a</code> đã được loại bỏ thành công,</p>
+
+<pre><code class="language-Go">func f5a(isa []int, isb []int) {
+	if len(isa) &gt; 0xFFF {
+		for _, n := range isb {
+			_ = isa[n &amp; 0xFFF]
+		}
+	}
+}
+</code></pre>
+
+<p>Tuy nhiên, trước Go toolchain v1.19, kiểm tra này không được loại bỏ.
+Các compiler trước version 1.19 cần một hint để loại bỏ kiểm tra, như được thể hiện trong function <code>f5b</code>:</p>
+
+<pre><code class="language-Go">func f5b(isa []int, isb []int) {
+	if len(isa) &gt; 0xFFF {
+		// Một hint thành công (đối với compiler v1.18-)
+		isa = isa[:0xFFF+1]
+		for _, n := range isb {
+			_ = isa[n &amp; 0xFFF] // BCEed!
+		}
+	}
+}
+
+func f5c(isa []int, isb []int) {
+	if len(isa) &gt; 0xFFF {
+		// Một hint không hoạt động (đối với compiler v1.18-)
+		_ = isa[:0xFFF+1]
+		for _, n := range isb {
+			_ = isa[n &amp; 0xFFF] // Found IsInBounds
+		}
+	}
+}
+
+func f5d(isa []int, isb []int) {
+	if len(isa) &gt; 0xFFF {
+		// Một hint không hoạt động (đối với compiler v1.18-)
+		_ = isa[0xFFF]
+		for _, n := range isb {
+			_ = isa[n &amp; 0xFFF] // Found IsInBounds
+		}
+	}
+}
+</code></pre>
+
+<p>Phần tiếp theo cho thấy thêm một số trường hợp cần compiler hint để tránh một số kiểm tra giới hạn không cần thiết.</p>
+
+<h2 id="example-5">Ví dụ 5</h2>
+
+<p>Trước Go toolchain v1.24, có một số kiểm tra giới hạn không cần thiết trong đoạn code sau:</p>
+
+<pre><code class="language-Go">func fz(s, x, y []byte) {
+	n := copy(s, x)
+	copy(s[n:], y) // Found IsSliceInBounds (1.24-)
+	_ = x[n:]      // Found IsSliceInBounds (1.24-)
+}
+
+func fy(a, b []byte) {
+    for i := range min(len(a), len(b)) {
+        _ = a[i] // Found IsInBounds (1.24-)
+        _ = b[i] // Found IsInBounds (1.24-)
+    }
+}
+
+func fx(a [256]byte) {
+	for i := 0; i &lt; 128; i++ {
+		_ = a[2*i] // Found IsInBounds (1.24-)
+	}
+}
+
+func f4a(is []int, bs []byte) {
+	if len(is) &gt;= 256 {
+		for _, n := range bs {
+			_ = is[n] // Found IsInBounds (1.24-)
+		}
+	}
+}
+</code></pre>
+
+<p>Kể từ version 1.24, tất cả các kiểm tra này đều được loại bỏ.</p>
+
+<p>Trước version 1.24, chúng ta phải thêm một dòng hint để loại bỏ kiểm tra giới hạn trong function <code>f4a</code>:</p>
+
+<pre><code class="language-Go">func f4a(is []int, bs []byte) {
+	if len(is) &gt;= 256 {
+		is = is[:256] // một hint thành công
+		for _, n := range bs {
+			_ = is[n] // BCEed!
+		}
+	}
+}
+</code></pre>
+
+<p>Kể từ version 1.24, dòng hint này không còn cần thiết.</p>
+
+<h2>Đôi khi compiler cần một số hint để loại bỏ một số kiểm tra giới hạn</h2>
+
+<p>Official standard Go compiler vẫn chưa đủ thông minh để loại bỏ tất cả các kiểm tra giới hạn không cần thiết.
+Đôi khi, compiler cần được cung cấp một số hint để loại bỏ một số kiểm tra giới hạn.</p>
+
+<p>Trong ví dụ sau, bằng cách thêm một block code <code>if</code> dư thừa vào function <code>NumSameBytes_2</code>, tất cả các kiểm tra giới hạn trong loop đều được loại bỏ.</p>
+
+<pre><code class="language-Go">type T = string
+
+func NumSameBytes_1(x, y T) int {
+	if len(x) &gt; len(y) {
+		x, y = y, x
+	}
+	for i := 0; i &lt; len(x); i++ {
+		if x[i] != 
+			y[i] { // Found IsInBounds
+			return i
+		}
+	}
+	return len(x)
+}
+
+func NumSameBytes_2(x, y T) int {
+	if len(x) &gt; len(y) {
+		x, y = y, x
+	}
+	
+	// một hint thành công
+	if len(x) &gt; len(y) {
+		panic(&quot;unreachable&quot;)
+	}
+	
+	for i := 0; i &lt; len(x); i++ {
+		if x[i] != y[i] { // BCEed!
+			return i
+		}
+	}
+	return len(x)
+}
+</code></pre>
+
+<p>Hint trên hoạt động khi <code>T</code> là một string type hoặc một slice type,
+trong khi mỗi hint trong hai hint sau chỉ hoạt động cho một trường hợp (theo Go toolchain v1.24.n).</p>
+
+<pre><code class="language-Go">func NumSameBytes_3(x, y T) int {
+	if len(x) &gt; len(y) {
+		x, y = y, x
+	}
+	
+	y = y[:len(x)] // một hint, chỉ hoạt động khi T là slice
+	for i := 0; i &lt; len(x); i++ {
+		if x[i] != y[i] {
+			return i
+		}
+	}
+	return len(x)
+}
+
+func NumSameBytes_4(x, y T) int {
+	if len(x) &gt; len(y) {
+		x, y = y, x
+	}
+	
+	_ = y[:len(x)] // một hint, chỉ hoạt động khi T là string
+	for i := 0; i &lt; len(x); i++ {
+		if x[i] != y[i] {
+			return i
+		}
+	}
+	return len(x)
+}
+</code></pre>
+
+<p>Lưu ý rằng các version tương lai của official standard Go compiler sẽ trở nên thông minh hơn, nhờ đó các hint trên sau này sẽ không còn cần thiết.</p>
+
+<h2>Viết code theo cách thân thiện với BCE</h2>
+
+<p>Trong ví dụ sau, các function <code>f7b</code> và <code>f7c</code> thực hiện ít hơn <code>f7a</code> 3 kiểm tra giới hạn.</p>
+
+<pre><code class="language-Go">func f7a(s []byte, i int) {
+	_ = s[i+3] // Found IsInBounds
+	_ = s[i+2] // Found IsInBounds
+	_ = s[i+1] // Found IsInBounds
+	_ = s[i]   // Found IsInBounds
+}
+
+func f7b(s []byte, i int) {
+	s = s[i:i+4] // Found IsSliceInBounds
+	_ = s[3]
+	_ = s[2]
+	_ = s[1]
+	_ = s[0]
+}
+
+func f7c(s []byte, i int) {
+	s = s[i:i+4:i+4] // Found IsSliceInBounds
+	_ = s[3]
+	_ = s[2]
+	_ = s[1]
+	_ = s[0]
+}
+</code></pre>
+
+<p>Tuy nhiên, hãy lưu ý rằng có thể có <a href="3-array-and-slice.html#specify-capacity">một số yếu tố khác</a> ảnh hưởng đến performance của chương trình.
+Trên máy của tôi (Intel i5-4210U CPU @ 1.70GHz, Linux/amd64), trong 3 function trên,
+function <code>f7b</code> thực tế là function có performance kém nhất.</p>
+
+<pre><code class="language-Go">Benchmark_f7a-4  3861 ns/op
+Benchmark_f7b-4  4223 ns/op
+Benchmark_f7c-4  3477 ns/op
+</code></pre>
+
+<p>Trong thực tế, nên sử dụng dạng subslice ba index (<code>f7c</code>).</p>
+
+<p>Trong ví dụ sau, kết quả benchmark cho thấy</p>
+
+<ul>
+<li>function <code>f8z</code> có performance tốt nhất (đúng như dự kiến)</li>
+<li>nhưng function <code>f8y</code> có performance tốt ngang function <code>f8x</code> (ngoài dự kiến).</li>
+</ul>
+
+<pre><code class="language-Go">func f8x(s []byte) {
+	var n = len(s)
+	s = s[:n]
+	for i := 0; i &lt;= n - 4; i += 4 {
+		_ = s[i+3] // Found IsInBounds
+		_ = s[i+2] // Found IsInBounds
+		_ = s[i+1] // Found IsInBounds
+		_ = s[i]
+	}
+}
+
+func f8y(s []byte) {
+	for i := 0; i &lt;= len(s) - 4; i += 4 {
+		s2 := s[i:]
+		_ = s2[3] // Found IsInBounds
+		_ = s2[2]
+		_ = s2[1]
+		_ = s2[0]
+	}
+}
+
+func f8z(s []byte) {
+	for i := 0; len(s) &gt;= 4; i += 4 {
+		_ = s[3]
+		_ = s[2]
+		_ = s[1]
+		_ = s[0]
+		s = s[4:]
+	}
+}
+</code></pre>
+
+<p>Thực tế, kết quả benchmark cũng cho thấy function <code>f8y3</code> sau đây có performance tốt ngang function <code>f8z</code>
+và performance của function <code>f8y2</code> ngang với function <code>f8y</code>.
+Vì vậy, trong thực tế nên sử dụng các dạng subslice ba index cho những tình huống như vậy.</p>
+
+<pre><code class="language-Go">func f8y2(s []byte) {
+	for i := 0; i &lt; len(s) - 3; i += 4 {
+		s2 := s[i:i+4] // Found IsInBounds
+		_ = s2[3]
+		_ = s2[2]
+		_ = s2[1]
+		_ = s2[0]
+	}
+}
+
+func f8y3(s []byte) {
+	for i := 0; i &lt; len(s) - 3; i += 4 {
+		s2 := s[i:i+4:i+4] // Found IsInBounds
+		_ = s2[3]
+		_ = s2[2]
+		_ = s2[1]
+		_ = s2[0]
+	}
+}
+</code></pre>
+
+<p>Trong ví dụ sau, không có kiểm tra giới hạn nào trong các function <code>f9b</code> và <code>f9c</code>, nhưng có một kiểm tra trong function <code>f9a</code>.</p>
+
+<pre><code class="language-Go">func f9a(n int) []int {
+	buf := make([]int, n+1)
+	k := 0
+	for i := 0; i &lt;= n; i++ {
+		buf[i] = k // Found IsInBounds
+		k++
+	}
+	return buf
+}
+
+
+func f9b(n int) []int {
+	buf := make([]int, n+1)
+	k := 0
+	for i := 0; i &lt; len(buf); i++ {
+		buf[i] = k
+		k++
+	}
+	return buf
+}
+
+func f9c(n int) []int {
+	buf := make([]int, n+1)
+	k := 0
+	for i := 0; i &lt; n+1; i++ {
+		buf[i] = k
+		k++
+	}
+	return buf
+}
+</code></pre>
+
+<p>Trong đoạn code sau, function <code>f6b</code> có performance tốt hơn <code>f6a</code>,
+nhưng cả hai đều có performance kém hơn rất nhiều so với <code>f6c</code>.</p>
+
+<pre><code class="language-Go">const N = 3
+
+func f6a(s []byte) {
+	for i := 0; i &lt; len(s)-(N-1); i += N {
+		_ = s[i+N-1] // Found IsInBounds
+	}
+}
+
+func f6b(s []byte) {
+	for i := N-1; i &lt; len(s); i += N {
+		_ = s[i] // Found IsInBounds
+	}
+}
+
+func f6c(s []byte) {
+	for i := uint(N-1); i &lt; uint(len(s)); i += N {
+		_ = s[i]
+	}
+}
+</code></pre>
+
+<p>Các slice ở cấp package thường không thân thiện với BCE, vì vậy chúng ta nên cố gắng assign chúng vào các slice local để loại bỏ một số kiểm tra giới hạn không cần thiết. Ví dụ, trong đoạn code sau, function <code>fa0</code> thực hiện nhiều hơn các function <code>fa1</code> và <code>fa2</code> một kiểm tra giới hạn, do đó các lời gọi function <code>fa1()</code> và <code>fa2(s)</code> đều có performance tốt hơn <code>fa0()</code>.</p>
+
+<pre><code class="language-Go">var s = make([]int, 5)
+
+func fa0() {
+	for i := range s {
+		s[i] = i // Found IsInBounds
+	}
+}
+
+func fa1() {
+	s := s
+	for i := range s {
+		s[i] = i
+	}
+}
+
+func fa2(x []int) {
+	for i := range x {
+		x[i] = i
+	}
+}
+</code></pre>
+
+<p>Array thường thân thiện với BCE hơn slice.
+Trong đoạn code sau, các function phiên bản array (<code>fb2</code> và <code>fc2</code>) không cần kiểm tra giới hạn.</p>
+
+<pre><code class="language-Go">var s = make([]int, 256)
+var a = [256]int{}
+
+func fb1() int {
+    return s[100] // Found IsInBounds
+}
+
+func fb2() int {
+    return a[100]
+}
+
+func fc1(n byte) int {
+    return s[n] // Found IsInBounds
+}
+
+func fc2(n byte) int {
+    return a[n]
+}
+</code></pre>
+
+<p>Trước Go toolchain v1.24, function <code>f0b</code> trong đoạn code sau có performance tốt hơn nhiều so với <code>f0a</code>,
+vì function <code>f0a</code> có một số kiểm tra giới hạn không cần thiết.
+Kể từ Go toolchain v1.24, tất cả các kiểm tra giới hạn không cần thiết trong function <code>f0a</code> đều được loại bỏ,
+do đó performance của function <code>f0a</code> được cải thiện đáng kể (dù vẫn chậm hơn một chút so với <code>f0b</code>).</p>
+
+<pre><code class="language-Go">func f0a(x [16]byte) (r [4]byte){
+	for i := 0; i &lt; 4; i++ {
+		r[i] =
+			x[i*4+3] ^
+			x[i*4+2] ^
+			x[i*4+1] ^
+			x[i*4]     
+	}
+	return
+}
+
+func f0b(x [16]byte) (r [4]byte){
+	r[0] = x[3] ^ x[2] ^ x[1] ^ x[0]
+	r[1] = x[7] ^ x[6] ^ x[5] ^ x[4]
+	r[2] = x[11] ^ x[10] ^ x[9] ^ x[8]
+	r[3] = x[15] ^ x[14] ^ x[13] ^ x[12]
+	return
+}
+</code></pre>
+
+<p>Lưu ý rằng các version tương lai của official standard Go compiler sẽ trở nên thông minh hơn, nhờ đó
+có thể nhiều code không thân thiện với BCE sẽ trở nên thân thiện với BCE hơn về sau.</p>
+
+<h2>Official standard Go compiler hiện tại không loại bỏ được một số kiểm tra giới hạn không cần thiết</h2>
+
+<p>Tính đến Go toolchain v1.24.n, official standard Go compiler không loại bỏ các kiểm tra giới hạn không cần thiết sau đây.</p>
+
+<pre><code class="language-Go">func fd(data []int, check func(int) bool) []int {
+	var k = 0
+	for _, v := range data {
+		if check(v) {
+			data[k] = v // Found IsInBounds
+			k++
+		}
+	}
+	return data[:k] // Found IsSliceInBounds
+}
+
+
+// Đối với kiểm tra giới hạn duy nhất trong function sau,
+// * nếu N == 1, nó sẽ luôn được loại bỏ.
+// * nếu N là lũy thừa của 2, Go toolchain 1.19+ có thể loại bỏ nó.
+// * với các trường hợp khác, Go toolchain không loại bỏ được nó.
+func fe(s []byte) {
+	const N = 3
+	if len(s) &gt;= N {
+		r := len(s) % N
+		_ = s[r] // Found IsInBounds
+	}
+}
+
+func ff(s []byte) {
+	for i := 0; i &lt; len(s); i++ {
+		_ = s[i/2] // Found IsInBounds
+		_ = s[i/3] // Found IsInBounds
+	}
+}
+
+func fg(src, dst []byte) {
+	dst = dst[:len(src)]
+	for len(src) &gt;= 4 {
+		dst[1] = // Found IsInBounds
+			src[0]
+		dst[0] = src[1]
+		src = src[4:]
+		dst = dst[4:] // Found IsSliceInBounds
+	}
+}
+</code></pre>
+
+<p>Các version tương lai của official standard Go compiler sẽ trở nên thông minh hơn, nhờ đó các kiểm tra giới hạn không cần thiết nói trên sẽ được loại bỏ về sau.</p>

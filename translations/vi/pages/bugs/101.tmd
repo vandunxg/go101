@@ -1,0 +1,29 @@
+
+### Các lỗi Go 101
+
+
+Mục lục:
+
+""" html
+<!-- index starts (don't remove) -->
+"""
+
+*  __ Các lời gọi `recover` trong thân vòng lặp khi duyệt qua các iterator không hoạt động
+       === ...`` recover-calls-in-loop-bodies-of-ranging-over-iterators-not-work.tmd
+*  __Các biến lặp `strings.Builder` trong các vòng lặp `for;;` truyền thống dạng 3 mệnh đề được triển khai không chính xác
+       === ...`` string-builders-as-iteration-variables-in-traditional-for-loops-are-bad-implemented.tmd
+*  __ Dòng chỉ thị `go 1.mn` trong tệp `go.mod` không hoạt động với một số phiên bản Go toolchain
+   đối với một số tệp mã nguồn Go có chứa các chỉ thị chú thích `//line ...`
+       === ...`` go-version-in-mod-file-not-work.tmd
+*  __Các chỉ thị chú thích `//go:build go1.mn` không hoạt động với các phiên bản Go toolchain v1.22.x khi không có tệp `go.mod` nào liên quan
+       === ...`` go-build-directive-not-work.tmd
+*  __Một lỗi so sánh channel khi các channel được dùng làm biểu thức case của các khối mã switch (trong Go toolchain v1.20 - v1.23.x)
+       === ...`` a-switch-case-channel-comparison-bug.tmd
+*  __Một số lỗi đã biết về thứ tự khởi tạo biến cấp package trong một số phiên bản Go toolchain
+       === ...`` package-level-variable-initialization-order-bugs.tmd
+*  __Hàm `json.Unmarshal` không khớp chính xác các key của object khi lẽ ra phải khớp
+       === ...`` json-unmarshal-bug.tmd
+
+""" html
+<!-- index ends (don't remove) -->
+"""

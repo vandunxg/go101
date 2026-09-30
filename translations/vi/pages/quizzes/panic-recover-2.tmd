@@ -1,0 +1,69 @@
+
+##### panic/recover 2
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	defer func() {
+		println(recover().(int))
+	}()
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		defer recover()
+		panic(3)
+	}()
+	defer func() {
+		defer func() {
+			defer func() {
+				recover()
+			}()
+		}()
+		defer recover()
+		panic(2)
+	}()
+	panic(1)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+1
+2
+3
+<nil>
+"""
+
+
+@@@ #answer
+{
+Đáp án: 2
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/xawck_2YOWz __.
+
+Các điểm chính:
+*
+   Ngoại trừ hai lời gọi `recover` ở dòng 9 và 5, tất cả các lời gọi còn lại đều không có tác dụng.
+*
+   Các lời gọi `recover` ở dòng 9 recover panic `3`.
+*
+   Các lời gọi `recover` ở dòng 5 recover panic `2`.
+*
+   Panic `1` không bao giờ được recover, nhưng bị panic `2` che lấp.
+
+
+
+Hãy đọc __ Giải thích chi tiết cơ chế Panic/Recover`` https://go101.org/article/panic-and-recover-more.html __ để biết chi tiết.
+
+
+}

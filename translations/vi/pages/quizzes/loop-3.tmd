@@ -1,0 +1,68 @@
+
+##### vòng lặp 3
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+type Book struct {
+	Pages int
+}
+
+func f() int {
+	var books = []Book{{555}}
+	for _, book := range books {
+		book.Pages = 999
+	}
+	return books[0].Pages
+}
+
+func g() int {
+	var books = []*Book{{555}}
+	for _, book := range books {
+		book.Pages = 999
+	}
+	return books[0].Pages
+}
+
+func main() {
+	println(f(), g())
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+999 999
+555 999
+999 555
+555 555
+"""
+
+
+@@@ #answer
+{
+Đáp án: 555 999
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/CXwI7t9u3BZ __.
+
+Các điểm chính:
+*
+   Trong một vòng lặp, mỗi phần tử của container được copy vào biến vòng lặp thứ hai;
+   việc sửa đổi biến vòng lặp không làm thay đổi các value của các phần tử trong container.
+*
+   Một value kiểu struct sở hữu các field của nó. Khi một value kiểu struct được copy, tất cả các field của nó cũng được copy.
+*
+   Một pointer đến một value kiểu struct không sở hữu các field của value kiểu struct đó.
+   Nó chỉ reference value kiểu struct đó, hay nói cách khác, chỉ reference các field của value kiểu struct đó.
+   Khi một pointer được copy, các value được pointer reference không bị copy.
+   Sau khi copy, bản copy của pointer reference cùng các value như pointer ban đầu.
+
+
+}
+

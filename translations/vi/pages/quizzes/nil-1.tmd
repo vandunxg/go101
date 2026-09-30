@@ -1,0 +1,65 @@
+
+##### nil 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+var x = *new(*int)
+var y *int = nil
+
+func f() interface{} {
+	return y
+}
+
+func main() {
+	if f() == nil {
+		if x == nil {
+			println("A")
+		} else {
+			println("B")
+		}
+	} else {
+		if x == nil {
+			println("C")
+		} else {
+			println("D")
+		}
+	}
+}
+'''
+}
+
+Lựa chọn:
+
+""" go101-quiz
+A
+B
+C
+D
+"""
+
+
+@@@ #answer
+{
+Đáp án: C
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/imFfcWS711a __.
+
+Điểm chính:
+*
+   Một interface value có dynamic value nil thuộc kiểu không phải interface không phải là một interface nil.
+   Vì vậy, hàm `f` luôn trả về một interface value khác nil.
+*
+   Một lời gọi đến hàm dựng sẵn `new` luôn trả về một pointer trỏ đến một zero value.
+   Điều đó có nghĩa là dereference pointer sẽ cho ra một zero value.
+   Zero value của type `*int` là nil.
+
+
+
+}

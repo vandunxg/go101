@@ -1,0 +1,76 @@
+
+##### vòng lặp 2
+
+@@@ #question
+{
+Chương trình sau in ra nội dung gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func f() {
+	var a = [2]int{5, 7}
+	for i, v := range a {
+		if i == 0 {
+			a[1] = 9
+		} else {
+			print(v)
+		}
+	}
+}
+
+func g() {
+	var a = [2]int{5, 7}
+	for i, v := range a[:] {
+		if i == 0 {
+			a[1] = 9
+		} else {
+			print(v)
+		}
+	}
+}
+
+func main() {
+	f()
+	g()
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+77
+79
+97
+99
+"""
+
+
+@@@ #answer
+{
+Đáp án: 79
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/gbS29WWWP3E __.
+
+Các điểm chính:
+*
+   Khi lặp qua các phần tử của một container (array/slice/map), thực tế là các phần tử của một bản sao của container được lặp qua.
+*
+   Một array sở hữu các phần tử của nó. Khi sao chép một array, các phần tử của nó cũng được sao chép.
+   Việc sửa đổi các phần tử trong một array không ảnh hưởng đến các phần tử trong bản sao của array.
+*
+   Một slice chỉ reference đến các phần tử của nó. Khi sao chép một slice (thông qua phép gán,
+   không phải gọi hàm builtin `copy`), các phần tử của nó không được sao chép.
+   Sau khi sao chép, bản sao của slice dùng chung các phần tử với slice ban đầu.
+   Vì vậy, sửa đổi các phần tử trong một slice cũng có nghĩa là sửa đổi các phần tử trong bản sao của slice.
+
+
+
+Vì vậy, trong hàm `f`, việc sửa đổi `a[1]` không được phản ánh trong vòng lặp.
+Nhưng việc sửa đổi `a[1]` trong hàm `g` được phản ánh trong vòng lặp.
+
+
+}
+

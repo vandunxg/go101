@@ -1,0 +1,12 @@
+
+### Hàm `json.Unmarshal` không khớp chính xác với các key của object khi lẽ ra phải như vậy
+
+Vui lòng đọc __chi tiết__ được tập hợp trong __Go Details & Tips 101__.
+
+    === chi tiết :: https://go101.org/details-and-tips/json-unmarshal-is-case-insensitive.html
+    === Go Details & Tips 101 :: https://go101.org/details-and-tips/101.html
+
+Ngoài lỗi này, implementation hiện tại (v1) của package `encoding/json` còn có một số pitfall.
+Lỗi này và những pitfall đó có thể sẽ được loại bỏ trong __implementation v2__.
+
+    === implementation v2 :: https://github.com/golang/go/discussions/63397

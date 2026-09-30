@@ -1,0 +1,368 @@
+<p id="f-444-first-look-of-custom-generics-md"></p>
+<h1>Cái nhìn đầu tiên về generics tùy chỉnh</h1>
+
+<p>Trong thế giới generics tùy chỉnh, một type có thể được khai báo là generic type,
+và một function có thể được khai báo là generic function.
+Ngoài ra, generic type là defined type, nên chúng có thể có method.</p>
+
+<p>Khai báo của một generic type, generic function hoặc method của một generic type
+chứa một phần type parameter list, đây là khác biệt chính so với
+khai báo của một type, function hoặc method thông thường.</p>
+
+<h2>Ví dụ về generic type</h2>
+
+<p>Trước tiên, hãy xem một ví dụ để thấy generic type trông như thế nào.
+Có thể đây không phải là một ví dụ hoàn hảo, nhưng nó cho thấy tính hữu ích của generic type tùy chỉnh.</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;sync&quot;
+
+type Lockable[T any] struct {
+	sync.Mutex
+	Data T
+}
+
+func main() {
+	var n Lockable[uint32]
+	n.Lock()
+	n.Data++
+	n.Unlock()
+	
+	var f Lockable[float64]
+	f.Lock()
+	f.Data += 1.23
+	f.Unlock()
+	
+	var b Lockable[bool]
+	b.Lock()
+	b.Data = !b.Data
+	b.Unlock()
+	
+	var bs Lockable[[]byte]
+	bs.Lock()
+	bs.Data = append(bs.Data, &quot;Go&quot;...)
+	bs.Unlock()
+}
+</code></pre>
+
+<p>Trong ví dụ trên, <code>Lockable</code> là một generic type.
+So với các non-generic type, phần khai báo (nói chính xác hơn là specification) của một generic type
+có thêm một phần, đó là type parameter list.
+Ở đây, type parameter list của generic type <code>Lockable</code> là <code>[T any]</code>.</p>
+
+<p>Một type parameter list có thể chứa một hoặc nhiều khai báo type parameter,
+được đặt trong ngoặc vuông và phân tách bằng dấu phẩy.
+Mỗi khai báo type parameter gồm một tên type parameter và một type constraint.
+Trong ví dụ trên, <code>T</code> là tên type parameter và <code>any</code> là constraint của <code>T</code>.</p>
+
+<p>Lưu ý rằng <code>any</code> là một predeclared identifier mới được giới thiệu trong Go 1.18.
+Nó là một alias của blank interface type <code>interface{}</code>.
+Ta hẳn đã biết rằng mọi type đều implement blank interface type.</p>
+
+<p><em>(Lưu ý, nhìn chung, các cuốn sách Go 101 không nói type alias là một type.
+Chúng chỉ nói type alias biểu thị một type.
+Nhưng để thuận tiện, cuốn sách Go Generics 101 thường nói <code>any</code> là một type.)</em></p>
+
+<p>Ta có thể xem constraint là type của các type parameter.
+Mọi type constraint thực ra đều là interface type.
+Constraint là phần cốt lõi của generics tùy chỉnh và
+sẽ được giải thích chi tiết trong chương tiếp theo.</p>
+
+<p><code>T</code> biểu thị một type parameter type.
+Scope của nó bắt đầu sau tên của generic type được khai báo
+và kết thúc ở cuối specification của generic type.
+Ở đây, nó được dùng làm type của field <code>Data</code>.</p>
+
+<p>Kể từ Go 1.18, các value type được chia thành hai loại:</p>
+
+<ol>
+<li>type parameter type;</li>
+<li>ordinary type.</li>
+</ol>
+
+<p>Trước Go 1.18, mọi value type đều là ordinary type.</p>
+
+<p>Generic type là một <a href="https://go101.org/article/type-system-overview.html#type-definition">defined type</a>.
+Nó phải được instantiate để được dùng làm value type.
+Ký hiệu <code>Lockable[uint32]</code> được gọi là instantiated type (của generic type <code>Lockable</code>).
+Trong ký hiệu này, <code>[uint32]</code> được gọi là type argument list và <code>uint32</code> được gọi là type argument,
+được truyền cho type parameter <code>T</code> tương ứng.
+Điều đó có nghĩa là type của field <code>Data</code> thuộc instantiated type <code>Lockable[uint32]</code> là <code>uint32</code>.</p>
+
+<p>Một type argument phải implement constraint của type parameter tương ứng.
+Constraint <code>any</code> là constraint lỏng nhất; bất kỳ value type nào cũng có thể được truyền cho type parameter <code>T</code>.
+Các type argument khác được dùng trong ví dụ trên là: <code>float64</code>, <code>bool</code> và <code>[]byte</code>.</p>
+
+<p>Mọi instantiated type đều là <a href="https://go101.org/article/type-system-overview.html#named-type">named type</a> và ordinary type.
+Ví dụ, <code>Lockable[uint32]</code> và <code>Lockable[[]byte]</code> đều là named type.</p>
+
+<p>Ví dụ trên cho thấy generics tùy chỉnh tránh lặp code trong các khai báo type như thế nào.
+Nếu không có generics tùy chỉnh, cần khai báo nhiều struct type,
+như đoạn code sau đây cho thấy.</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;sync&quot;
+
+type LockableUint32 struct {
+	sync.Mutex
+	Data uint32
+}
+
+type LockableFloat64 struct {
+	sync.Mutex
+	Data float64
+}
+
+type LockableBool struct {
+	sync.Mutex
+	Data bool
+}
+
+type LockableBytes struct {
+	sync.Mutex
+	Data []byte
+}
+
+func main() {
+	var n LockableUint32
+	n.Lock()
+	n.Data++
+	n.Unlock()
+	
+	var f LockableFloat64
+	f.Lock()
+	f.Data += 1.23
+	f.Unlock()
+	
+	var b LockableBool
+	b.Lock()
+	b.Data = !b.Data
+	b.Unlock()
+	
+	var bs LockableBytes
+	bs.Lock()
+	bs.Data = append(bs.Data, &quot;Go&quot;...)
+	bs.Unlock()
+}
+</code></pre>
+
+<p>Code non-generic chứa nhiều phần lặp lại,
+những phần này có thể được tránh bằng cách dùng generic type ở trên.</p>
+
+<h2>Ví dụ về method của một generic type</h2>
+
+<p>Một số người có thể không đánh giá cao implementation của generic type ở trên.
+Thay vào đó, họ thích dùng một implementation khác như đoạn code sau đây.
+So với implementation của <code>Lockable</code> trong section trước, implementation mới
+ẩn các struct field khỏi những người dùng generic type bên ngoài package.</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;sync&quot;
+
+type Lockable[T any] struct {
+	mu sync.Mutex
+	data T
+}
+
+func (l *Lockable[T]) Do(f func(*T)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	f(&amp;l.data)
+}
+
+func main() {
+	var n Lockable[uint32]
+	n.Do(func(v *uint32) {
+		*v++
+	})
+	
+	var f Lockable[float64]
+	f.Do(func(v *float64) {
+		*v += 1.23
+	})
+	
+	var b Lockable[bool]
+	b.Do(func(v *bool) {
+		*v = !*v
+	})
+	
+	var bs Lockable[[]byte]
+	bs.Do(func(v *[]byte) {
+		*v = append(*v, &quot;Go&quot;...)
+	})
+}
+</code></pre>
+
+<p>Trong code trên, một method <code>Do</code> được khai báo cho generic base type <code>Lockable</code>.
+Ở đây, receiver type là một pointer type có base type là generic type <code>Lockable</code>.
+Khác với khai báo method cho ordinary base type,
+có một phần type parameter list nằm sau tên generic type <code>Lockable</code> của receiver trong phần receiver.
+Ở đây, type parameter list là <code>[T]</code>.</p>
+
+<p>Type parameter list trong khai báo method cho generic base type
+thực ra là sự lặp lại type parameter list được chỉ định trong specification của generic receiver base type.
+Để code gọn hơn, các type constraint được (và phải được) lược bỏ khỏi list.
+Đó là lý do type parameter list ở đây là <code>[T]</code>, thay vì <code>[T any]</code>.</p>
+
+<p>Ở đây, <code>T</code> được dùng trong type của value parameter, <code>func(*T)</code>.</p>
+
+<ul>
+<li>Type của method <code>Do</code> thuộc instantiated type <code>Lockable[uint32]</code> là <code>func(f func(*uint32))</code>.</li>
+<li>Type của method <code>Do</code> thuộc instantiated type <code>Lockable[float64]</code> là <code>func(f func(*float64))</code>.</li>
+<li>Type của method <code>Do</code> thuộc instantiated type <code>Lockable[bool]</code> là <code>func(f func(*bool))</code>.</li>
+<li>Type của method <code>Do</code> thuộc instantiated type <code>Lockable[[]byte]</code> là <code>func(f func(*[]byte))</code>.</li>
+</ul>
+
+<p>Lưu ý rằng tên type parameter được dùng trong khai báo method cho generic base type
+không bắt buộc phải giống các tên tương ứng được dùng trong specification của generic type.
+Ví dụ, khai báo method ở trên tương đương với khai báo được viết lại sau đây.</p>
+
+<pre><code class="language-Go">func (l *Lockable[Foo]) Do(f func(*Foo)) {
+	...
+}
+</code></pre>
+
+<p>Tuy vậy, không giữ các tên type parameter tương ứng giống nhau là một cách làm không tốt.</p>
+
+<p>Nhân tiện, tên của một type parameter thậm chí có thể là blank identifier <code>_</code>
+nếu nó không được dùng (điều này cũng đúng với các type parameter trong khai báo generic type và function).
+Ví dụ,</p>
+
+<pre><code class="language-Go">func (l *Lockable[_]) DoNothing() {
+}
+</code></pre>
+
+<h2>Các generic type alias</h2>
+
+<p>Các generic type alias được hỗ trợ kể từ Go 1.24.</p>
+
+<pre><code class="language-Go">type TreeMap[K comparable, E any] struct {
+	// ... các field không được export
+}
+
+// Một số generic type alias:
+type TreeSet[K comparable] = TreeMap[K, struct{}]
+type TreeMapWithIntKey[E any] = TreeMap[int, E]
+type TreeMapWithStringKey[E any] = TreeMap[string, E]
+</code></pre>
+
+<h2>Ví dụ về generic function</h2>
+
+<p>Bây giờ, hãy xem một ví dụ về cách khai báo và sử dụng các generic function (không phải method).</p>
+
+<pre><code class="language-Go">package main
+
+// NoDiff kiểm tra xem một collection
+// các value có hoàn toàn giống nhau hay không.
+func NoDiff[V comparable](vs ...V) bool {
+	if len(vs) == 0 {
+		return true
+	}
+	
+	v := vs[0]
+	for _, x := range vs[1:] {
+		if v != x {
+			return false
+		}
+	}
+	return true
+}
+
+func main() {
+	var NoDiffString = NoDiff[string]
+	println(NoDiff(&quot;Go&quot;, &quot;Go&quot;, &quot;Go&quot;)) // true
+	println(NoDiffString(&quot;Go&quot;, &quot;go&quot;)) // false
+	
+	println(NoDiff(123, 123, 123, 123)) // true
+	println(NoDiff[int](123, 123, 789)) // false
+	
+	type A = [2]int
+	println(NoDiff(A{}, A{}, A{}))     // true
+	println(NoDiff(A{}, A{}, A{1, 2})) // false
+	
+	println(NoDiff(new(int)))           // true
+	println(NoDiff(new(int), new(int))) // false
+
+	println(NoDiff[bool]())   // true
+
+	// _ = NoDiff() // error: cannot infer V
+	
+	// error: *** does not implement comparable
+	// _ = NoDiff([]int{}, []int{})
+	// _ = NoDiff(map[string]int{})
+	// _ = NoDiff(any(1), any(1))
+}
+</code></pre>
+
+<p>Trong ví dụ trên, <code>NoDiff</code> là một generic function.
+Khác với non-generic function và tương tự generic type,
+khai báo của generic function có thêm một phần, đó là type parameter list.
+Ở đây, type parameter list của generic function <code>NoDiff</code> là <code>[V comparable]</code>, trong đó
+<code>V</code> là tên type parameter và <code>comparable</code> là constraint của <code>V</code>.</p>
+
+<p><code>comparable</code> là predeclared identifier mới được giới thiệu trong Go 1.18.
+Nó biểu thị một interface được implement bởi mọi comparable type.
+Nó sẽ được giải thích chi tiết hơn trong chương tiếp theo.</p>
+
+<p>Ở đây, type parameter <code>V</code> được dùng làm type của variadic (value) parameter.</p>
+
+<p>Các ký hiệu <code>NoDiff[string]</code>, <code>NoDiff[int]</code> và <code>NoDiff[bool]</code> được gọi là instantiated function (của generic function <code>NoDiff</code>).
+Tương tự instantiated type, trong các ký hiệu này, <code>[string]</code>, <code>[int]</code> và <code>[bool]</code> được gọi là type argument list.
+Trong các list này, <code>string</code>, <code>int</code> và <code>bool</code> được gọi là type argument, tất cả đều được truyền cho type parameter <code>V</code>.</p>
+
+<p>Toàn bộ type argument list có thể được bỏ hoàn toàn khỏi một instantiated function expression
+nếu tất cả type argument có thể được suy ra từ các value argument.
+Đó là lý do một số lời gọi generic function <code>NoDiff</code> trong ví dụ trên không có type argument list.</p>
+
+<ul>
+<li>Trong lời gọi <code>NoDiff(&quot;Go&quot;, &quot;Go&quot;, &quot;Go&quot;)</code>, type argument được suy ra là <code>string</code>, type mặc định của các value argument.</li>
+<li>Trong lời gọi <code>NoDiff(123, 123, 123, 123)</code>, type argument được suy ra là <code>int</code>, type mặc định của các value argument.</li>
+<li>Trong hai lời gọi có <code>A{}</code> và <code>A{1, 2}</code> làm value argument, type argument được suy ra là <code>[2]int</code>, type của các value argument.</li>
+<li>Trong hai lời gọi có <code>new(int)</code> làm value argument, type argument được suy ra là <code>*int</code>, type của các value argument.</li>
+</ul>
+
+<p>Lưu ý rằng tất cả các type argument này đều implement interface <code>comparable</code>.
+Các type không comparable, chẳng hạn như <code>[]int</code> và <code>map[string]int</code>, không được truyền làm type argument
+của các lời gọi đến generic function <code>NoDiff</code>.
+Ngoài ra, mặc dù <code>any</code> là một comparable (value) type, nó không implement <code>comparable</code>,
+nên cũng không phải là type argument hợp lệ.
+Nội dung này sẽ được nói chi tiết trong chương tiếp theo.</p>
+
+<p>Ví dụ trên cho thấy generics tránh lặp code trong các khai báo function như thế nào.
+Nếu không có generics tùy chỉnh, ta cần khai báo một function cho mỗi type argument được dùng trong ví dụ.
+Phần thân của các khai báo function này gần như giống nhau.</p>
+
+<h2>Có thể xem generic function là dạng đơn giản hóa của method của generic type</h2>
+
+<p>Có thể xem generic function được trình bày trong section trên là dạng đơn giản hóa
+của method của một generic type, như trong đoạn code sau.</p>
+
+<pre><code class="language-Go">package main
+
+type NoDiff[V comparable] struct{}
+
+func (nd NoDiff[V]) Do(vs ...V) bool {
+	... // giống phần thân của generic function ở trên
+}
+
+func main() {
+	var NoDiffString = NoDiff[string]{}.Do
+	println(NoDiffString(&quot;Go&quot;, &quot;go&quot;)) // false
+	
+	println(NoDiff[int]{}.Do(123, 123, 789)) // false
+	
+	println(NoDiff[*int]{}.Do(new(int))) // true
+}
+</code></pre>
+
+<p>Trong code trên, <code>NoDiff[string]{}.Do</code>, <code>NoDiff[int]{}.Do</code>
+và <code>NoDiff[*int]{}.Do</code> là ba method value của các instantiated type khác nhau.</p>
+
+<p>Ta có thể xem generic type là một không gian type parameter,
+và xem tất cả method của nó là các function dùng chung không gian type parameter đó.</p>
+
+<p>Để mô tả đơn giản, đôi khi trong cuốn sách này,
+method của generic type cũng được gọi là generic function.</p>

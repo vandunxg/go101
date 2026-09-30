@@ -1,0 +1,91 @@
+
+### Một số bug đã biết về thứ tự khởi tạo biến cấp package trong một số phiên bản Go toolchain
+
+###====== Trường hợp 1
+
+Do __một bug inline function__ (lời gọi hàm `foo()` được inline ở đây),
+với các phiên bản Go toolchain trước v1.23, chương trình sau in ra
+`1 0`, nhưng theo __các quy tắc__ được quy định trong Go specification,
+nó phải in ra `1 1`.
+
+    === ...bug `` https://github.com/golang/go/issues/66585
+    === các quy tắc `` https://go101.org/article/evaluation-orders.html
+
+Bug này đã được sửa kể từ Go toolchain v1.23.
+
+''' Go
+package main
+
+var x = 0
+var a = foo()
+var b = x
+
+func foo() int {
+	x++
+	return x
+}
+
+func main() {
+	println(a, b)
+}
+'''
+
+###====== Trường hợp 2
+
+Do __một bug tối ưu hóa trong compiler__,
+với các phiên bản Go toolchain trước v1.22, chương trình sau in ra
+`true`, nhưng theo __các quy tắc__ được quy định trong Go specification,
+nó phải in ra `false`.
+
+    === ...bug `` https://github.com/golang/go/issues/51913
+    === các quy tắc `` https://go101.org/article/evaluation-orders.html
+
+Bug này đã được sửa kể từ Go toolchain v1.22.
+
+''' Go
+package main
+
+var _ = func() int {
+	a = false
+	return 0
+}()
+
+var a = true
+var b = a
+
+func main() {
+	println(b)
+}
+'''
+
+###====== Trường hợp 3
+
+Do __một bug trong compiler__,
+với các phiên bản Go toolchain trước v1.12, chương trình sau in ra
+`5 4`, nhưng theo __các quy tắc__ được quy định trong Go specification,
+nó phải in ra `4 5`.
+
+    === ...bug `` https://github.com/golang/go/issues/22326
+    === các quy tắc `` https://go101.org/article/evaluation-orders.html
+
+Bug này đã được sửa kể từ Go toolchain v1.13.
+
+''' Go
+package main
+
+var (
+  a = c
+  b = f()
+  c = f()
+  d = 3
+)
+
+func f() int {
+  d++
+  return d
+}
+
+func main() {
+	println(b, c)
+}
+'''

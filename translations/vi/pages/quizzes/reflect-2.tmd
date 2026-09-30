@@ -1,0 +1,52 @@
+
+##### reflect 2
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+import "reflect"
+
+type T struct{
+  A int
+  b int
+}
+
+func (T) M() {}
+func (T) m() {}
+
+func main() {
+	v := reflect.ValueOf(T{})
+	println(v.NumField(), v.NumMethod())
+}
+'''
+}
+
+Lựa chọn:
+
+""" go101-quiz
+1 1
+1 2
+2 1
+2 2
+"""
+
+@@@ #answer
+{
+Đáp án: 2 1
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/bvWfO-zkRxF __.
+
+Điểm chính:
+*
+   method `reflect.Value.NumMethod` chỉ đếm các method được export đối với các type/value không phải interface.
+*
+   method `reflect.Value.NumField` đếm cả field được export và không được export.
+
+
+}

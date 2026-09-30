@@ -1,0 +1,61 @@
+
+##### panic/recover 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	defer func() {
+		fmt.Print(recover())
+	}()
+	defer func() {
+		defer fmt.Print(recover())
+		defer panic(1)
+		recover()
+	}()
+	defer recover()
+	panic(2)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+21
+<nil>1
+<nil>2
+1<nil>
+"""
+
+
+@@@ #answer
+{
+Đáp án: 21
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/SDN_OE_xAxz __.
+
+Các điểm chính:
+*
+   Hai lời gọi `recover` ở dòng 14 và 12 không có tác dụng.
+*
+   Lời gọi `recover` ở dòng 10 bắt panic `2`.
+*
+   Lời gọi `recover` ở dòng 7 bắt panic `1`.
+
+
+
+Hãy đọc __ Giải thích chi tiết cơ chế Panic/Recover`` https://go101.org/article/panic-and-recover-more.html __ để biết chi tiết.
+
+
+}
+
+

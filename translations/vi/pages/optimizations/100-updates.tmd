@@ -1,0 +1,37 @@
+
+##### Lịch sử cập nhật Go Optimizations 101
+
+###========== v1.24.a (2024/Dec/16)
+
+*  Chương "BCE (Loại bỏ kiểm tra giới hạn)" được chỉnh sửa theo Go toolchain go1.24rc1.
+*  Trong chương "Stack và Escape Analysis", một số ngưỡng được chỉnh sửa theo Go toolchain go1.24rc1.
+
+###========== v1.23.a (2024/Oct/16)
+
+*  Chương "BCE (Loại bỏ kiểm tra giới hạn)" được chỉnh sửa theo __ https://github.com/golang/go/issues/40704 __
+
+###========== v1.22.a (2024/Mar/18)
+
+*  Go 1.22 đã thay đổi ngữ nghĩa của các khối mã vòng lặp for. Các bài viết liên quan được chỉnh sửa tương ứng.
+
+###========== v1.21.a (2023/OCT/11)
+
+*  Trong chương "Stack và Escape Analysis", đề cập rằng các lời gọi hàm `reflect.ValueOf` không phải lúc nào cũng allocate và làm các value được các argument của chúng tham chiếu escape.
+*  Trong section "Xóa các entry của map" của chương "Maps", đề cập rằng Go 1.21 đã bổ sung một hàm builtin mới là `clear`.
+
+###========== v1.20.a (2023/Feb/01)
+
+*  Trong section "Function inlining" của chương "Functions", đề cập rằng các function chứa khai báo type sẽ không ngăn function được inline kể từ Go toolchain 1.20. Nhiều ví dụ sử dụng khai báo type cục bộ `type _ int` được chỉnh sửa tương ứng, bao gồm ví dụ trong section cuối ("Grow stack in less times") của chương "Stack và Escape Analysis".
+*  Trong chương "Arrays và Slices", đề cập rằng `copy(s, s)` là no-op, nhưng `append(s[:0], s...)` thì không.
+*  Trong chương "BCE (Loại bỏ kiểm tra giới hạn)", đề cập rằng `-gcflags="-d=ssa/check_bce"` không hoạt động với một số hàm generic.
+
+###========== v1.19 (2022/Aug/28)
+
+*  Chương "Garbage Collection" được cập nhật rất nhiều. Nội dung cập nhật chủ yếu nằm ở 4 section cuối (bắt đầu từ section "Sử dụng chiến lược phần trăm memory heap mới để kiểm soát tần suất GC tự động"). Một số mô tả trong section đầu "GC pacer" cũng được chỉnh sửa đôi chút.
+*  Trong section "Tăng trưởng và thu nhỏ stack" của chương "Stack và Escape Analysis", các mô tả về kích thước stack ban đầu được chỉnh sửa.
+*  Trong chương "BCE", một section "Example 4" mới được thêm vào. Ví dụ này nằm trong section "Đôi khi compiler cần một số gợi ý để loại bỏ một số lần kiểm tra giới hạn".
+*  Trong chương "Functions", section "Những function nào có thể được inline?" nêu rằng các function chứa khối mã `select` có thể được inline kể từ Go toolchain 1.19.
+
+###========== v1.17 (2021/Dec/22)
+
+*  phát hành

@@ -1,0 +1,154 @@
+<h1>Go Optimizations 101</h1>
+
+<p>
+Cuốn sách này cung cấp một số thủ thuật, mẹo và gợi ý tối ưu hóa hiệu năng mã,
+bao gồm
+</p>
+
+<ul>
+<li>cách sử dụng ít tài nguyên CPU hơn.</li>
+<li>cách sử dụng ít bộ nhớ hơn.</li>
+<li>cách giảm số lần cấp phát bộ nhớ.</li>
+<li>cách kiểm soát vị trí cấp phát bộ nhớ.</li>
+<li>cách giảm áp lực lên garbage collection.</li>
+</ul>
+
+<p>
+Cuốn sách hiện đã sẵn sàng cho Go 1.25 (<a href="100-updates.html">lịch sử cập nhật</a>).
+</p>
+
+<p style="font-size: smaller;"><i>
+(Hãy theo dõi tài khoản X chính thức của Go 101 <a href="https://x.com/zigo_101">@zigo_101</a>
+để cập nhật tin tức Go 101 mới nhất và tìm hiểu đủ loại kiến thức về Go.)
+</i></p>
+
+<div id="ebooks" class="alert alert-success row item-row">
+	<div class="col-xs-12 col-sm-3 text-center" style="font-size: small;">
+		<img src="res/cover-1000x.jpg" style="width: 160px;" alt="Go Optimizations 101"></img>
+		<p>(khoảng 150 trang, 101+ thông tin và gợi ý tối ưu hóa mã Go)</p>
+	</div>
+	<div class="col-xs-12 col-sm-9" style="padding-top: 6px; font-size: smaller;">
+		Các phiên bản kỹ thuật số của cuốn sách này có tại những nơi sau:
+		<ul>
+		<li>
+			<a href="https://leanpub.com/go-optimizations-101">cửa hàng Leanpub</a>,
+			<i>$9.99+</i>
+		</li>
+		<li>
+			<a href="https://books.apple.com/book/id1609924340">cửa hàng Apple Books</a>,
+			<i>$9.99</i>.
+		</li>
+		<li>
+			<a href="https://www.amazon.com/dp/B09NT2HJCM">cửa hàng Amazon Kindle</a>,
+			<i>$9.99</i>.
+		</li>
+		<li>
+			<a href="https://play.google.com/store/books/details?id=Ac1wEAAAQBAJ">cửa hàng Google Play</a>,
+			<i>$9.99</i>.
+		</li>
+		</ul>
+
+		<p>
+		Nói thật, cuốn sách đáng giá $20+.
+		</p>
+
+		<p>
+		Tapir, tác giả của Go 101, đã viết series sách Go 101 và duy trì website go101.org từ tháng 7 năm 2016.
+		Nội dung mới vẫn đang (và sẽ tiếp tục được) thường xuyên bổ sung vào series sách và website theo thời gian.
+		</p>
+
+		<p>
+		Tapir cũng là một nhà phát triển game indie.
+		Nếu muốn, bạn cũng có thể ủng hộ cuốn sách và website bằng cách
+		chơi <a href="https://www.tapirgames.com">các game của Tapir</a>
+		(được phát triển cho cả Android và iPhone/iPad).
+		Bạn cũng có thể quyên góp cá nhân <a href="https://paypal.me/tapirliu">qua PayPal</a>.
+		</p>
+
+		<p>
+		Cảm ơn Olexandr Shalakhin đã cho phép sử dụng một trong những
+		<a href="https://github.com/shalakhin/gophericons">hình ảnh biểu tượng gopher tuyệt vời</a>
+		trên bìa sách.
+		</p>
+	</div>
+</div>
+
+
+
+<div>
+
+<h3>Mục lục:</h3>
+
+<!-- index starts (don't remove) -->
+
+<div id="book-index">
+
+<ul class="index part">
+	<li><a class="index" href="0.0-acknowledgements.html">Lời cảm ơn</a></li>
+	<li><a class="index" href="0.1-introduction.html">Về Go Optimizations 101</a></li>
+	<li>Các phần value và kích thước value <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>kích thước value/type</li>
+		<li>căn chỉnh bộ nhớ</li>
+		<li>padding của struct</li>
+		<li>tránh chi phí copy lớn hơn</li>
+	</ul>
+	<li><a class="index" href="0.3-memory-allocations.html">Cấp phát bộ nhớ</a></li>
+	<li>Stack và escape analysis <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>escape analysis</li>
+		<li>cách kiểm soát vị trí cấp phát value</li>
+		<li>stack tăng và giảm kích thước</li>
+		<li>cách giảm số lần tăng stack</li>
+	</ul>
+	<li>Garbage collection <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>GC pacer</li>
+		<li>cách giảm áp lực GC</li>
+		<li>kiểm soát tần suất GC</li>
+	</ul>
+	<li><a class="index" href="1-pointer.html">Pointer</a></li>
+	<li>Struct <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>3 thông tin/gợi ý</li>
+	</ul>
+	<li>Array và slice <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>10+ thông tin/gợi ý</li>
+	</ul>
+	<li>String và byte slice <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>10+ thông tin/gợi ý</li>
+	</ul>
+	<li><a class="index" href="5-bce.html">BCE (loại bỏ kiểm tra giới hạn)</a></li>
+	<ul>
+		<li>các trường hợp BCE hoạt động được</li>
+		<li>các trường hợp BCE không hoạt động</li>
+		<li>các trường hợp BCE hoạt động được khi được cung cấp gợi ý</li>
+	</ul>
+	<li><a class="index" href="6-map.html">Map</a></li>
+	<li>Channel <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>3 thông tin/gợi ý</li>
+	</ul>
+	<li>Function <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>cách làm cho một function có thể inline</li>
+		<li>cách làm cho một function không thể inline</li>
+		<li>parameter/result dạng pointer so với các parameter/result không phải pointer</li>
+		<li>named result so với result ẩn danh</li>
+		<li>10+ thông tin/gợi ý</li>
+	</ul>
+	<li>Interface <sup stylee="font-size: smaller;">(có trong <a href="#ebooks">các ebook trả phí</a>)</sup></li>
+	<ul>
+		<li>chi phí value boxing</li>
+		<li>3+ thông tin/gợi ý</li>
+	</ul>
+</ul>
+
+
+</div>
+
+<!-- index ends (don't remove) -->
+
+</div>

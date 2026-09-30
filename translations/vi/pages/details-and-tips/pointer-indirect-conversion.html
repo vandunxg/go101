@@ -1,0 +1,56 @@
+
+
+<h1>Giá trị của hai named pointer type khác nhau có thể được convert gián tiếp sang type của nhau nếu base type của hai type có cùng underlying type</h1>
+
+<p>Nhìn chung, giá trị của hai pointer type không thể được convert sang nhau nếu underlying type của hai pointer type khác nhau.
+Ví dụ, 4 conversion trong code sau đều không hợp lệ.</p>
+
+<pre><code class="language-Go">package main
+
+type MyInt int
+type IntPtr *int     // underlying type là *int
+type MyIntPtr *MyInt // underlying type là *MyInt
+
+func main() {
+	var x IntPtr
+	var y MyIntPtr
+	x = IntPtr(y)       // lỗi
+	y = MyIntPtr(x)     // lỗi
+	var _ = (*int)(y)   // lỗi
+	var _ = (*MyInt)(x) // lỗi
+}
+</code></pre>
+
+<p>Mặc dù không thể thực hiện trực tiếp 4 conversion trên, chúng có thể được thực hiện gián tiếp. Điều này dựa trên thực tế rằng các conversion sau là hợp lệ.</p>
+
+<pre><code class="language-Go">package main
+
+type MyInt int
+
+func main() {
+	var x *int
+	var y *MyInt
+	x = (*int)(y)   // hợp lệ
+	y = (*MyInt)(x) // hợp lệ
+}
+</code></pre>
+
+<p>Lý do hai conversion trên là hợp lệ là giá trị của hai unnamed pointer type có thể được convert sang type của nhau nếu base type của hai type có cùng underlying type. Trong ví dụ trên, base type của các type của <code>x</code> và <code>y</code> là <code>int</code> và <code>MyInt</code>, chúng có cùng underlying type là <code>int</code>, nên <code>x</code> và <code>y</code> có thể được convert sang type của nhau.</p>
+
+<p>Nhờ thực tế vừa đề cập, giá trị của <code>IntPtr</code> và <code>MyIntPtr</code> cũng có thể được convert sang type của nhau, dù các conversion như vậy phải được thực hiện gián tiếp, như trong code sau.</p>
+
+<pre><code class="language-Go">package main 
+
+type MyInt int
+type IntPtr *int
+type MyIntPtr *MyInt
+
+func main() {
+	var x IntPtr
+	var y MyIntPtr
+	x = IntPtr((*int)((*MyInt)(y)))     // hợp lệ
+	y = MyIntPtr(((*MyInt))((*int)(x))) // hợp lệ
+	var _ = (*int)((*MyInt)(y))         // hợp lệ
+	var _ = (*MyInt)((*int)(x))         // hợp lệ
+}
+</code></pre>

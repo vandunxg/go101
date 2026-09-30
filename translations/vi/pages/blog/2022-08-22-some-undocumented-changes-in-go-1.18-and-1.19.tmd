@@ -1,0 +1,316 @@
+
+### Một số thay đổi chưa được ghi nhận trong Go 1.18 và 1.19
+
+Khi một phiên bản Go mới được phát hành, các thay đổi trong phiên bản này thường
+được liệt kê trong release notes của phiên bản đó.
+Tuy nhiên, đôi khi một số thay đổi bị thiếu trong release notes.
+
+Bài viết này liệt kê một số thay đổi bị thiếu trong release notes của Go __1.18__ và __1.19__.
+
+    === 1.18 `` https://go.dev/doc/go1.18
+    === 1.19 `` https://go.dev/doc/go1.19
+
+###======================= GoTV
+
+Chúng ta sử dụng GoTV __#gotv__ để minh họa các thay đổi không được đề cập trong bài viết này.
+GoTV (Go Toolchain Version) là một công cụ được dùng để quản lý và
+sử dụng nhiều bản cài đặt Go toolchain chính thức cùng tồn tại
+một cách hài hòa và thuận tiện.
+
+Nếu chưa cài, bạn có thể cài GoTV bằng cách chạy
+
+'''
+go install go101.org/gotv@latest
+'''
+
+sau đó chạy các command sau để cài các bản phát hành mới nhất của Go 1.17,
+Go 1.18 và Go 1.19 toolchain.
+
+'''
+gotv 1.17. version
+gotv 1.18. version
+gotv 1.19. version
+'''
+
+Lần thực thi đầu tiên của command `gotv` cần pull project ngôn ngữ Go,
+vì vậy có thể mất vài phút mới hoàn tất.
+
+###======================= Định nghĩa của thuật ngữ ||slice của byte|| được làm rõ
+
+Đặc tả Go phát biểu rằng ||một value không phải constant `x` có thể được convert sang type `T` nếu `x` là một string và `T` là một slice của byte, và ngược lại||.
+
+Nhưng ||slice của byte|| là gì? Có hai cách hiểu:
+
+*. bất kỳ type nào có underlying type là `[]byte`.
+*. bất kỳ slice type nào có element type có underlying type là `byte`.
+
+Trước Go 1.18, Go compiler chuẩn chính thức đôi khi dùng cách hiểu thứ nhất,
+đôi khi dùng cách hiểu thứ hai.
+Kể từ Go 1.18, Go compiler chuẩn chính thức luôn dùng cách hiểu thứ hai.
+Và Go 1.19 chính thức thừa nhận implementation từ 1.18 trở đi là đúng.
+
+Ví dụ, Go compiler chuẩn chính thức 1.17 cho rằng
+function `f` trong đoạn code sau là hợp lệ
+nhưng cho rằng function `g` không hợp lệ.
+
+''' Go
+package main
+
+type T byte
+
+//go:noinline
+func f(s string) []T {
+	return []T(s)
+}
+
+//go:noinline
+func g(x []T) string {
+	return string(x) // lỗi (dòng 12)
+}
+
+func main() {
+	_ = f("Go")
+	_ = g([]T{71, 111})
+}
+'''
+
+Kể từ Go toolchain 1.18, cả hai function đều compile thành công.
+Sau đây là output của Go compiler chuẩn chính thức 1.17 và 1.18
+cho program ở trên.
+
+'''
+$ gotv 1.17. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.17.13/bin/go run main.go
+# command-line-arguments
+./main.go:12:15: cannot use <node SPTR> (type *T) as type *byte in argument to runtime.slicebytetostring
+
+$ gotv 1.18. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.18.7/bin/go main main.go
+'''
+
+Go compiler chuẩn chính thức 1.17 đôi khi xem `[]T` là một ||slice của byte||
+(trong function `f`), đôi khi không (trong function `g`).
+Nếu type definition `type T byte` được đổi thành type alias declaration `type T = byte`,
+thì function `g` cũng được Go compiler chuẩn chính thức 1.17 xem là hợp lệ.
+
+Tình huống tương tự cũng xảy ra với ||slice của rune|| (hay ||rune slice||).
+
+Lưu ý, cho đến hiện tại (Go 1.19), package chuẩn `reflect` vẫn chưa được cập nhật tương ứng.
+Ví dụ, program sau in ra hai `false`, nhưng đáng ra phải in ra hai `true`.
+
+''' Go
+package main
+
+import "reflect"
+
+type T byte
+
+func main() {
+	var s string
+	var x []T
+	var sType = reflect.TypeOf(s)
+	var xType = reflect.TypeOf(x)
+	println(sType.ConvertibleTo(xType))
+	println(xType.ConvertibleTo(sType))
+}
+'''
+
+Tham khảo:
+
+*  __https://github.com/golang/go/issues/23536
+*  __https://github.com/golang/go/issues/23814
+*  __https://github.com/golang/go/issues/53523
+
+###======================= Một chi tiết tinh tế trong các khai báo constant cục bộ
+
+Program sau nên in ra gì?
+
+''' Go
+package main
+
+func main() {
+	const (
+		iota = iota
+		Y
+	)
+	println(Y)
+}
+'''
+
+Một số gopher nghĩ nó nên in ra `1`, đây thực sự là đáp án của Go compiler chuẩn chính thức 1.17.13-.
+Tuy nhiên, kể từ Go compiler chuẩn chính thức 1.18, đáp án là `0`.
+Sau đây là output với các phiên bản compiler khác nhau:
+
+'''
+$ gotv 1.17. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.17.13/bin/go run main.go
+1
+
+$ gotv 1.18. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.18.7/bin/go run main.go
+0
+'''
+
+Đáp án nào đúng?
+
+Đặc tả Go nói:
+
+>  Trong một danh sách khai báo const đặt trong ngoặc, danh sách expression có thể được bỏ qua ở bất kỳ ConstSpec nào ngoại trừ ConstSpec đầu tiên. Một danh sách rỗng như vậy tương đương với việc thay thế bằng văn bản danh sách expression không rỗng ngay trước đó và type của nó, nếu có. Do đó, việc bỏ qua danh sách expression tương đương với việc lặp lại danh sách trước đó.
+
+Mô tả này cho thấy đáp án 1.18+ là đúng, vì program ở trên tương đương với
+
+''' Go
+package main
+
+func main() {
+	const (
+		iota = iota
+		Y    = iota
+	)
+	println(Y)
+}
+'''
+
+`iota` cuối cùng là `iota` được khai báo cục bộ, có value là `0`.
+
+Go 1.19 xác nhận đó là một bug trong các phiên bản 1.17.13-.
+
+Ref: __https://github.com/golang/go/issues/49157
+
+###======================= Một bug liên quan đến type alias tồn tại lâu năm đã được sửa
+
+Khi type alias được đưa vào Go 1.8, một bug về comparison cũng được đưa vào.
+
+Program sau đáng ra phải in ra `false`, nhưng in ra `true`
+khi sử dụng Go compiler chuẩn chính thức từ phiên bản 1.8 đến 1.17.13.
+
+''' Go
+package main
+
+type T struct{}
+type S = T
+
+type A = struct{ T }
+type B = struct{ S }
+
+func main() {
+	var a A
+	var b B
+	println(interface{}(b) == interface{}(a))
+}
+'''
+
+Các type alias `A` và `B` biểu thị các type khác nhau (với tên field khác nhau),
+đó là lý do comparison đáng ra phải cho kết quả `false`.
+
+Bug này đã được sửa trong Go 1.18.
+
+Sau đây là output với các phiên bản compiler khác nhau:
+
+'''
+$ gotv 1.17. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.17.13/bin/go run main.go
+true
+
+$ gotv 1.18. run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.18.7/bin/go run main.go
+false
+'''
+
+Ref: __https://github.com/golang/go/issues/24721
+
+###======================= Thuật ngữ ^||named type|| quay trở lại đặc tả Go
+
+Khi type alias được đưa vào Go 1.8, thuật ngữ ||named type||
+bị loại bỏ khỏi đặc tả Go. Một thuật ngữ mới là ||defined type|| được
+đưa vào để lấp các khoảng trống do việc loại bỏ ||named type|| gây ra.
+Tuy nhiên, __điều này khiến nhiều tutorial và bài viết Go cũ trở nên lỗi thời
+và mang lại một số nhược điểm khác__.
+
+    === ...nhược điểm `` https://github.com/golang/go/issues/35091
+
+Với sự ra đời của custom generics,
+thuật ngữ ||named type|| đã quay trở lại kể từ Go 1.18,
+điều này hữu ích để giải thích rõ __nhiều quy tắc conversion và assignment__ trong Go.
+
+    === ...quy tắc `` https://go101.org/article/value-conversions-assignments-and-comparisons.html
+
+Hiện nay, một named type có thể là
+
+*  một predeclared type;
+*  một defined (không phải custom-generic) type;
+*  một instantiated type (của một generic type);
+*  một type parameter type (được dùng trong custom generics).
+
+Lưu ý, một type alias của một unnamed type không phải là một named type.
+
+###======================= Goexit signal có thể hủy các panic (có thể recover) đã xảy ra
+
+Program sau sẽ crash do panic hay thoát bình thường?
+
+''' Go
+package main
+
+import "runtime"
+
+func main() {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		defer runtime.Goexit()
+		panic("bye")
+	}()
+	<-c
+}
+'''
+
+Trước Go 1.19, chưa có câu trả lời rõ ràng.
+Một số gopher nghĩ nó phải crash, vì panic `"bye"` không bao giờ được recover.
+Nhưng trong implementation của Go runtime chuẩn chính thức,
+một Goexit signal sẽ hủy các panic (có thể recover) đã xảy ra trong goroutine hiện tại.
+Vì vậy, với compiler chuẩn chính thức, program ở trên sẽ thoát bình thường.
+__Hành vi này được quyết định là đúng trong Go 1.19__.
+
+    === Hành vi này... `` https://github.com/golang/go/issues/35378
+
+Theo ý kiến cá nhân của tôi, Goexit signal không nên hủy các panic,
+vì vậy program ở trên đáng ra phải crash.
+Nhưng tôi tôn trọng quyết định cuối cùng của Go core team.
+
+Quyết định cuối cùng khiến các lời gọi `runtime.Goexit` hoạt động như các lời gọi `recover` siêu cấp.
+Ví dụ, hai hàm goroutine sau có cùng hành vi.
+
+''' Go
+func goroutine1() {
+	defer runtime.Goexit()
+	panic(1)
+}
+
+func goroutine2() {
+	defer func() {
+		recover()
+	}()
+	panic(1)
+}
+'''
+
+Tài liệu Go chính thức giải thích cơ chế panic/recover đơn giản đến mức vẫn còn một số chi tiết khác không được đề cập,
+đó là lý do sách Go 101 có __một bài viết đặc biệt giải thích chi tiết cơ chế panic/recover__.
+
+    === một... `` https://go101.org/article/panic-and-recover-more.html
+
+###======================= Một số thay đổi nhỏ khác trong compiler và runtime
+
+Ngoài ra, các phiên bản Go toolchain gần đây cũng thực hiện một số tối ưu hóa nhỏ trong compiler và runtime nhưng chưa được tài liệu hóa.
+Một số tối ưu hóa nhỏ được đề cập trong sách __Go Optimizations 101__.
+
+    === Go Optimizations 101 `` https://go101.org/optimizations/101.html
+
+
+---
+
+{ %%
+@@@ #gotv
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là một công cụ được dùng để cài đặt và sử dụng các bản cài đặt
+của các phiên bản Go toolchain cùng tồn tại một cách hài hòa.
+}

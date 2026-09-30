@@ -1,0 +1,142 @@
+
+### Các thao tác slice built-in của Go còn chưa đầy đủ
+
+###========= Thiếu cách có hiệu năng cao để merge 3+ slice
+
+Trong Go, có ba function built-in để thao tác với slice:
+
+1. function `make` được dùng để tạo một slice với length và capacity được chỉ định. Mọi element đều được đặt về zero value.
+1. function `copy` được dùng để copy một số element từ slice này sang slice khác nếu hai slice có element type giống hệt nhau.
+1. function `append` được dùng để append một số element vào một base slice và cho kết quả là một slice mới.
+Base slice có thể chia sẻ toàn bộ các element của nó với slice mới hoặc không,
+tùy thuộc vào việc capacity của base slice có đủ lớn để chứa tất cả element được append hay không.
+
+Khi capacity của base slice trong một lời gọi function `append` không đủ lớn,
+lời gọi đó có thể được xem là một cách để merge hai slice.
+Vì đây là cách built-in nên nó có hiệu năng cao.
+
+Tuy nhiên, không có cách nào có hiệu năng cao để merge 3+ slice.
+Implementation dưới đây có thể là cách có hiệu năng cao nhất để thực hiện việc này:
+
+''' Go
+func merge[S ~[]E, E any](ss ...S) S {
+	var n, allNils, k = 0, true, -1
+	for i := range ss {
+		if m := len(ss[i]); n != 0 {
+			n += m
+			if n < 0 {
+				panic("sum of lengths is too large")
+			}
+		} else if m > 0 {
+			n = m
+			allNils = false
+			k = i
+		} else {
+			allNils = allNils && ss[i] == nil
+		}
+	}
+	if allNils {
+		return nil
+	}
+	if n == 0 {
+		return S{}
+	}
+
+	// Tận dụng tối ưu hóa này:
+	// https://github.com/golang/go/commit/6ed4661807b219781d1aa452b7f210e21ad1974b
+	s := ss[k]
+	r := make(S, n)
+	copy(r, s)
+	r = r[:len(s)]
+	ss = ss[k+1:]
+
+	for _, s := range ss {
+		r = append(r, s...)
+	}
+	return r
+}
+'''
+
+Thông thường, một lời gọi `make` sẽ đặt các element được allocate trong quá trình thực thi về zero value,
+việc này không cần thiết cho use case cụ thể này.
+Implementation cố gắng hết sức để zero ít element nhất có thể trong lời gọi `make`;
+nhờ sử dụng tối ưu hóa đã nêu, nó không zero các element trong `r[:len(ss[0])]`,
+nhưng vẫn không tránh được việc zero các element còn lại (những element trong `r[len(ss[0]):]`).
+
+Nếu function `merge` là built-in, nó có thể tránh toàn bộ các phép zero element không cần thiết.
+
+###========= Thiếu cách gọn gàng để clip slice
+
+Như đã đề cập ở trên, một lời gọi function `append` sẽ sử dụng lại backing array
+của đối số slice đầu tiên (gọi nó là `base` ở đây) cho slice kết quả nếu capacity của `base`
+đủ lớn để chứa tất cả element được append.
+Trong một số scenario, chúng ta muốn ngăn một lời gọi `append` sửa đổi các element trong `base[len(base):]`
+và đạt được điều đó bằng cách clip capacity của `base` về length của nó:
+
+''' Go
+var x, y, z T
+
+	... = append(base[:len(base):len(base)], x, y, z)
+'''
+
+Không có gì đáng phàn nàn, ngoại trừ việc nó hơi dài dòng,
+đặc biệt khi expression `base` dài dòng, chẳng hạn như
+
+''' Go
+	... = append(aValue.Field.Slice[:len(aValue.Field.Slice):len(aValue.Field.Slice)], x, y, z)
+'''
+
+Nếu expression `base` là một function call, chúng ta phải lưu kết quả của lời gọi đó vào một biến trung gian tạm thời:
+
+''' Go
+	base := aFunctionCall()
+	... = append(base[:len(base):len(base)], x, y, z)
+'''
+
+Có thể dùng function `Clip` trong package `golang.org/x/exp/slices`, nhưng cách này vẫn chưa đủ gọn gàng.
+
+''' Go
+import "golang.org/x/exp/slices"
+
+	... = append(slices.Clip((base), x, y, z)
+
+	... = append(slices.Clip(aValue.Field.Slice), x, y, z)
+
+	... = append(slices.Clip(aFunctionCall()), x, y, z)
+'''
+
+Tôi thích __đề xuất này__ hơn, nhưng nó đã bị từ chối:
+
+''' Go
+aSlice[ : n : ]  // <=> aSlice[ : n : n]
+aSlice[m : n : ] // <=> aSlice[m : n : n]
+sSlice[ : : ]    // <=> aSlice[ : len(aSlice) : len(aSlice)]
+aSlice[m : : ]   // <=> aSlice[m : len(aSlice) : len(aSlice)]
+'''
+
+Nếu đề xuất được chấp nhận, thì ta có thể chỉ cần viết code như sau:
+
+''' Go
+	... = append(base[::], x, y, z)
+
+	... = append(aValue.Field.Slice[::], x, y, z)
+
+	... = append(aFunctionCall()[::], x, y, z)
+'''
+
+cách này gọn gàng hơn nhiều.
+
+    === đề xuất này `` https://github.com/golang/go/issues/25638
+
+###========= Thiếu cách an toàn để phát hiện sự chồng lấp element giữa hai slice
+
+Thực tế này ngăn các package Go tùy chỉnh tạo ra những implementation hoàn hảo cho một số thao tác slice.
+
+Một số package chuẩn đang (đã từng) sử dụng các cách unsafe để thực hiện việc này.
+Ví dụ:
+
+*  __https://github.com/golang/go/blob/13529cc5f443ef4e242da3716daa0032aa8d34f2/src/slices/slices.go#L466-L479
+*  __https://github.com/golang/crypto/blob/eec23a3978ad/internal/subtle/aliasing.go#L13-L19
+
+Những cách dùng unsafe này thực tế không tuân theo bất kỳ [mẫu sử dụng unsafe hợp lệ nào](https://pkg.go.dev/unsafe#Pointer),
+vì vậy chúng là những implementation tồi và nguy hiểm.

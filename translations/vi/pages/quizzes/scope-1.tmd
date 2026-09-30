@@ -1,0 +1,47 @@
+
+##### scope 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func f(n int) (r int) {
+	a, r := n-1, n+1
+	if a+a == r {
+		c, r := n, n*n
+		r = r - c
+	}
+	return r
+}
+
+func main() {
+	println(f(3))
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+4
+6
+"""
+
+@@@ #answer
+{
+Đáp án: 4
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/YimtmACsxOP __.
+
+Điểm chính:
+*
+	Biến `r` được khai báo trong block bên trong không phải là khai báo lại của biến `r` (kết quả trả về) được khai báo trong block cấp cao nhất của hàm.
+	Nó hoàn toàn là một biến mới được khai báo.
+	Vì vậy, kết quả trả về không bị thay đổi trong block bên trong.
+
+}

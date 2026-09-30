@@ -1,0 +1,48 @@
+
+### Các lời gọi `recover` trong thân vòng lặp `for-range` khi duyệt iterator không hoạt động
+
+Theo đặc tả Go, chương trình sau in ra `123`.
+
+''' Go
+package main
+
+import "fmt"
+
+func main() {
+	defer foo()
+	panic(123)
+}
+
+func foo() {
+	for range 1 {
+		fmt.Println(recover()) // 123
+	}
+}
+'''
+
+Tương tự, chương trình sau cũng phải in ra `123`.
+Nhưng nó in ra `<nil>` rồi bị crash (kể từ phiên bản Go toolchain 1.23.0).
+
+''' Go
+package main
+
+import "fmt"
+
+func main() {
+	defer foo()
+	panic(123)
+}
+
+func foo() {
+	for range iter {
+		fmt.Println(recover())
+	}
+}
+
+func iter(yield func() bool) {
+	yield()
+}
+'''
+
+// (Issue liên quan: __https://github.com/golang/go/issues/71685__.)
+

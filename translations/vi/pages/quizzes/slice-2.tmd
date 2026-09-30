@@ -1,0 +1,126 @@
+
+##### slice 2
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var x = []string{"A", "B", "C"}
+
+	for i, s := range x {
+		print(i, s, ",")
+		x[i+1] = "M"
+		x = append(x, "Z")
+		x[i+1] = "Z"
+	}
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+0A,1B,2C,
+0A,1Z,2Z,
+0A,1M,2M,
+0A,1M,2C,
+0A,1Z,2M,
+0A,1M,2Z,
+(vòng lặp vô hạn)
+"""
+
+
+@@@ #answer
+{
+Đáp án: 0A,1M,2C,
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/NHHstfnADmP __.
+
+Các điểm chính:
+*
+   Thao tác range trên một container iterate các phần tử của một bản sao của container.
+   Việc đánh giá bản sao diễn ra trước khi thực thi vòng lặp,
+   nên length và capacity của bản sao không bao giờ thay đổi.
+*
+   Một slice tham chiếu đến các phần tử của nó trên một backing array.
+   Vì vậy, một bản sao của slice dùng chung các phần tử (và backing array) với slice đó.
+*
+   Phép gán `x[i+1] = "M"` ở bước lặp đầu tiên sửa đổi phần tử thứ hai
+   của slice `x` ban đầu và bản sao của slice `x` ban đầu.
+*
+   Nếu các vị trí phần tử còn trống của slice đối số thứ nhất trong một lời gọi `append`
+   không đủ để chứa tất cả các phần tử được append, lời gọi `append` sẽ tạo
+   một backing array mới để chứa tất cả các phần tử của slice đối số thứ nhất và
+   các phần tử được append.
+   Vì vậy, ở cuối bước lặp đầu tiên, backing array của slice `x` được thay đổi.
+   Tuy nhiên, thay đổi này không ảnh hưởng đến bản sao của slice được dùng để iterate các phần tử.
+   Mọi thay đổi phần tử tiếp theo đều áp dụng lên backing array mới, nên không có tác động đến
+   bản sao được dùng để iterate các phần tử.
+
+
+
+Quiz ở trên được mở rộng từ __ một trong các quiz của Valentin Deleplace`` https://x.com/val_deleplace/status/1476907441459798055 __.
+Quiz gốc như sau.
+
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var x = []string{"A", "B", "C"}
+
+	for i, s := range x {
+		print(i, s, ",")
+		x = append(x, "Z")
+		x[i+1] = "Z"
+	}
+}
+'''
+
+
+Quiz gốc in ra `0A,1B,2C,`, vì container được range qua là một bản sao của `x` ban đầu,
+và các phần tử của bản sao không bao giờ bị thay đổi.
+
+
+
+Quiz sau đây là __ một quiz khác`` https://x.com/val_deleplace/status/1476239147601997828 __
+do Valentin Deleplace tạo ra (với một chút sửa đổi).
+
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var y = []string{"A", "B", "C", "D"}
+	var x = y[:3]
+
+	for i, s := range x {
+		print(i, s, ",")
+		x = append(x, "Z")
+		x[i+1] = "Z"
+	}
+}
+'''
+
+
+Quiz còn lại in ra `0A,1Z,2C,`. Nó tương tự quiz mở rộng ở trên.
+Các điểm chính:
+* 
+	Lời gọi `append` đầu tiên không tạo một backing array mới,
+	nên phép gán `x[i+1] = "Z"` ở vòng lặp đầu tiên có tác động đến
+	slice `x` ban đầu (và bản sao của nó được dùng để iterate các phần tử).
+* 
+	Lời gọi `append` thứ hai tạo một backing array mới,
+	nên các phép gán `x[i+1] = "Z"` tiếp theo không có tác động đến
+	slice `x` ban đầu (và bản sao của nó được dùng để iterate các phần tử).
+
+}
+

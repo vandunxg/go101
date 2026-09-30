@@ -1,0 +1,58 @@
+
+### Dòng chỉ thị `go 1.mn` trong tệp `go.mod` không hoạt động với một số phiên bản Go toolchain
+    đối với một số tệp mã nguồn Go chứa các chỉ thị chú thích `//line ...`
+
+Go 1.22 đã thay đổi ngữ nghĩa của vòng lặp `for-range` và vòng lặp `for;;` truyền thống.
+Vì những thay đổi ngữ nghĩa này làm thay đổi hành vi của mã hiện có được viết theo
+ngữ nghĩa trước đây, chúng phá vỡ tính tương thích ngược.
+
+Mặc dù hành vi của các vòng lặp `for-range` cũ hầu như không bị ảnh hưởng,
+một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do việc phá vỡ tương thích này__.
+
+    === có hành vi bất ngờ ... `` https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+Để ngăn mã cũ hoạt động sai, Go 1.22 trở lên yêu cầu rằng
+mỗi tệp mã nguồn Go phải được chỉ định bằng một phiên bản Go.
+Có hai cách phổ biến để thực hiện việc này.
+
+Cách thứ nhất là thêm một chú thích `//go:build go1.mn` ở ngay đầu tệp mã nguồn Go.
+Tuy nhiên, __một số phiên bản Go toolchain được biết là có lỗi khi xử lý chỉ thị này__.
+
+    === một số phiên bản ... `` go-build-directive-not-work.tmd
+
+Cách khác là thêm một chỉ thị `go 1.mn` vào tệp `go.mod` của module chứa tệp mã nguồn Go.
+Đáng tiếc là một số phiên bản Go toolchain cũng có lỗi trong cách xử lý việc này.
+
+Ví dụ, hãy xét một module có tệp `go.mod` chỉ định phiên bản 1.21.
+Nếu module đó được compile bằng Go toolchain 1.22.x hoặc 1.23.y,
+chương trình sẽ in ra `210` (hành vi mới) thay vì `333` (hành vi cũ) như mong đợi.
+Điều này cho thấy toolchain không tôn trọng phiên bản được chỉ định trong tệp go.mod.
+
+.  ### go.mod
+   '''
+module main
+
+go 1.21
+   '''
+
+.  ### main.go
+   ''' zig
+//line main.go:1
+package main
+
+func main() {
+	for i := 0; i < 3; i++ {
+	    defer func() {
+	        print(i)
+	    }()
+	}
+}
+   '''
+
+Lỗi này, được theo dõi tại __ https://github.com/golang/go/issues/77248 __,
+được xác định khi Go 1.26 sắp được phát hành.
+Do đó, các phiên bản Go toolchain sau đây bị ảnh hưởng vĩnh viễn bởi lỗi này:
+* Tất cả các phiên bản 1.22 và 1.23.
+* Tất cả các phiên bản 1.24 trước 1.24.13.
+* Tất cả các phiên bản 1.25 trước 1.25.7.
+

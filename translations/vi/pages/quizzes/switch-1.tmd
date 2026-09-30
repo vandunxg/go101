@@ -1,0 +1,50 @@
+
+##### switch 1
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func f() bool {
+	return false
+}
+
+func main() {
+	switch f() //
+	{
+	case true:
+		println(1)
+	case false:
+		println(0)
+	}
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+0
+1
+"""
+
+@@@ #answer
+{
+
+Đáp án: 1
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/vfpqxb6FY2L __.
+
+Điểm chính:
+*
+   Khi biên dịch mã Go, trình biên dịch Go sẽ __ tự động chèn dấu chấm phẩy`` https://go101.org/article/line-break-rules.html __.
+*
+   Biểu thức `switch` mặc định là `true` (thuộc kiểu dựng sẵn `bool`).
+
+Các chi tiết nhỏ được đề cập ở trên chỉ là hai trong khoảng 100 chi tiết được tập hợp trong cuốn sách __ Go Details & Tips 101`` https://go101.org/details-and-tips/101.html __.
+
+}

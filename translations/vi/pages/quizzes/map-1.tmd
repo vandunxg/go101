@@ -1,0 +1,47 @@
+
+##### map 1
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	m := make(map[string]int, 3)
+	x := len(m)
+	m["Go"] = m["Go"]
+	y := len(m)
+	println(x, y)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+3 3
+3 4
+0 0
+0 1
+"""
+
+
+@@@ #answer
+{
+Đáp án: 0 1
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/MwomJeUCT9o __.
+
+Điểm chính:
+*
+   Khi sử dụng hàm `make` để tạo một map, đối số thứ hai không phải là độ dài ban đầu cũng không phải là capacity của map kết quả.
+   Nó chỉ là một gợi ý cho Go runtime cấp phát một backing array đủ lớn để chứa ít nhất số entry được chỉ định.
+*
+   Độ dài (số entry) của map kết quả là 0.
+   `m["Go"] = m["Go"]` tương đương với `m["Go"] = 0`.
+   Sau assignment, map chứa một entry.
+
+}

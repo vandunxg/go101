@@ -1,0 +1,571 @@
+<p id="f-666-generic-instantiations-and-type-argument-inferences-md"></p>
+<h1>Generic Instantiation và Suy luận Type Argument</h1>
+
+<p>Trong hai chương trước, chúng ta đã sử dụng một số instantiation của generic type và function.
+Chương này giới thiệu một cách formal về các type và function đã được instantiation.</p>
+
+<h2>Instantiation của generic type/function</h2>
+
+<p>Generic type phải được instantiation để được dùng làm type của value, còn
+generic function phải được instantiation để được gọi hoặc được dùng làm function value.</p>
+
+<p>Một generic function (type) được instantiation bằng cách thay thế một danh sách type argument
+cho danh sách type parameter trong declaration (specification) của nó.
+Độ dài của danh sách type argument (đầy đủ) bằng với độ dài của danh sách type parameter.
+Mỗi type argument tương ứng với một type parameter và được truyền cho type parameter đó.
+Giả sử constraint của type parameter tương ứng với một type argument là <code>C</code>,
+thì type argument phải là</p>
+
+<ul>
+<li>một ordinary type (một non-interface type hoặc basic interface type)
+mà <a href="555-type-constraints-and-parameters.html#implementation-vs-satisfaction">satisfies</a> (nhưng không bắt buộc phải implement) <code>C</code>;
+hoặc</li>
+<li>một type parameter <a href="555-type-constraints-and-parameters.html#type-sets-and-implementations">implements</a> <code>C</code> nếu instantiation
+nằm bên trong một generic function declaration hoặc type specification bao chứa.
+Type parameter đó được khai báo bởi generic function declaration hoặc type specification bao chứa.</li>
+</ul>
+
+<p>Các function đã được instantiation là các function non-generic.
+Các type đã được instantiation là các named ordinary value type.</p>
+
+<p>Giống như danh sách type parameter, một danh sách type argument cũng được đặt trong dấu ngoặc vuông
+và các type argument cũng được phân tách bằng dấu phẩy trong danh sách type argument.
+Rule chèn dấu phẩy cho danh sách type argument cũng giống với danh sách type parameter.</p>
+
+<p>Hai danh sách type argument là identical nếu độ dài của dạng đầy đủ của chúng bằng nhau và mọi type argument tương ứng đều identical.
+Hai type đã được instantiation là identical nếu chúng được instantiation từ cùng một generic type và có cùng danh sách type argument dạng đầy đủ.</p>
+
+<p>Như đã được chỉ ra nhiều lần trong các mô tả trên, một danh sách type argument có thể không đầy đủ.
+Hãy đọc section &quot;Suy luận type argument&quot; sau đây để biết chi tiết.</p>
+
+<p>Trong chương trình sau, generic type <code>Data</code> được instantiation bốn lần.
+Ba trong bốn instantiation có cùng danh sách type argument
+(lưu ý rằng predeclared <code>byte</code> là alias của predeclared type <code>uint8</code>).
+Do đó, type của variable <code>x</code>, type được biểu diễn bởi alias <code>Z</code>, và underlying type
+của defined type <code>W</code> là cùng một type.</p>
+
+<pre><code class="language-Go">package main
+
+import (
+	&quot;fmt&quot;	
+	&quot;reflect&quot;
+)
+
+type Data[A int64 | int32, B byte | bool, C comparable] struct {
+	a A
+	b B
+	c C
+}
+
+var x = Data[int64, byte, [8]byte]{1&lt;&lt;62, 255, [8]byte{}}
+type Y = Data[int32, bool, string]
+type Z = Data[int64, uint8, [8]uint8]
+type W Data[int64, byte, [8]byte]
+
+// Dòng sau không biên dịch được vì
+// []uint8 không satisfies constraint comparable.
+// type T = Data[int64, uint8, []uint8] // error
+
+func main() {
+	println(reflect.TypeOf(x) == reflect.TypeOf(Z{})) // true
+	println(reflect.TypeOf(x) == reflect.TypeOf(Y{})) // false
+	fmt.Printf(&quot;%T\n&quot;, x)   // main.Data[int64,uint8,[8]uint8]
+	fmt.Printf(&quot;%T\n&quot;, Z{}) // main.Data[int64,uint8,[8]uint8]
+}
+</code></pre>
+
+<p>Sau đây là một ví dụ sử dụng một số function đã được instantiation
+của một generic function.</p>
+
+<pre><code class="language-Go">package main
+
+type Ordered interface {
+	~int | ~uint | ~int8 | ~uint8 | ~int16 | ~uint16 |
+	~int32 | ~uint32 | ~int64 | ~uint64 | ~uintptr |
+	~float32 | ~float64 | ~string
+}
+
+func Max[S ~[]E, E Ordered](vs S) E {
+	if len(vs) == 0 {
+		panic(&quot;no elements&quot;)
+	}
+	
+	var r = vs[0]
+	for i := range vs[1:] {
+		if vs[i] &gt; r {
+			r = vs[i]
+		}
+	}
+	return r
+}
+
+type Age int
+var ages = []Age{99, 12, 55, 67, 32, 3}
+
+var langs = []string {&quot;C&quot;, &quot;Go&quot;, &quot;C++&quot;}
+
+func main() {
+	var maxAge = Max[[]Age, Age]
+	println(maxAge(ages)) // 99
+	
+	var maxStr = Max[[]string, string]
+	println(maxStr(langs)) // Go
+}
+</code></pre>
+
+<p>Trong ví dụ trên, generic function <code>Max</code> được instantiation hai lần.</p>
+
+<ul>
+<li>Instantiation thứ nhất <code>Max[[]Age, Age]</code> tạo ra một function value <code>func([]Age] Age</code>.</li>
+<li>Instantiation thứ hai <code>Max[[]string, string]</code> tạo ra một function value <code>func([]string) string</code>.</li>
+</ul>
+
+<h2 id="type-argument-inferences">Suy luận type argument cho generic function instantiation</h2>
+
+<p>Trong ví dụ generic function được trình bày ở section trước,
+hai function instantiation là các instantiation dạng đầy đủ,
+trong đó mọi type argument đều xuất hiện trong danh sách type argument bao chứa chúng.
+Go hỗ trợ type inference cho generic function instantiation,
+do đó danh sách type argument của một function đã được instantiation
+có thể không đầy đủ hoặc thậm chí bị bỏ hoàn toàn,
+miễn là các type argument bị thiếu có thể được suy luận từ value parameter
+và các type argument được cung cấp.</p>
+
+<p>Ví dụ, function <code>main</code> của ví dụ cuối trong section trước có thể được viết lại như sau</p>
+
+<pre><code class="language-Go">func main() {
+	var maxAge = Max[[]Age] // danh sách argument không đầy đủ
+	println(maxAge(ages)) // 99
+	
+	var maxStr = Max[[]string] // danh sách argument không đầy đủ
+	println(maxStr(langs)) // Go
+}
+</code></pre>
+
+<p>Danh sách type argument không đầy đủ phải là một prefix của danh sách argument đầy đủ.
+Trong code trên, các argument thứ hai đều bị bỏ qua,
+vì chúng có thể được suy luận từ các argument thứ nhất.</p>
+
+<p>Nếu một function đã được instantiation được gọi trực tiếp và một số type argument ở suffix
+có thể được suy luận từ các type của value argument, thì danh sách type argument
+cũng có thể không đầy đủ hoặc thậm chí bị bỏ hoàn toàn.
+Ví dụ, function <code>main</code> cũng có thể được viết lại như sau</p>
+
+<pre><code class="language-Go">func main() {
+	println(Max(ages))  // 99
+	println(Max(langs)) // Go
+}
+</code></pre>
+
+<p>Function <code>main</code> được viết lại cho thấy các lời gọi đến
+ generic function có thể gọn như các function thông thường (ít nhất là đôi khi),
+ngay cả khi declaration của generic function dài dòng hơn.</p>
+
+<p>Lưu ý rằng danh sách type argument có thể bị bỏ hoàn toàn nhưng không được để trống.
+Code sau là không hợp lệ.</p>
+
+<pre><code class="language-Go">func main() {
+	println(Max[](ages))  // syntax error
+	println(Max[](langs)) // syntax error
+}
+</code></pre>
+
+<p>Phần trên đã nói rằng một danh sách type argument không đầy đủ phải là một prefix của danh sách argument đầy đủ.
+Điều này cũng có nghĩa là các type argument được suy luận trong một danh sách type argument thuộc về một suffix của danh sách type argument.
+Ví dụ, code sau không biên dịch được.</p>
+
+<pre><code class="language-Go">package main
+
+func foo[A, B, C any](v B) {}
+
+func main() {
+	// error: cannot use _ as value or type
+	foo[int, _, bool](&quot;Go&quot;)
+}
+</code></pre>
+
+<p>Type argument có thể được suy luận từ các type của element, type của field,
+type của parameter và type của result trong value argument.
+Ví dụ,</p>
+
+<pre><code class="language-Go">package main
+
+func luk[E any](v struct{x E}) {}
+func kit[E any](v []E) {} 
+func wet[E any](v func() E) {}
+
+func main() {
+	luk(struct{x int}{123})        // okay
+	kit([]string{&quot;go&quot;, &quot;c&quot;})       // okay
+	wet(func() bool {return true}) // okay
+}
+</code></pre>
+
+<p>Nếu type set của constraint của một type parameter chỉ chứa một type
+và type parameter được dùng làm type của value parameter trong một generic function,
+thì compiler sẽ cố gắng suy luận type của một untyped value argument được truyền
+cho value parameter đó thành type duy nhất đó. Nếu việc cố gắng này thất bại,
+untyped value argument đó được xem là không hợp lệ.</p>
+
+<p>Ví dụ, trong chương trình sau, chỉ lời gọi function thứ nhất biên dịch được.</p>
+
+<pre><code class="language-Go">package main
+
+func foo[T int](x T) {}
+func bar[T ~int](x T) {}
+
+func main() {
+	// Type mặc định của 1.0 là float64, nhưng
+	// 1.0 cũng có thể biểu diễn được dưới dạng các giá trị integer.
+
+	foo(1.0)  // okay
+	foo(1.23) // error: cannot use 1.23 as int
+
+	bar(1.0)  // error: float64 does not implement ~int
+	bar(1.23) // error: float64 does not implement ~int
+}
+</code></pre>
+
+<p>Các rule và implementation của việc suy luận type argument vẫn đang được cải tiến liên tục,
+từ version này sang version khác. Ví dụ, code sau không biên dịch được trước Go 1.21
+nhưng biên dịch được từ Go 1.21 (<code>T</code> được suy luận là <code>float64</code>).</p>
+
+<pre><code class="language-Go">func Less[T ~int | ~float64](x, y T) bool {
+	return x &lt; y
+}
+
+var _ = Less(1, 0.0) // chỉ biên dịch được từ 1.21
+</code></pre>
+
+<p>Trước Go 1.21, khi dùng một generic function làm function value,
+danh sách type argument của function đã được instantiation phải ở dạng đầy đủ.
+Từ Go 1.21, danh sách type argument có thể không đầy đủ nếu
+một số type argument ở suffix có thể được suy luận. Ví dụ</p>
+
+<pre><code class="language-Go">func Sum[T ~float32 | ~float64](x, y T) T {
+	return x + y
+}
+
+// Hai dòng sau chỉ biên dịch được từ Go 1.21.
+var _ func(float32, float32) float32 = Sum
+var _ func(float64, float64) float64 = Sum
+
+// Trước Go 1.21, hai dòng trên phải được viết như sau:
+var _ func(float32, float32) float32 = Sum[float32]
+var _ func(float64, float64) float64 = Sum[float64]
+</code></pre>
+
+<p>Một ví dụ hoàn chỉnh:</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;fmt&quot;
+
+func Convert[S ~[]E, E, T any](s S, conv func(E) T) []T {
+	r := make([]T, len(s))
+	for i := range s {
+		r[i] = conv(s[i])
+	}
+	return r
+}
+
+func isEven(n int) bool {
+	return n&amp;1 == 0
+}
+
+func intsToBools(s []int) []bool {
+	// Dòng sau chỉ biên dịch được từ Go 1.21.
+	var conv func([]int, func(int) bool) []bool = Convert
+	// Trước Go 1.21, để dòng trên biên dịch được, phía
+	// bên phải của nó phải được viết thành Convert[[]int, int bool]
+	
+	return conv(s, isEven)
+}
+
+func main() {
+	var s = []int{2, 3, 5, 8}
+	fmt.Println(intsToBools(s)) // [true false false true]
+}
+</code></pre>
+
+<p>Tương tự, từ Go 1.21, type argument có thể được suy luận
+bằng cách phân tích type của parameter và result của method.
+Ví dụ, code sau không biên dịch được trước Go 1.21
+nhưng biên dịch được từ Go 1.21.</p>
+
+<pre><code class="language-Go">package main
+
+type C[I, O any] interface {
+	M(I) O
+}
+
+type Foo struct {
+	v int
+}
+
+func (f Foo) M(n int) bool {
+	return n == f.v
+}
+
+func bar[T C[I, O], I, O any](t T) {}
+
+func main() {
+	var foo Foo
+	
+	// 1.20:  error: cannot infer I. Phải viết
+	//        dưới dạng bar[Foo, int, bool](foo) để biên dịch.
+	// 1.21+: biên dịch được.
+	bar(foo)
+}
+</code></pre>
+
+<p>Một ví dụ phức tạp hơn (biên dịch được từ Go 1.21):</p>
+
+<pre><code class="language-Go">type Getter[T any] interface {
+	Get() T
+}
+
+type Age[T uint8 | int16] struct {
+	n T
+}
+
+func (a Age[T]) Get() T {
+	return a.n
+}
+
+func doSomething[T any](g Getter[T]) T {
+	return g.Get()
+}
+
+// Hai dòng này chỉ biên dịch được từ Go 1.21.
+var _ = doSomething(Age[uint8]{255}) // error
+var _ = doSomething(Age[int16]{256}) // error
+
+// Trước Go 1.21, để hai dòng trên biên dịch được,
+// chúng phải được viết như sau:
+var _ = doSomething[uint8](Age[uint8]{255})
+var _ = doSomething[int16](Age[int16]{256})
+</code></pre>
+
+<p>Cuốn sách không giải thích các cơ chế chi tiết liên quan đến quá trình suy luận.
+Hãy đọc <a href="https://go.dev/ref/spec#Type_inference">Go specification</a> và <a href="https://go.dev/blog/type-inference">bài blog này</a> để biết chi tiết về việc suy luận type argument.</p>
+
+<h2>Suy luận type argument không hoạt động với generic type instantiation</h2>
+
+<p>Hiện tại (Go 1.25), việc suy luận type argument của type đã được instantiation từ value literal chưa được hỗ trợ.
+Điều đó có nghĩa là danh sách type argument của một generic type instantiation luôn phải ở dạng đầy đủ.</p>
+
+<p>Ví dụ, trong đoạn code sau, dòng declaration cho variable <code>y</code> không hợp lệ,
+dù có thể suy luận type argument là <code>int16</code>.</p>
+
+<pre><code class="language-Go">type Set[E comparable] map[E]bool
+
+// biên dịch được
+var x = Set[int16]{123: false, 789: true}
+
+// error: cannot use generic type without instantiation.
+var y = Set{int16(123): false, int16(789): true}
+</code></pre>
+
+<p>Một ví dụ khác:</p>
+
+<pre><code class="language-Go">import &quot;sync&quot;
+
+type Lockable[T any] struct {
+	sync.Mutex
+	Data T
+}
+
+// biên dịch được
+var a = Lockable[float64]{Data: 1.23}
+
+// error: cannot use generic type without instantiation
+var b = Lockable{Data: float64(1.23)} // error
+</code></pre>
+
+<p>Chưa rõ liệu <a href="https://github.com/golang/go/issues/50482">việc suy luận type argument
+cho generic type instantiation</a>
+có được hỗ trợ trong các version Go tương lai hay không.</p>
+
+<h2>Khác biệt giữa việc truyền type parameter và ordinary type làm type argument</h2>
+
+<p>Phần trên đã đề cập rằng,</p>
+
+<ul>
+<li>khi một ordinary type được dùng làm type argument, ordinary type đó
+chỉ cần <a href="555-type-constraints-and-parameters.html#implementation-vs-satisfaction">satisfy</a> constraint của
+type parameter tương ứng. Đây là thay đổi được thực hiện trong Go 1.20.</li>
+<li>khi một type parameter được dùng làm type argument, type parameter đó
+được yêu cầu phải <a href="555-type-constraints-and-parameters.html#type-sets-and-implementations">implement</a> constraint của type parameter tương ứng.</li>
+</ul>
+
+<p>Ví dụ, từ Go 1.20, mọi instantiation trong chương trình sau đều hợp lệ
+(chúng không hợp lệ trước Go 1.20).
+Không type argument nào trong số đó, dù tất cả đều là ordinary type,
+implement constraint <code>comparable</code>; tuy nhiên tất cả đều satisfy constraint đó.</p>
+
+<pre><code class="language-Go">package main
+
+type Base[T comparable] []T
+
+type _ Base[any]
+type _ Base[error]
+type _ Base[[2]any]
+type _ Base[struct{x any}]
+
+func Gf[T comparable](x T) {}
+
+var _ = Gf[any]
+var _ = Gf[error]
+var _ = Gf[[2]any]
+var _ = Gf[struct{x any}]
+
+func main() {
+	Gf[any](123)
+	Gf[error](nil)
+	Gf[[2]any]([2]any{})
+	Gf[struct{x any}](struct{x any}{})
+}
+</code></pre>
+
+<p>Mặt khác, mọi instantiation trong chương trình sau đều không hợp lệ.
+Tất cả type argument đều là type parameter, và không type argument nào implement
+constraint <code>comparable</code>, đó là lý do tất cả chúng đều là type argument không hợp lệ.</p>
+
+<pre><code class="language-Go">package main
+
+type Base[T comparable] []T
+
+func Gf[T comparable](x T) {}
+
+func vut[T any]() {
+	_ = Gf[T]     // T does not implement comparable
+	var _ Base[T] // T does not implement comparable
+}
+
+func law[T struct{x any}]() {
+	_ = Gf[T]     // T does not implement comparable
+	var _ Base[T] // T does not implement comparable
+}
+
+func pod[T [2]any]() {
+	_ = Gf[T]     // T does not implement comparable
+	var _ Base[T] // T does not implement comparable
+}
+
+func main() {}
+</code></pre>
+
+<p>Tất cả type argument được dùng trong chương trình sau đều hợp lệ.
+Tất cả chúng đều là type parameter và implement constraint <code>comparable</code>.</p>
+
+<pre><code class="language-Go">package main
+
+type Base[T comparable] []T
+
+func Gf[T comparable](x T) {}
+
+func vut[T comparable]() {
+	_ = Gf[T]
+	var _ Base[T]
+}
+
+func law[T struct{x int}]() {
+	_ = Gf[T]
+	var _ Base[T] 
+}
+
+func pod[T [2]string]() {
+	_ = Gf[T]
+	var _ Base[T]
+}
+
+func main() {}
+</code></pre>
+
+<h2>Thêm về type đã được instantiation</h2>
+
+<p>Vì một type đã được instantiation là một ordinary type,</p>
+
+<ul>
+<li>nó có thể được dùng làm union term nếu là một non-interface type.</li>
+<li>nó có thể được dùng làm union term nếu là một interface type không có method.</li>
+<li>nó có thể được dùng làm type constraint nếu là một interface type.</li>
+<li>nó có thể được embed trong struct type nếu satisfy
+<a href="https://go101.org/article/type-embedding.html">các yêu cầu đối với embedded field</a>.</li>
+</ul>
+
+<p>Các generic type declaration <code>C1</code> và <code>C2</code> trong code sau đều hợp lệ.</p>
+
+<pre><code class="language-Go">package main
+
+type Slice[T any] []T
+
+type C1[E any] interface {
+	Slice[E] // một ordinary type name
+}
+
+type C2[E any] interface {
+	[]E | Slice[E] // okay
+}
+
+func foo[E any, T C2[E]](x T) {}
+
+func main() {
+	var x Slice[bool]
+	var y Slice[string]
+	foo(x)
+	foo(y)
+}
+</code></pre>
+
+<p>Code sau cho thấy một declaration của ordinary struct type embedding hai instantiation của generic type <code>Set</code>.
+Để tránh các field name trùng nhau, một trong các embedded field
+sử dụng alias cho một instantiation của generic type.</p>
+
+<pre><code class="language-Go">package main
+
+type Set[T comparable] map[T]struct{}
+
+type Strings = Set[string]
+
+type MyData struct {
+	Set[int]
+	Strings
+}
+
+func main() {
+	var md = MyData {
+		Set:     Set[int]{},
+		Strings: Strings{},
+	}
+	md.Set[123] = struct{}{}
+	md.Strings[&quot;Go&quot;] = struct{}{}
+}
+</code></pre>
+
+<h2>Về sự không nhất quán trong syntax instantiation giữa custom generic và built-in generic</h2>
+
+<p>Từ các nội dung trước, chúng ta có thể thấy syntax instantiation của custom generic trong Go
+không nhất quán với built-in generic trong Go.</p>
+
+<pre><code class="language-Go">type TreeMap[K comparable, V any] struct {
+	// ... // triển khai nội bộ
+}
+
+func MyNew[T any]() *T {
+	return new(T)
+}
+
+// Cách viết của hai instantiation khác nhau.
+var _ map[string]int
+var _ TreeMap[string, int]
+
+// Cách viết của hai instantiation khác nhau.
+var _ = new(bool)
+var _ = MyNew[bool]()
+</code></pre>
+
+<p>Cá nhân tôi cho rằng sự không nhất quán này đáng tiếc và nó làm tăng gánh nặng nhận thức khi lập trình Go.
+Mặt khác, tôi thừa nhận rằng rất khó (hoặc thậm chí không thể) làm cho syntax nhất quán.
+Đáng tiếc là Go đã không hỗ trợ custom generic ngay từ đầu.</p>

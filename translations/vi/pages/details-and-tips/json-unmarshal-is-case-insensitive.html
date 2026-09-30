@@ -1,0 +1,29 @@
+
+<h1>Hàm <code>json.Unmarshal</code> chấp nhận việc khớp key của object không phân biệt chữ hoa chữ thường</h1>
+
+<p>Ví dụ, chương trình sau in ra <code>bar</code>, thay vì <code>foo</code>.</p>
+
+<pre><code class="language-Go">package main
+
+import (
+	&quot;encoding/json&quot;
+	&quot;fmt&quot;
+)
+
+type T struct {
+	HTML string `json:&quot;HTML&quot;`
+}
+
+var s = `{&quot;HTML&quot;: &quot;foo&quot;, &quot;html&quot;: &quot;bar&quot;}`
+
+func main() {
+	var t T
+	if err := json.Unmarshal([]byte(s), &amp;t); err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(t.HTML) // bar
+}
+</code></pre>
+
+<p>Tài liệu của hàm <code>json.Unmarshal</code> ghi rằng &quot;ưu tiên khớp chính xác nhưng cũng chấp nhận khớp không phân biệt chữ hoa chữ thường&quot;. Vì vậy, cá nhân tôi cho rằng đây là một bug trong implementation của hàm <code>json.Unmarshal</code>, nhưng Go core team <a href="https://github.com/golang/go/issues/14750">không nghĩ vậy</a>.</p>

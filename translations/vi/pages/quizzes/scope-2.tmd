@@ -1,0 +1,70 @@
+
+##### scope 2
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+var f = func(x int) {}
+
+func Bar() {
+	f := func(x int) {
+		if x >= 0 {
+			print(x)
+			f(x - 1)
+		}
+	}
+	f(2)
+}
+
+func Foo() {
+	f = func(x int) {
+		if x >= 0 {
+			print(x)
+			f(x - 1)
+		}
+	}
+	f(2)
+}
+
+func main() {
+	Bar()
+	print(" | ")
+	Foo()
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+2 | 2
+2 | 210
+210 | 2
+210 | 210
+"""
+
+@@@ #answer
+{
+Đáp án: 2 | 210
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/eOaoWXNUKJ2 __.
+
+Các điểm chính:
+*
+   Trong hàm `Bar`, `f` thứ hai (là `f` trong lời gọi `f(x - 1)`) là `f` cấp package.
+*
+   Trong hàm `Foo`, cả ba `f` đều là `f` cấp package.
+
+
+
+Hãy đọc __ code block và scope của identifier`` https://go101.org/article/blocks-and-scopes.html __ để biết phần giải thích chi tiết hơn.
+
+
+
+}

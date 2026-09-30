@@ -1,0 +1,268 @@
+<p id="f-1-pointer-md"></p>
+<h1>Pointer</h1>
+
+<h2>Tránh các phép kiểm tra pointer nil của array không cần thiết trong loop</h2>
+
+<p>Có một số thiếu sót trong implementation hiện tại của Go compiler tiêu chuẩn chính thức (v1.24.n).
+Một trong số đó là <a href="https://github.com/golang/go/issues/41666">một số phép kiểm tra pointer nil của array không được đưa ra ngoài loop</a>.
+Đây là một ví dụ cho thấy thiếu sót này.</p>
+
+<pre><code class="language-Go">// unnecessary-checks.go
+package pointers
+
+import &quot;testing&quot;
+
+const N = 1000
+var a [N]int
+
+//go:noinline
+func g0(a *[N]int) {
+	for i := range a {
+		a[i] = i // line 12
+	}
+}
+
+//go:noinline
+func g1(a *[N]int) {
+	_ = *a // line 18
+	for i := range a {
+		a[i] = i // line 20
+	}
+}
+
+func Benchmark_g0(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ { g0(&amp;a) }
+}
+
+func Benchmark_g1(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ { g1(&amp;a) }
+}
+</code></pre>
+
+<p>Hãy chạy benchmark với tùy chọn compiler <code>-S</code>; các output sau đây thu được (đã lược bỏ những phần text không đáng chú ý):</p>
+
+<pre><code>$ go test -bench=. -gcflags=-S unnecessary-checks.go
+...
+0x0004 00004 (unnecessary-checks.go:12)	TESTB	AL, (AX)
+0x0006 00006 (unnecessary-checks.go:12)	MOVQ	CX, (AX)(CX*8)
+...
+0x0000 00000 (unnecessary-checks.go:18)	TESTB	AL, (AX)
+0x0002 00002 (unnecessary-checks.go:18)	XORL	CX, CX
+0x0004 00004 (unnecessary-checks.go:19)	JMP	13
+0x0006 00006 (unnecessary-checks.go:20)	MOVQ	CX, (AX)(CX*8)
+...
+Benchmark_g0-4  494.8 ns/op
+Benchmark_g1-4  399.3 ns/op
+</code></pre>
+
+<p>Từ các output, có thể thấy implementation <code>g1</code> có performance tốt hơn implementation <code>g0</code>,
+ngay cả khi implementation <code>g1</code> có thêm một dòng code (line 18).
+Tại sao? Câu hỏi này được giải đáp bởi các assembly instruction được output.</p>
+
+<p>Trong implementation <code>g0</code>, instruction <code>TESTB</code> được generate bên trong loop, còn trong implementation <code>g1</code>, instruction <code>TESTB</code> được generate bên ngoài loop.
+Instruction <code>TESTB</code> được dùng để kiểm tra argument <code>a</code> có phải là một pointer nil hay không.
+Với trường hợp cụ thể này, kiểm tra một lần là đủ.
+Dòng code thêm đó tránh được thiếu sót trong implementation của compiler.</p>
+
+<p>Có một implementation thứ ba có performance tương đương implementation <code>g1</code>.
+Implementation thứ ba dùng một slice được tạo từ argument array pointer.</p>
+
+<pre><code class="language-Go">//go:noinline
+func g2(x *[N]int) {
+	a := x[:]
+	for i := range a {
+		a[i] = i
+	}
+}
+</code></pre>
+
+<p>Lưu ý rằng thiếu sót này có thể được sửa trong các version compiler tương lai.</p>
+
+<p>Cũng lưu ý rằng nếu ba function implementation có thể được inline, kết quả benchmark sẽ thay đổi đáng kể.
+Đó là lý do các compiler directive <code>//go:noinline</code> được sử dụng ở đây.
+(Trước Go toolchain v1.18, các compiler directive <code>//go:noinline</code> thực sự không cần thiết ở đây.
+Vì Go toolchain v1.18 trở về trước không bao giờ inline một function có loop <code>for-range</code>.)</p>
+
+<h3>Trường hợp array pointer là một struct field</h3>
+
+<p>Đối với các trường hợp array pointer là một struct field, mọi thứ phức tạp hơn một chút.
+Dòng <code>_ = *t.a</code> trong code sau đây không có tác dụng trong việc tránh thiếu sót của compiler.
+Ví dụ, chênh lệch performance giữa function <code>f1</code> và function <code>f0</code> là nhỏ.
+(Thực tế, function <code>f1</code> thậm chí có thể chậm hơn, nếu một instruction <code>NOP</code> được generate bên trong loop của nó.)</p>
+
+<pre><code class="language-Go">type T struct {
+	a *[N]int
+}
+
+//go:noinline
+func f0(t *T) {
+	for i := range t.a {
+		t.a[i] = i
+	}
+}
+
+//go:noinline
+func f1(t *T) {
+	_ = *t.a
+	for i := range t.a {
+		t.a[i] = i
+	}
+}
+</code></pre>
+
+<p>Để đưa các phép kiểm tra pointer nil của array ra ngoài loop, nên copy field <code>t.a</code> vào một local variable, sau đó áp dụng mẹo được giới thiệu ở trên:</p>
+
+<pre><code class="language-Go">//go:noinline
+func f3(t *T) {
+	a := t.a
+	_ = *a
+	for i := range a {
+		a[i] = i
+	}
+}
+</code></pre>
+
+<p>Hoặc đơn giản tạo một slice từ array pointer field:</p>
+
+<pre><code class="language-Go">//go:noinline
+func f4(t *T) {
+	a := t.a[:]
+	for i := range a {
+		a[i] = i
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_f0-4  622.9 ns/op
+Benchmark_f1-4  637.4 ns/op
+Benchmark_f2-4  511.3 ns/op
+Benchmark_f3-4  390.1 ns/op
+Benchmark_f4-4  387.6 ns/op
+</code></pre>
+
+<p>Kết quả xác nhận các kết luận trước đó.</p>
+
+<p>Lưu ý, function <code>f2</code> được nhắc đến trong kết quả benchmark được khai báo như sau</p>
+
+<pre><code class="language-Go">//go:noinline
+func f2(t *T) {
+	a := t.a
+	for i := range a {
+		a[i] = i
+	}
+}
+</code></pre>
+
+<p>Implementation <code>f2</code> không nhanh bằng implementation <code>f3</code> và <code>f4</code>, nhưng nhanh hơn implementation <code>f0</code> và <code>f1</code>. Tuy nhiên, đó là <a href="2-struct.html#avoid-accessing-fields-in-loops">một câu chuyện khác</a>.</p>
+
+<p>Nếu các element của array pointer field không bị sửa đổi (chỉ được đọc) trong loop, cách <code>f1</code> có performance tương đương cách <code>f3</code> và <code>f4</code>.</p>
+
+<p>Theo quan điểm cá nhân, trong hầu hết trường hợp, nên thử dùng cách slice (cách <code>f4</code>) để đạt performance tốt nhất,
+vì nhìn chung slice được Go compiler tiêu chuẩn chính thức optimize tốt hơn array.</p>
+
+<h2 id="avoid-unnecessary-dereferences">Tránh dereference pointer không cần thiết trong loop</h2>
+
+<p>Đôi khi, Go compiler tiêu chuẩn chính thức hiện tại (v1.24.n) <a href="https://github.com/golang/go/issues/49785">chưa đủ thông minh để generate assembly instruction theo cách được optimize tốt nhất</a>. Phải viết code theo một cách khác để đạt performance tốt nhất. Ví dụ, trong code sau đây, function <code>f</code> có performance kém hơn nhiều so với function <code>g</code>.</p>
+
+<pre><code class="language-Go">// avoid-indirects_test.go
+package pointers
+
+import &quot;testing&quot;
+
+//go:noinline
+func f(sum *int, s []int) {
+	for _, v := range s { // line 8
+		*sum += v // line 9
+	}
+}
+
+//go:noinline
+func g(sum *int, s []int) {
+	var n = *sum
+	for _, v := range s { // line 16
+		n += v // line 17
+	}
+	*sum = n
+}
+
+var s = make([]int, 1024)
+var r int
+
+func Benchmark_f(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		f(&amp;r, s)
+	}
+}
+
+func Benchmark_g(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		g(&amp;r, s)
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark (đã lược bỏ những phần text không đáng chú ý):</p>
+
+<pre><code>$ go test -bench=. -gcflags=-S avoid-indirects_test.go
+...
+0x0009 00009 (avoid-indirects_test.go:9)	MOVQ	(AX), SI
+0x000c 00012 (avoid-indirects_test.go:9)	ADDQ	(BX)(DX*8), SI
+0x0010 00016 (avoid-indirects_test.go:9)	MOVQ	SI, (AX)
+0x0013 00019 (avoid-indirects_test.go:8)	INCQ	DX
+0x0016 00022 (avoid-indirects_test.go:8)	CMPQ	CX, DX
+0x0019 00025 (avoid-indirects_test.go:8)	JGT	9
+...
+0x000b 00011 (avoid-indirects_test.go:16)	MOVQ	(BX)(DX*8), DI
+0x000f 00015 (avoid-indirects_test.go:16)	INCQ	DX
+0x0012 00018 (avoid-indirects_test.go:17)	ADDQ	DI, SI
+0x0015 00021 (avoid-indirects_test.go:16)	CMPQ	CX, DX
+0x0018 00024 (avoid-indirects_test.go:16)	JGT	11
+...
+Benchmark_f-4  3024 ns/op
+Benchmark_g-4   566.6 ns/op
+</code></pre>
+
+<p>Các assembly instruction được output cho thấy pointer <code>sum</code> được dereference bên trong loop trong function <code>f</code>.
+Một phép dereference là một memory operation.
+Đối với function <code>g</code>, các phép dereference xảy ra bên ngoài loop, và các instruction được generate cho loop chỉ xử lý register.
+Việc để CPU instruction xử lý register nhanh hơn nhiều so với xử lý memory là lý do function <code>g</code> có performance tốt hơn nhiều so với function <code>f</code>.</p>
+
+<p>Đây không phải là một thiếu sót của compiler. Thực tế, function <code>f</code> và <code>g</code> không tương đương
+(mặc dù trong hầu hết use case thực tế, kết quả của chúng giống nhau).
+Ví dụ, nếu chúng được gọi như trong code sau đây, chúng sẽ trả về các kết quả khác nhau
+(cảm ơn skeeto@reddit vì đã <a href="https://old.reddit.com/r/golang/comments/uy7weh/use_go_pointer_efficiently_in_some_cases/ia39qwk/">đưa ra sự sửa chữa này</a>).</p>
+
+<pre><code class="language-Go">{
+	var s = []int{1, 1, 1}
+	var sum = &amp;s[2]
+	f(sum, s)
+	println(*sum) // 6
+}
+{
+	var s = []int{1, 1, 1}
+	var sum = &amp;s[2]
+	g(sum, s)
+	println(*sum) // 4
+}
+</code></pre>
+
+<p>Một implementation khác có performance tốt cho trường hợp cụ thể này là đưa pointer parameter ra ngoài function body
+(một lần nữa, nó không hoàn toàn tương đương với function <code>f</code> hoặc <code>g</code>):</p>
+
+<pre><code class="language-Go">//go:noinline
+func h(s []int) int {
+	var n = 0
+	for _, v := range s {
+		n += v
+	}
+	return n
+}
+
+func use_h(s []int) {
+	var sum = new(int)
+	*sum += h(s)
+	...
+}
+</code></pre>

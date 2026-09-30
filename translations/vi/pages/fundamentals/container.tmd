@@ -1,0 +1,2389 @@
+### Array, Slice và Map trong Go
+
+Nói chính xác, trong Go có ba loại container type là công dân hạng nhất:
+array, slice và map.
+Đôi khi, string và channel cũng có thể được xem là container type,
+nhưng bài viết này không đề cập đến hai loại type đó.
+Tất cả container type được nói đến trong bài viết này là
+array, slice và map.
+
+Go có rất nhiều chi tiết liên quan đến container.
+Bài viết này sẽ lần lượt liệt kê chúng.
+
+###=========== Tổng quan đơn giản về Container Type và Value
+
+Mỗi value thuộc một trong ba loại type này được dùng để
+lưu một tập hợp các element value.
+Type của tất cả element được lưu trong một container value là giống nhau.
+Type giống nhau đó được gọi là element type của
+(container type của) container value.
+
+Mỗi element trong một container có một key tương ứng.
+Có thể truy cập hoặc sửa một element value thông qua key tương ứng của nó.
+Key type của map type phải là __comparable type__.
+Key type của array type và slice type đều là built-in type `int`.
+Key của các element trong array hoặc slice là các số nguyên không âm,
+đánh dấu vị trí của những element này trong array hoặc slice.
+Các key số nguyên không âm thường được gọi là index.
+
+    === comparable type :: type-system-overview.tmd#types-not-support-comparison
+
+Mỗi container value có một property length,
+cho biết có bao nhiêu element được lưu trong container đó.
+Range hợp lệ của các key số nguyên của một array value hoặc slice value
+từ zero (bao gồm) đến length (không bao gồm) của array hoặc slice.
+Đối với mỗi map value, các key value của map value đó
+có thể là một value bất kỳ thuộc key type của map type.
+
+Ba loại container type này cũng có nhiều điểm khác nhau.
+Phần lớn khác biệt bắt nguồn từ sự khác nhau giữa
+value memory layout của ba loại type này.
+Từ bài viết trước, __value parts__,
+ta biết rằng một array value chỉ gồm một direct part,
+trong khi một slice hoặc map value có thể có một underlying part,
+được direct part của slice hoặc map value tham chiếu.
+
+    === value parts :: value-part.tmd
+
+Các element của array hoặc slice đều được lưu
+liên tiếp trong một memory segment liên tục.
+Đối với array, memory segment liên tục đó
+chứa direct part của array.
+Đối với slice, memory segment liên tục đó
+chứa underlying indirect part của slice.
+Implementation map của Go compiler/runtime chuẩn
+dùng thuật toán hashtable.
+Vì vậy, tất cả element của một map cũng được lưu trong một memory segment
+liên tục bên dưới, nhưng chúng có thể không liền kề nhau.
+Có thể có nhiều lỗ (khoảng trống) bên trong memory segment liên tục đó.
+Một thuật toán map phổ biến khác là thuật toán binary tree.
+Bất kể dùng thuật toán nào, các key liên kết với element của map
+cũng được lưu trong (các underlying part của) map.
+
+Ta có thể truy cập một element thông qua key của nó.
+Time complexity của việc truy cập element trên mọi container value
+đều là // `O(1)` //,
+dù nhìn chung việc truy cập element của map chậm hơn vài lần
+so với việc truy cập element của array và slice.
+Nhưng map có hai ưu điểm so với array và slice:
+*
+   key type của map có thể là bất kỳ comparable type nào.
+*
+   map tiêu thụ ít memory hơn nhiều so với array và slice
+   nếu phần lớn element là zero value.
+
+Từ bài viết trước, ta biết rằng underlying part của một value
+sẽ không bị copy khi value được copy.
+Nói cách khác, nếu một value có underlying part,
+bản copy của value sẽ dùng chung underlying part với value đó.
+Đây là nguyên nhân gốc rễ của nhiều khác biệt về behavior
+giữa array value và slice/map value.
+Những khác biệt behavior này sẽ được giới thiệu bên dưới.
+
+###=========== Biểu diễn Literal của Unnamed Container Type
+
+Biểu diễn literal của ba loại unnamed container type:
+*  array type: `[N]T`
+*  slice type: `[]T`
+*  map type: `map[K]T`
+   trong đó
+*
+   `T` là một type bất kỳ.
+   Nó chỉ định element type của container type.
+   Chỉ những value thuộc element type được chỉ định
+   mới có thể được lưu làm element value của các value thuộc container type.
+*
+   `N` phải là một integer constant không âm.
+   Nó chỉ định số element được lưu trong mọi value của array type,
+   và có thể được gọi là length của array type.
+   Điều này có nghĩa là length của array type là phần vốn có của array type.
+   Ví dụ, `[5]int` và `[8]int`
+   là hai array type khác nhau.
+*
+   `K` là một comparable type bất kỳ.
+   Nó chỉ định key type của map type.
+   Hầu hết type trong Go đều comparable, các incomparable type được __liệt kê ở đây__.
+
+    === liệt kê ở đây :: type-system-overview.tmd#types-not-support-comparison
+
+Sau đây là một số ví dụ về biểu diễn literal của container type:
+@@@ .line-numbers;must-line-numbers
+''' go
+const Size = 32
+
+type Person struct {
+	name string
+	age  int
+}
+
+/* Array types */
+
+[5]string
+[Size]int
+// Element type là slice type: []byte
+[16][]byte
+// Element type là struct type: Person
+[100]Person
+
+/* Slice types */
+
+[]bool
+[]int64
+// Element type là map type: map[int]bool
+[]map[int]bool
+// Element type là pointer type: *int
+[]*int
+
+/* Map types */
+
+map[string]int
+map[int]bool
+// Element type là array type: [6]string
+map[int16][6]string
+// Element type là slice type: []string
+map[bool][]string
+// Element type là pointer type: *int8,
+// và key type là struct type.
+map[struct{x int}]*int8
+'''
+
+Kích thước (__sizes__) của mọi slice type là giống nhau.
+Kích thước của mọi map type cũng giống nhau.
+Kích thước của một array type phụ thuộc vào length của nó và kích thước của element type.
+Kích thước của array type có length zero hoặc array type
+có element type với kích thước zero là zero.
+
+    === sizes :: type-system-overview.tmd#value-size
+
+@@@ #value-literals
+###=========== Container Value Literal
+
+Giống như struct value, container value cũng có thể được biểu diễn
+bằng composite literal, `T{...}`, trong đó `T` biểu thị container type
+(ngoại trừ zero value của slice type và map type).
+Sau đây là một số ví dụ:
+@@@ .line-numbers
+''' go
+// Một array value chứa bốn bool value.
+[4]bool{false, true, true, false}
+
+// Một slice value chứa ba word.
+[]string{"break", "continue", "fallthrough"}
+
+// Một map value chứa một số key-value pair.
+map[string]int{"C": 1972, "Python": 1991, "Go": 2009}
+'''
+
+Mỗi cặp key-element nằm giữa hai dấu ngoặc nhọn của map composite literal
+cũng được gọi là một entry.
+
+Có một số biến thể của array composite literal và slice composite literal:
+@@@ .line-numbers
+''' go
+
+// Các slice composite literal sau
+// tương đương với nhau.
+[]string{"break", "continue", "fallthrough"}
+[]string{0: "break", 1: "continue", 2: "fallthrough"}
+[]string{2: "fallthrough", 1: "continue", 0: "break"}
+[]string{2: "fallthrough", 0: "break", "continue"}
+
+// Các array composite literal sau
+// tương đương với nhau.
+[4]bool{false, true, true, false}
+[4]bool{0: false, 1: true, 2: true, 3: false}
+[4]bool{1: true, true}
+[4]bool{2: true, 1: true}
+[...]bool{false, true, true, false}
+[...]bool{3: false, 1: true, true}
+'''
+
+Trong hai literal cuối, các `...` có nghĩa là ta muốn compiler
+suy ra length cho các array value tương ứng.
+
+{ %%
+Element value trong một container composite literal phải assignable
+cho container element type tương ứng.
+Key value trong một container composite literal phải assignable
+cho map key type tương ứng.
+}
+
+Từ các ví dụ trên, ta biết rằng index (key) của element là tùy chọn
+trong array composite literal và slice composite literal. Trong array composite literal
+hoặc slice composite literal,
+*
+   nếu có index,
+   index đó không cần là một typed value thuộc key type `int`,
+   nhưng phải là một constant không âm có thể biểu diễn dưới dạng value của type `int`.
+   Và nếu index có type, type của nó phải là __basic integer type__.
+*
+   **element không có index sẽ dùng index của element trước đó cộng một làm index của nó.**
+*
+   nếu element đầu tiên không có index, index của nó là zero.
+
+    === basic integer type :: basic-types-and-value-literals.tmd#overview
+
+Key của các entry trong map literal không được vắng mặt, và chúng có thể là non-constant.
+
+@@@ .line-numbers
+''' go
+var a uint = 1
+var _ = map[uint]int {a : 123} // hợp lệ
+
+// Hai dòng sau không biên dịch được,
+// vì "a" không phải là key/index constant.
+var _ = []int{a: 100}  // lỗi
+var _ = [5]int{a: 100} // lỗi
+'''
+
+Các key constant trong một composite literal cụ thể __không thể trùng lặp__.
+
+    === không thể trùng lặp :: details.tmd#constant-keys-in-composite-literals
+
+###=========== Biểu diễn Literal của Zero Value của Container Type
+
+Giống như struct, zero value của một array type `A` có thể được biểu diễn
+bằng composite literal `A{}`.
+Ví dụ, zero value của type `[100]int`
+có thể được biểu diễn là `[100]int{}`.
+Tất cả element được lưu trong zero value của một array type
+đều là zero value của element type của array type đó.
+
+Giống như pointer type, zero value của mọi slice type và map type được biểu diễn
+bằng predeclared `nil`.
+
+BTW, còn có một số loại type khác mà zero value cũng được biểu diễn bằng `nil`,
+bao gồm function, channel và interface type sẽ được giới thiệu sau.
+
+Khi một array variable được khai báo mà không chỉ định initial value,
+memory đã được allocate cho các element của zero array value.
+Memory cho các element của nil slice value hoặc map value vẫn chưa được allocate.
+
+Xin lưu ý, `[]T{}` biểu diễn một blank slice value (có zero element)
+thuộc slice type `[]T`, nó khác với `[]T(nil)`.
+Tình huống tương tự xảy ra với `map[K]T{}` và `map[K]T(nil)`.
+
+@@@ #take-composite-literal-address
+###=========== Composite Literal Không Addressable nhưng Có Thể Lấy Address
+
+Trước đây ta đã biết __có thể lấy address trực tiếp
+của struct composite literal__.
+Container composite literal cũng không có ngoại lệ ở đây.
+
+    === struct composite literals ... :: struct.tmd#take-composite-literal-address
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	pm := &map[string]int{"C": 1972, "Go": 2009}
+	ps := &[]string{"break", "continue"}
+	pa := &[...]bool{false, true, true, false}
+	fmt.Printf("%T\n", pm) // *map[string]int
+	fmt.Printf("%T\n", ps) // *[]string
+	fmt.Printf("%T\n", pa) // *[4]bool
+}
+'''
+
+@@@ #composite-literal-simplification
+###=========== Nested Composite Literal Có Thể Được Đơn Giản Hóa
+
+Nếu một composite literal lồng nhiều composite literal khác,
+thì các composite literal lồng bên trong đó có thể được đơn giản hóa thành dạng `{...}`.
+
+Ví dụ, slice value literal
+
+@@@ .line-numbers
+''' go
+
+// Một slice value có type mà element type là
+// *[4]byte. Element type là pointer type
+// có base type là [4]byte. Base type là
+// array type có element type là "byte".
+var heads = []*[4]byte{
+	&[4]byte{'P', 'N', 'G', ' '},
+	&[4]byte{'G', 'I', 'F', ' '},
+	&[4]byte{'J', 'P', 'E', 'G'},
+}
+'''
+
+có thể được đơn giản hóa thành
+
+@@@ .line-numbers
+''' go
+var heads = []*[4]byte{
+	{'P', 'N', 'G', ' '},
+	{'G', 'I', 'F', ' '},
+	{'J', 'P', 'E', 'G'},
+}
+'''
+
+Array value literal trong ví dụ sau
+@@@ .line-numbers
+''' go
+type language struct {
+	name string
+	year int
+}
+
+var _ = [...]language{
+	language{"C", 1972},
+	language{"Python", 1991},
+	language{"Go", 2009},
+}
+'''
+
+có thể được đơn giản hóa thành
+
+@@@ .line-numbers
+''' go
+var _ = [...]language{
+	{"C", 1972},
+	{"Python", 1991},
+	{"Go", 2009},
+}
+'''
+
+Và map value literal trong ví dụ sau
+@@@ .line-numbers
+''' go
+type LangCategory struct {
+	dynamic bool
+	strong  bool
+}
+
+// Một value thuộc map type có key type là
+// struct type và element type
+// là một map type khác "map[string]int".
+var _ = map[LangCategory]map[string]int{
+	LangCategory{true, true}: map[string]int{
+		"Python": 1991,
+		"Erlang": 1986,
+	},
+	LangCategory{true, false}: map[string]int{
+		"JavaScript": 1995,
+	},
+	LangCategory{false, true}: map[string]int{
+		"Go":   2009,
+		"Rust": 2010,
+	},
+	LangCategory{false, false}: map[string]int{
+		"C": 1972,
+	},
+}
+'''
+
+có thể được đơn giản hóa thành
+
+@@@ .line-numbers
+''' go
+var _ = map[LangCategory]map[string]int{
+	{true, true}: {
+		"Python": 1991,
+		"Erlang": 1986,
+	},
+	{true, false}: {
+		"JavaScript": 1995,
+	},
+	{false, true}: {
+		"Go":   2009,
+		"Rust": 2010,
+	},
+	{false, false}: {
+		"C": 1972,
+	},
+}
+'''
+
+Xin lưu ý, trong một số ví dụ trên, dấu phẩy sau item cuối cùng
+trong mỗi composite literal không thể được bỏ qua.
+Vui lòng đọc __các quy tắc xuống dòng trong Go__ để biết thêm thông tin sau.
+
+    === các quy tắc xuống dòng trong Go :: line-break-rules.tmd
+
+@@@ #comparison
+###=========== So sánh Container Value
+
+Như đã được đề cập trong bài viết __tổng quan về
+Go type system__, map type và slice type là incomparable type.
+Vì vậy map type và slice type không thể được dùng làm map key type.
+
+    === tổng quan về Go type system :: type-system-overview.tmd#types-not-support-comparison
+
+Mặc dù slice value hoặc map value không thể được so sánh với slice value hoặc map value khác
+(hoặc với chính nó), nó có thể được so sánh với identifier `nil` untyped trần
+để kiểm tra slice value hoặc map value đó có phải là zero value hay không.
+
+Hầu hết array type đều comparable,
+ngoại trừ những array type có element type là incomparable type.
+
+Khi so sánh hai array value, từng cặp element tương ứng sẽ được so sánh.
+Ta có thể hình dung các cặp element được so sánh theo thứ tự index.
+Hai array value bằng nhau chỉ khi tất cả element tương ứng của chúng bằng nhau.
+Việc so sánh dừng sớm khi tìm thấy một cặp element không bằng nhau hoặc __một panic xảy ra__.
+
+    === một panic xảy ra :: interface.tmd#comparison
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a [16]byte
+	var s []int
+	var m map[string]int
+
+	fmt.Println(a == a)   // true
+	fmt.Println(m == nil) // true
+	fmt.Println(s == nil) // true
+	fmt.Println(nil == map[string]int{}) // false
+	fmt.Println(nil == []int{})          // false
+
+	// Các dòng sau không biên dịch được.
+	/*
+	_ = m == m
+	_ = s == s
+	_ = m == map[string]int(nil)
+	_ = s == []int(nil)
+	var x [16][]int
+	_ = x == x
+	var y [16]map[int]bool
+	_ = y == y
+	*/
+}
+'''
+
+@@@ #cap-len
+###=========== Kiểm tra Length và Capacity của Container Value
+
+Bên cạnh property length, mỗi container value còn có property capacity.
+Capacity của một array luôn bằng length của array.
+Capacity của một map non-nil có thể được xem là không giới hạn.
+Vì vậy, trên thực tế, chỉ capacity của slice value mới có ý nghĩa.
+Capacity của một slice luôn bằng hoặc lớn hơn length của slice.
+Ý nghĩa của slice capacity sẽ được giải thích trong section sau section kế tiếp.
+
+Ta có thể dùng built-in function `len` để lấy length của
+container value, và dùng built-in function `cap`
+để lấy capacity của container value.
+Mỗi function trong hai function này trả về một result có type `int`
+hoặc một result untyped có default type là `int`,
+tùy thuộc vào argument được truyền vào có phải là constant expression hay không.
+Vì capacity của mọi map value là không giới hạn,
+built-in function `cap` không áp dụng cho map value.
+
+Length và capacity của một array value không bao giờ thay đổi.
+Length và capacity của mọi value thuộc một array type luôn bằng length của array type.
+Length và capacity của một slice value có thể thay đổi lúc runtime.
+Vì vậy slice có thể được xem là dynamic array.
+Slice linh hoạt hơn nhiều so với array
+và được dùng phổ biến hơn array trên thực tế.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a [5]int
+	fmt.Println(len(a), cap(a)) // 5 5
+	var s []int
+	fmt.Println(len(s), cap(s)) // 0 0
+	s, s2 := []int{2, 3, 5}, []bool{}
+	fmt.Println(len(s), cap(s))   // 3 3
+	fmt.Println(len(s2), cap(s2)) // 0 0
+	var m map[int]bool
+	fmt.Println(len(m)) // 0
+	m, m2 := map[int]bool{1: true, 0: false}, map[int]int{}
+	fmt.Println(len(m), len(m2)) // 2 0
+}
+'''
+
+Length và capacity của mỗi slice value được nêu trong ví dụ cụ thể trên là bằng nhau.
+Điều này không đúng với mọi slice value.
+Trong các section sau, ta sẽ dùng một số slice
+có length và capacity tương ứng không bằng nhau.
+
+@@@ #element-access
+###=========== Lấy và Sửa Container Element
+
+Element liên kết với key `k` được lưu trong container value
+`v` được biểu diễn bằng form syntax indexing element `v[k]`.
+
+Với một cách dùng `v[k]`, giả sử `v` là array hoặc slice,
+*
+   nếu `k` là constant, thì nó phải thỏa mãn __các yêu cầu được mô tả ở trên__
+   đối với index trong container composite literal.
+   Ngoài ra, nếu `v` là array,
+   `k` phải nhỏ hơn length của array.
+*
+   nếu `k` là một non-constant value, nó phải là value thuộc một basic integer type bất kỳ.
+   Ngoài ra, nó phải lớn hơn hoặc bằng zero và nhỏ hơn `len(v)`,
+   nếu không sẽ xảy ra panic lúc runtime.
+*
+   nếu `v` là nil slice,
+   sẽ xảy ra panic lúc runtime.
+
+    === các yêu cầu được mô tả ở trên :: #value-literals
+
+Với một cách dùng `v[k]`, giả sử `v` là map,
+thì `k` phải assignable cho các value của element type của map type, và
+*
+   nếu `k` là một interface value có dynamic type là incomparable,
+   sẽ xảy ra panic lúc runtime.
+*
+   nếu `v[k]` được dùng làm destination value trong một assignment và `v` là nil map,
+   sẽ xảy ra panic lúc runtime.
+*
+   nếu `v[k]` được dùng để lấy element value tương ứng với key `k` trong map `v`,
+   sẽ không xảy ra panic, ngay cả khi `v` là nil map.
+   (Giả sử việc evaluate `k` không gây panic.)
+*
+   nếu `v[k]` được dùng để lấy element value tương ứng với key `k` trong map `v`,
+   và map `v` không chứa entry có key `k`, `v[k]` cho ra zero value
+   của element type thuộc map type tương ứng của `v`.
+   Nói chung, `v[k]` được xem là một single-value expression.
+   Tuy nhiên, khi `v[k]` được dùng làm source value expression duy nhất trong một assignment,
+   nó có thể được xem là một multi-value expression và cho ra một optional untyped boolean value thứ hai,
+   cho biết map `v` có chứa entry có key `k` hay không.
+
+Ví dụ về việc truy cập và sửa container element:
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := [3]int{-1, 0, 1}
+	s := []bool{true, false}
+	m := map[string]int{"abc": 123, "xyz": 789}
+	fmt.Println (a[2], s[1], m["abc"])    // lấy
+	a[2], s[1], m["abc"] = 999, true, 567 // sửa
+	fmt.Println (a[2], s[1], m["abc"])    // lấy
+
+	n, present := m["hello"]
+	fmt.Println(n, present, m["hello"]) // 0 false 0
+	n, present = m["abc"]
+	fmt.Println(n, present, m["abc"]) // 567 true 567
+	m = nil
+	fmt.Println(m["abc"]) // 0
+
+	// Hai dòng sau không biên dịch được.
+	/*
+	_ = a[3]  // index 3 vượt giới hạn
+	_ = s[-1] // index phải không âm
+	*/
+
+	// Mỗi dòng sau đều có thể gây panic.
+	_ = a[n]         // panic: index nằm ngoài range
+	_ = s[n]         // panic: index nằm ngoài range
+	m["hello"] = 555 // panic: assign vào entry trong nil map
+}
+'''
+
+###=========== Nhắc lại Định nghĩa Cấu trúc Nội bộ của Slice Type
+
+Để hiểu slice type và slice value rõ hơn và giải thích về slice dễ hơn,
+ta cần có hình dung về cấu trúc nội bộ của slice type.
+Từ bài viết trước, __value parts__,
+ta biết rằng cấu trúc nội bộ của slice type
+được Go compiler/runtime chuẩn định nghĩa như sau:
+@@@ .line-numbers;must-line-numbers
+''' go
+type _slice struct {
+	elements unsafe.Pointer // tham chiếu các element bên dưới
+	len      int            // length
+	cap      int            // capacity
+}
+'''
+
+    === value parts :: value-part.tmd
+
+Các định nghĩa cấu trúc nội bộ được các compiler/runtime khác sử dụng
+có thể không hoàn toàn giống nhau nhưng sẽ tương tự.
+Các giải thích sau đây dựa trên slice implementation chính thức.
+
+Cấu trúc nội bộ được trình bày ở trên giải thích memory layout
+của direct part trong slice value.
+Field `len` của direct part của một slice cho biết length của slice,
+và field `cap` cho biết capacity của slice.
+Hình sau mô tả một memory layout khả dĩ của một slice value.
+
+{ ><
+&& res/slice-internal.png
+}
+
+Mặc dù memory segment bên dưới chứa các element của một slice
+có thể rất lớn, slice chỉ có thể biết một sub-segment của memory segment đó.
+Ví dụ, trong hình trên, slice chỉ biết sub-segment màu xám ở giữa
+của toàn bộ memory segment.
+
+Đối với slice được mô tả trong hình trên, các element từ
+index `len` đến index `cap` (không bao gồm)
+không thuộc về các element của slice.
+Chúng chỉ là một số element slot dư thừa của slice được mô tả,
+nhưng chúng có thể là element hiệu lực của slice khác hoặc array khác.
+
+Section tiếp theo sẽ giải thích cách append element vào một base slice và tạo ra
+một slice mới bằng built-in function `append`.
+Result slice của một function call `append` có thể dùng chung
+các element đầu với base slice hoặc không, tùy thuộc vào capacity (và length)
+của base slice và số element được append.
+
+Khi slice được dùng làm base slice trong một function call `append`,
+*
+   nếu số element được append lớn hơn số element slot dư thừa của base slice,
+   một memory segment mới bên dưới sẽ được allocate cho result slice,
+   do đó result slice và base slice sẽ không dùng chung element nào.
+*
+   nếu không, sẽ không allocate memory segment bên dưới mới
+   cho result slice, và các element của base slice cũng thuộc về các element của result slice.
+   Nói cách khác, hai slice dùng chung một số element và tất cả element của chúng
+   đều được chứa trong cùng một memory segment bên dưới.
+
+Section sau section kế tiếp sẽ cho thấy một hình mô tả cả hai
+trường hợp khả dĩ khi append slice element.
+
+Còn có nhiều cách khác khiến element của hai slice
+được chứa trong cùng một memory segment bên dưới.
+Chẳng hạn như assignment và các phép subslice sẽ được giới thiệu bên dưới.
+
+Lưu ý, nói chung ta không thể sửa riêng lẻ ba field của một slice value,
+ngoại trừ bằng reflection và unsafe.
+Nói cách khác, nói chung để sửa một slice value,
+phải sửa cả ba field của nó cùng nhau.
+Thông thường, điều này được thực hiện bằng cách assign một slice value khác
+(cùng slice type) cho slice cần được sửa.
+
+    === reflection :: #modify-slice-length-and-capacity
+    === unsafe :: unsafe.tmd
+
+@@@ #assignment
+###=========== Assignment Container
+
+Nếu một map được assign cho một map khác, hai map sẽ dùng chung
+tất cả element (bên dưới).
+Việc append element vào (hoặc delete element khỏi) một map
+sẽ được phản ánh ở map còn lại.
+
+Giống như map assignment, nếu một slice được assign cho một slice khác,
+chúng sẽ dùng chung tất cả element (bên dưới).
+Length và capacity tương ứng của chúng bằng nhau.
+Tuy nhiên, nếu length/capacity của một slice thay đổi về sau,
+thay đổi đó sẽ không được phản ánh ở slice còn lại.
+
+Khi một array được assign cho một array khác,
+tất cả element được copy từ array nguồn sang array đích.
+Hai array không dùng chung element nào.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m0 := map[int]int{0:7, 1:8, 2:9}
+	m1 := m0
+	m1[0] = 2
+	fmt.Println(m0, m1) // map[0:2 1:8 2:9] map[0:2 1:8 2:9]
+
+	s0 := []int{7, 8, 9}
+	s1 := s0
+	s1[0] = 2
+	fmt.Println(s0, s1) // [2 8 9] [2 8 9]
+
+	a0 := [...]int{7, 8, 9}
+	a1 := a0
+	a1[0] = 2
+	fmt.Println(a0, a1) // [7 8 9] [2 8 9]
+}
+'''
+
+@@@ #element-addition-deletion
+###=========== Append và Delete Container Element
+
+Cú pháp append một key-element pair (một entry)
+vào map giống với cú pháp sửa một map element.
+Ví dụ, với một map value `m` non-nil,
+dòng sau đây
+@@@ .disable-line-numbers111
+''' go
+m[k] = e
+'''
+
+đưa key-element pair `(k, e)` vào map `m`
+nếu `m` không chứa entry có key `k`,
+hoặc sửa element value liên kết với `k`
+nếu `m` có chứa entry có key `k`.
+
+{ %%
+Underlying continuous memory segment của map có thể cần được reallocate
+để chứa ngày càng nhiều element nếu một entry mới được đưa vào map.
+}
+
+Có một built-in function `delete`
+dùng để delete một entry khỏi map.
+Ví dụ, dòng sau đây sẽ delete entry có key `k`
+khỏi map `m`.
+Nếu map `m` không chứa entry có key `k`,
+đó là một no-op, sẽ không xảy ra panic,
+kể cả khi `m` là nil map.
+@@@ .disable-line-numbers111
+''' go
+delete(m, k)
+'''
+
+Ví dụ cho thấy cách append (đưa vào) entry vào và delete entry khỏi map:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m := map[string]int{"Go": 2007}
+	m["C"] = 1972     // thêm
+	m["Java"] = 1995  // thêm
+	fmt.Println(m)    // map[C:1972 Go:2007 Java:1995]
+	m["Go"] = 2009    // sửa
+	delete(m, "Java") // xóa
+	fmt.Println(m)    // map[C:1972 Go:2009]
+}
+'''
+
+Xin lưu ý, trước Go 1.12, thứ tự in entry của map là không xác định.
+
+Array element không thể được append hay delete,
+dù element của array addressable có thể được sửa.
+
+Ta có thể dùng built-in function `append`
+để append nhiều element vào một base slice và tạo ra slice mới.
+Slice mới tạo ra chứa các element của base slice và các element được append.
+Xin lưu ý, base slice không bị function call `append` sửa đổi.
+Tất nhiên, nếu muốn (và thường là trong thực tế), ta có thể assign result slice
+cho base slice để sửa base slice.
+
+Không có cách built-in để delete một element khỏi slice.
+Ta phải dùng function `append` cùng với
+tính năng subslice được giới thiệu bên dưới để đạt được mục tiêu này.
+Việc delete và insert slice element sẽ được minh họa trong section
+__các thao tác slice khác__ bên dưới.
+Ở đây, ví dụ sau chỉ cho thấy cách dùng function `append`.
+
+    === các thao tác slice khác :: #slice-manipulations
+
+Ví dụ cho thấy cách dùng function `append`:
+
+@@@ .line-numbers;must-line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	s0 := []int{2, 3, 5}
+	fmt.Println(s0, cap(s0)) // [2 3 5] 3
+	s1 := append(s0, 7)      // thêm một element
+	fmt.Println(s1, cap(s1)) // [2 3 5 7] 6
+	s2 := append(s1, 11, 13) // thêm hai element
+	fmt.Println(s2, cap(s2)) // [2 3 5 7 11 13] 6
+	s3 := append(s0)         // <=> s3 := s0
+	fmt.Println(s3, cap(s3)) // [2 3 5] 3
+	s4 := append(s0, s0...)  // nhân đôi s0 thành s4
+	fmt.Println(s4, cap(s4)) // [2 3 5 2 3 5] 6
+
+	s0[0], s1[0] = 99, 789
+	fmt.Println(s2[0], s3[0], s4[0]) // 789 99 2
+}
+'''
+
+Lưu ý, built-in function `append` là một __variadic function__.
+Nó có hai parameter, parameter thứ hai là một __variadic parameter__.
+
+    === variadic function :: function.tmd#variadic-function
+    === variadic parameter :: function.tmd#variadic-parameter
+
+Variadic function sẽ được giải thích trong bài viết sau bài viết kế tiếp.
+Hiện tại, ta chỉ cần biết có hai cách truyền variadic argument.
+Trong ví dụ trên, dòng // 8 //, dòng // 10 // và dòng // 12 // dùng
+một cách, còn dòng // 14 // dùng cách kia.
+Với cách thứ nhất, ta có thể truyền zero hoặc nhiều element value làm variadic argument.
+Với cách thứ hai, ta phải truyền một slice làm variadic argument duy nhất
+và slice đó phải được theo sau bởi ba dấu chấm `...`.
+Ta có thể học cách gọi variadic function từ __bài viết sau bài viết kế tiếp__.
+
+    === bài viết sau bài viết kế tiếp :: function.tmd#variadic-call
+
+Trong ví dụ trên, dòng // 14 // tương đương với
+
+@@@ .disable-line-numbers111
+''' go
+	s4 := append(s0, s0[0], s0[1], s0[2])
+'''
+
+dòng // 8 // tương đương với
+
+@@@ .disable-line-numbers111
+''' go
+	s1 := append(s0, []int{7}...)
+'''
+
+và dòng // 10 // tương đương với
+
+@@@ .disable-line-numbers111
+''' go
+	s2 := append(s1, []int{11, 13}...)
+'''
+
+Với cách ba dấu chấm `...`, function `append` không yêu cầu
+variadic argument phải là slice có cùng type với slice argument thứ nhất,
+nhưng element type của chúng phải giống hệt nhau.
+Nói cách khác, hai argument slice phải dùng chung __underlying type__.
+
+    === underlying type :: type-system-overview.tmd#underlying-type
+
+Trong chương trình trên,
+*
+   lời gọi `append` ở dòng // 8 // sẽ allocate một underlying memory segment mới
+   cho slice `s1`, vì slice `s0` không có đủ element slot dư thừa
+   để lưu element mới được append. Tình huống tương tự xảy ra với
+   lời gọi `append` ở dòng // 14 //.
+*
+   lời gọi `append` ở dòng // 10 // sẽ không allocate underlying memory segment mới
+   cho slice `s2`, vì slice `s1` có đủ element slot dư thừa
+   để lưu các element mới được append.
+
+Vì vậy, `s1` và `s2` dùng chung một số element,
+`s0` và `s3` dùng chung tất cả element,
+còn `s4` không dùng chung element với các slice khác.
+Hình sau mô tả trạng thái của các slice này
+ở cuối chương trình trên.
+
+{ ><
+&& res/slice-append.png
+}
+
+Xin lưu ý rằng khi một lời gọi `append` allocate memory segment mới bên dưới
+cho result slice, capacity của result slice phụ thuộc vào compiler.
+Đối với Go compiler chuẩn, nếu capacity của base slice nhỏ,
+capacity của result slice sẽ ít nhất gấp đôi capacity của base slice,
+để tránh phải thường xuyên allocate memory segment bên dưới khi result slice
+được dùng làm base slice trong các lời gọi `append` có thể xảy ra sau đó.
+
+Như đã đề cập ở trên, ta có thể assign result slice cho base slice
+trong một lời gọi `append` để append element vào base slice.
+Ví dụ,
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var s = append([]string(nil), "array", "slice")
+	fmt.Println(s)      // [array slice]
+	fmt.Println(cap(s)) // 2
+	s = append(s, "map")
+	fmt.Println(s)      // [array slice map]
+	fmt.Println(cap(s)) // 4
+	s = append(s, "channel")
+	fmt.Println(s)      // [array slice map channel]
+	fmt.Println(cap(s)) // 4
+}
+'''
+
+Argument thứ nhất của function `append`
+không thể là untyped `nil` (cho đến Go 1.25).
+
+@@@ #make
+###=========== Tạo Slice và Map bằng Built-in Function `make`
+
+Bên cạnh việc dùng composite literal để tạo map value và slice value,
+ta cũng có thể dùng built-in function `make` để tạo map value và slice value.
+Built-in function `make` không thể được dùng để tạo array value.
+
+//
+BTW, built-in function `make` cũng có thể được dùng để tạo
+channel, nội dung này sẽ được giải thích sau trong bài viết __channel trong Go__.
+
+    === channel trong Go :: channel.tmd
+
+Giả sử `M` là một map type và `n` là một integer,
+ta có thể dùng hai form sau để tạo map mới thuộc type `M`.
+@@@ .line-numbers
+''' go
+make(M, n)
+make(M)
+'''
+
+Form thứ nhất tạo một map rỗng mới được allocate với đủ space
+để chứa ít nhất `n` entry mà không cần reallocate memory lần nữa.
+Form thứ hai chỉ nhận một argument,
+trong trường hợp đó một map rỗng mới được tạo với đủ space
+để chứa một số lượng nhỏ entry mà không cần reallocate memory lần nữa.
+Số lượng nhỏ đó phụ thuộc vào compiler.
+
+Lưu ý: argument thứ hai `n` có thể âm hoặc zero, trong trường hợp đó nó sẽ bị bỏ qua.
+
+Giả sử `S` là một slice type, `length` và
+`capacity` là hai số nguyên không âm,
+`length` không lớn hơn `capacity`,
+ta có thể dùng hai form sau để tạo slice mới thuộc type `S`.
+(Type của `length` và `capacity` không bắt buộc phải giống hệt nhau.)
+
+@@@ .line-numbers
+''' go
+make(S, length, capacity)
+make(S, length)
+'''
+
+Form thứ nhất tạo slice mới với length và capacity được chỉ định.
+Form thứ hai chỉ nhận hai argument, trong trường hợp đó capacity của slice mới tạo
+bằng với length của nó.
+
+Tất cả element trong result slice của một function call `make`
+được initialize thành zero value (của slice element type).
+
+Ví dụ về cách dùng built-in function `make`
+để tạo map và slice:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	// Tạo các map mới.
+	fmt.Println(make(map[string]int)) // map[]
+	m := make(map[string]int, 3)
+	fmt.Println(m, len(m)) // map[] 0
+	m["C"] = 1972
+	m["Go"] = 2009
+	fmt.Println(m, len(m)) // map[C:1972 Go:2009] 2
+
+	// Tạo các slice mới.
+	s := make([]int, 3, 5)
+	fmt.Println(s, len(s), cap(s)) // [0 0 0] 3 5
+	s = make([]int, 2)
+	fmt.Println(s, len(s), cap(s)) // [0 0] 2 2
+}
+'''
+
+@@@ #new
+###=========== Allocate Container bằng Built-in Function `new`
+
+Từ bài viết __pointer trong Go__, ta biết rằng
+ta cũng có thể gọi built-in function `new` để allocate
+value thuộc bất kỳ type nào và lấy một pointer tham chiếu đến value được allocate.
+Value được allocate là zero value của type của nó.
+Vì lý do này, dùng function `new` để
+tạo map value và slice value là vô nghĩa.
+
+    === pointer trong Go :: pointer.tmd
+
+Không hoàn toàn vô nghĩa khi dùng hàm dựng sẵn `new`
+để cấp phát zero value của kiểu array.
+Tuy nhiên, trong thực tế việc này hiếm khi được làm,
+vì dùng composite literal để cấp phát array thuận tiện hơn.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m := *new(map[string]int)   // <=> var m map[string]int
+	fmt.Println(m == nil)       // true
+	s := *new([]int)            // <=> var s []int
+	fmt.Println(s == nil)       // true
+	a := *new([5]bool)          // <=> var a [5]bool
+	fmt.Println(a == [5]bool{}) // true
+}
+'''
+
+@@@ #addressability
+###=========== Tính khả địa chỉ của element container
+
+Dưới đây là một số sự thật về tính khả địa chỉ của element container.
+*
+   Element của giá trị array khả địa chỉ cũng khả địa chỉ.
+   Element của giá trị array không khả địa chỉ cũng không khả địa chỉ.
+   Lý do là mỗi giá trị array chỉ gồm một __direct part__.
+*
+   Element của mọi giá trị slice luôn khả địa chỉ,
+   bất kể giá trị slice đó có khả địa chỉ hay không.
+   Điều này là do các element của slice được lưu trong
+   phần giá trị bên dưới (gián tiếp) của slice và phần bên dưới
+   luôn nằm trên một segment memory đã được cấp phát.
+*
+   Element của giá trị map luôn không khả địa chỉ.
+   Hãy đọc __this FAQ item__ để biết lý do.
+
+    === direct part :: value-part.tmd
+    === this FAQ item :: unofficial-faq.tmd#map-elements-are-unaddressable
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := [5]int{2, 3, 5, 7}
+	s := make([]bool, 2)
+	pa2, ps1 := &a[2], &s[1]
+	fmt.Println(*pa2, *ps1) // 5 false
+	a[2], s[1] = 99, true
+	fmt.Println(*pa2, *ps1) // 99 true
+	ps0 := &[]string{"Go", "C"}[0]
+	fmt.Println(*ps0) // Go
+
+	m := map[int]bool{1: true}
+	_ = m
+	// Các dòng sau không biên dịch được.
+	/*
+	_ = &[3]int{2, 3, 5}[0]
+	_ = &map[int]bool{1: true}[1]
+	_ = &m[1]
+	*/
+}
+'''
+
+Không giống hầu hết unaddressable value khác, vốn có direct part không thể sửa đổi,
+direct part của map element value có thể được sửa đổi,
+nhưng chỉ có thể được sửa đổi (ghi đè) toàn bộ.
+Với hầu hết loại element type, đây không phải vấn đề lớn.
+Tuy nhiên, nếu element type của map type là array type hoặc struct type,
+mọi việc trở nên hơi trái với trực giác.
+
+Từ bài viết trước, __value parts__, ta biết
+rằng mỗi struct value và array value chỉ gồm một direct part.
+Vì vậy
+*
+   nếu element type của map là struct type,
+   ta không thể sửa đổi riêng lẻ từng field của một element (là struct) trong map.
+*
+   nếu element type của map là array type,
+   ta không thể sửa đổi riêng lẻ từng element của một element
+   (là array) trong map.
+
+    === value parts :: value-part.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type T struct{age int}
+	mt := map[string]T{}
+	mt["John"] = T{age: 29} // sửa đổi toàn bộ
+	ma := map[int][5]int{}
+	ma[1] = [5]int{1: 789} // sửa đổi toàn bộ
+
+	// Hai dòng sau không biên dịch được,
+	// vì map element không thể được sửa đổi từng phần.
+	/*
+	ma[1][1] = 123      // lỗi
+	mt["John"].age = 30 // lỗi
+	*/
+
+	// Truy cập thì được.
+	fmt.Println(ma[1][1])       // 789
+	fmt.Println(mt["John"].age) // 29
+}
+'''
+
+Để thực hiện bất kỳ sửa đổi mong muốn nào trong ví dụ trên,
+trước tiên cần lưu element map tương ứng vào một biến tạm,
+sau đó sửa đổi biến tạm theo yêu cầu, cuối cùng
+ghi đè element map tương ứng bằng biến tạm.
+Ví dụ:
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type T struct{age int}
+	mt := map[string]T{}
+	mt["John"] = T{age: 29}
+	ma := map[int][5]int{}
+	ma[1] = [5]int{1: 789}
+
+	t := mt["John"] // một bản sao tạm thời
+	t.age = 30
+	mt["John"] = t // ghi đè trở lại
+
+	a := ma[1] // một bản sao tạm thời
+	a[1] = 123
+	ma[1] = a // ghi đè trở lại
+
+	fmt.Println(ma[1][1], mt["John"].age) // 123 30
+}
+'''
+
+Lưu ý: hạn chế vừa nêu __có thể được gỡ bỏ sau này__.
+
+    === có thể được gỡ bỏ sau này :: https://github.com/golang/go/issues/3117
+
+@@@ #subslice
+###=========== Tạo slice từ array và slice
+
+Ta có thể tạo một slice mới từ một slice khác (slice cơ sở)
+hoặc một array cơ sở khả địa chỉ bằng
+các dạng cú pháp subslice (đặc tả Go gọi chúng là dạng cú pháp slice).
+Quá trình này cũng thường được gọi là reslicing.
+Các element của slice được tạo và array hoặc slice cơ sở
+được lưu trên cùng segment memory.
+Nói cách khác, slice được tạo và array hoặc slice cơ sở
+có thể dùng chung một số element liên tục.
+
+Có hai dạng cú pháp subslice (`baseContainer` là array hoặc slice):
+@@@ .line-numbers
+''' go
+baseContainer[low : high]       // dạng hai index
+baseContainer[low : high : max] // dạng ba index
+'''
+
+Dạng hai index tương đương với
+@@@ .disable-line-numbers111
+''' go
+baseContainer[low : high : cap(baseContainer)]
+'''
+
+Vì vậy, dạng hai index là một trường hợp đặc biệt của dạng ba index.
+Dạng hai index được dùng phổ biến hơn nhiều
+so với dạng ba index trong thực tế.
+
+Lưu ý, dạng ba index chỉ được hỗ trợ từ Go 1.2.
+
+Trong một biểu thức subslice, các index `low`, `high` và
+`max` phải thỏa mãn các yêu cầu quan hệ sau.
+
+@@@ .disable-line-numbers111
+''' go
+// dạng hai index
+0 <= low <= high <= cap(baseContainer)
+
+// dạng ba index
+0 <= low <= high <= max <= cap(baseContainer)
+'''
+
+Các index không thỏa mãn những yêu cầu này có thể khiến biểu thức subslice
+không biên dịch được tại thời điểm compile hoặc gây panic lúc chạy,
+tùy thuộc vào loại kiểu container cơ sở và việc các index có phải là hằng số hay không.
+
+Lưu ý,
+*
+   cả index `low` và `high` đều có thể lớn hơn
+   `len(baseContainer)`, miễn là mọi quan hệ trên đều được thỏa mãn.
+   Nhưng hai index này không được lớn hơn `cap(baseContainer)`.
+*
+   biểu thức subslice sẽ không gây panic nếu `baseContainer`
+   là slice nil và mọi index được dùng trong biểu thức đều bằng zero.
+   Slice kết quả được tạo từ slice nil vẫn là slice nil.
+
+Length của slice kết quả được tạo bằng `high - low`, còn capacity
+của slice kết quả được tạo bằng `max - low`.
+Length của slice được tạo có thể lớn hơn container cơ sở,
+nhưng capacity sẽ không bao giờ lớn hơn container cơ sở.
+
+Trong thực tế, để đơn giản, ta thường bỏ qua một số index trong các dạng cú pháp subslice.
+Quy tắc bỏ qua là:
+*
+   nếu index `low` bằng zero, có thể bỏ qua nó,
+   trong cả dạng hai index lẫn dạng ba index.
+*
+   nếu `high` bằng `len(baseContainer)`,
+   có thể bỏ qua nó, nhưng chỉ trong dạng hai index.
+*
+   không bao giờ được bỏ qua `max` trong dạng ba index.
+
+Ví dụ, các biểu thức sau tương đương.
+@@@ .line-numbers
+''' go
+baseContainer[0 : len(baseContainer)]
+baseContainer[: len(baseContainer)]
+baseContainer[0 :]
+baseContainer[:]
+baseContainer[0 : len(baseContainer) : cap(baseContainer)]
+baseContainer[: len(baseContainer) : cap(baseContainer)]
+'''
+
+Ví dụ sử dụng các dạng cú pháp subslice:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := [...]int{0, 1, 2, 3, 4, 5, 6}
+	s0 := a[:]     // <=> s0 := a[0:7:7]
+	s1 := s0[:]    // <=> s1 := s0
+	s2 := s1[1:3]  // <=> s2 := a[1:3]
+	s3 := s1[3:]   // <=> s3 := s1[3:7]
+	s4 := s0[3:5]  // <=> s4 := s0[3:5:7]
+	s5 := s4[:2:2] // <=> s5 := s0[3:5:5]
+	s6 := append(s4, 77)
+	s7 := append(s5, 88)
+	s8 := append(s7, 66)
+	s3[1] = 99
+	fmt.Println(len(s2), cap(s2), s2) // 2 6 [1 2]
+	fmt.Println(len(s3), cap(s3), s3) // 4 4 [3 99 77 6]
+	fmt.Println(len(s4), cap(s4), s4) // 2 4 [3 99]
+	fmt.Println(len(s5), cap(s5), s5) // 2 2 [3 99]
+	fmt.Println(len(s6), cap(s6), s6) // 3 4 [3 99 77]
+	fmt.Println(len(s7), cap(s7), s7) // 3 4 [3 4 88]
+	fmt.Println(len(s8), cap(s8), s8) // 4 4 [3 4 88 66]
+}
+'''
+
+Hình sau mô tả memory layout cuối cùng của các array value
+và slice value được dùng trong ví dụ trên.
+
+{ ><
+&& res/slice-subslice-2.png
+}
+
+Từ hình này, ta biết element của slice `s7` và `s8`
+được lưu trên một underlying memory segment khác với các container còn lại.
+Element của các slice khác được lưu trên cùng memory segment
+đang chứa array `a`.
+
+Lưu ý, thao tác subslice có thể gây memory leaking ở mức độ nào đó.
+Ví dụ, một nửa memory được cấp phát cho slice trả về của lời gọi
+đến hàm sau sẽ bị lãng phí, trừ khi slice trả về trở nên không thể truy cập
+(nếu không có slice nào khác dùng chung underlying element memory segment với slice trả về).
+
+@@@ .line-numbers
+''' go
+func f() []int {
+	s := make([]int, 10, 100)
+	return s[50:60]
+}
+'''
+
+Lưu ý rằng, trong hàm trên,
+index thấp hơn (`50`) lớn hơn length (`10`) của `s`,
+điều này được phép.
+
+@@@ #slice-to-array-pointer
+###=========== Chuyển đổi slice thành pointer đến array
+
+Từ Go 1.17, một slice có thể được chuyển đổi thành pointer đến array.
+Trong phép chuyển đổi như vậy, nếu length của kiểu array cơ sở của kiểu pointer
+lớn hơn length của slice, sẽ xảy ra panic.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+type S []int
+type A [2]int
+type P *A
+
+func main() {
+	var x []int
+	var y = make([]int, 0)
+	var x0 = (*[0]int)(x) // hợp lệ, x0 == nil
+	var y0 = (*[0]int)(y) // hợp lệ, y0 != nil
+	_, _ = x0, y0
+
+	var z = make([]int, 3, 5)
+	var _ = (*[3]int)(z) // hợp lệ
+	var _ = (*[2]int)(z) // hợp lệ
+	var _ = (*A)(z)      // hợp lệ
+	var _ = P(z)         // hợp lệ
+
+	var w = S(z)
+	var _ = (*[3]int)(w) // hợp lệ
+	var _ = (*[2]int)(w) // hợp lệ
+	var _ = (*A)(w)      // hợp lệ
+	var _ = P(w)         // hợp lệ
+
+	var _ = (*[4]int)(z) // sẽ panic
+}
+'''
+
+@@@ #slice-to-array
+###=========== Chuyển đổi slice thành array
+
+{ %%
+https://github.com/golang/go/issues/46505
+}
+
+Từ Go 1.20, một slice có thể được chuyển đổi thành array.
+Trong phép chuyển đổi như vậy, nếu length của array type
+lớn hơn length của slice, sẽ xảy ra panic.
+Slice và array kết quả không dùng chung element nào.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var s = []int{0, 1, 2, 3}
+	var a = [3]int(s[1:])
+	s[2] = 9
+	fmt.Println(s) // [0 1 9 3]
+	fmt.Println(a) // [1 2 3]
+
+	_ = [3]int(s[:2]) // panic
+}
+'''
+
+@@@ #copy-slice-elements
+###=========== Sao chép element slice bằng hàm dựng sẵn `copy`
+
+Ta có thể dùng hàm dựng sẵn `copy` để sao chép element từ
+slice này sang slice khác, type của hai slice không bắt buộc phải giống nhau,
+nhưng type của element của chúng phải giống nhau.
+Nói cách khác, hai argument slice phải dùng chung underlying type.
+Parameter thứ nhất của hàm `copy` là destination slice,
+còn parameter thứ hai là source slice.
+Hai parameter có thể chồng lấn một số element.
+Hàm `copy` trả về số element được copy,
+là giá trị nhỏ hơn trong hai length của các parameter.
+
+Với sự hỗ trợ của cú pháp subslice, ta có thể dùng hàm `copy`
+để copy element giữa hai array hoặc giữa một array và một slice.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type Ta []int
+	type Tb []int
+	dest := Ta{1, 2, 3}
+	src := Tb{5, 6, 7, 8, 9}
+	n := copy(dest, src)
+	fmt.Println(n, dest) // 3 [5 6 7]
+	n = copy(dest[1:], dest)
+	fmt.Println(n, dest) // 2 [5 5 6]
+
+	a := [4]int{} // một array
+	n = copy(a[:], src)
+	fmt.Println(n, a) // 4 [5 6 7 8]
+	n = copy(a[:], a[2:])
+	fmt.Println(n, a) // 2 [7 8 7 8]
+}
+'''
+
+{ %%
+
+Thực tế, hàm `copy` không thật sự thiết yếu.
+Ta có thể triển khai nó bằng hàm dựng sẵn `append`.
+
+@@@ .line-numbers
+''' go
+// Giả sử element type là T.
+func Copy(dest, src []T) int {
+	if len(dest) < len(src) {
+		_ = append(dest[:0], src[:len(dest)]...)
+		return len(dest)
+	} else {
+		_ = append(dest[:0], src...)
+		return len(src)
+	}
+}
+'''
+
+Mặc dù hàm `copy` không phải là một hàm thiết yếu trong Go,
+trong nhiều trường hợp nó thuận tiện hơn cách vừa trình bày.
+
+Theo một góc nhìn khác, hàm `append` cũng có thể được xem
+là một hàm không thiết yếu (trong khi `copy` được xem là một hàm thiết yếu),
+vì mọi cách dùng nó đều có thể được triển khai bằng các lời gọi `make` và `copy`.
+
+}
+
+Lưu ý, trong một trường hợp đặc biệt, hàm dựng sẵn `copy`
+có thể được dùng để __sao chép byte từ string sang byte slice__.
+
+    === sao chép byte ... :: string.tmd#use-string-as-byte-slice
+
+Không argument nào trong hai argument của lời gọi hàm `copy`
+có thể là giá trị `nil` không định kiểu (tối đa đến Go 1.25).
+
+@@@ #iteration
+###=========== Lặp qua element container
+
+Trong Go, có thể lặp qua key và element của một container value bằng cú pháp sau:
+@@@ .disable-line-numbers111
+''' go
+for key, element = range aContainer {
+	// dùng key và element ...
+}
+'''
+
+trong đó `for` và `range` là hai keyword,
+`key` và `element` được gọi là iteration variable.
+Nếu `aContainer` là slice hoặc array (hoặc array pointer, xem bên dưới),
+thì type của `key` phải là built-in type `int`.
+
+Dấu assignment `=` có thể là short variable declaration sign
+`:=`, trong trường hợp đó cả hai iteration variable đều là các variable mới được khai báo
+chỉ hiển thị bên trong thân code block `for-range`,
+nếu `aContainer` là slice hoặc array (hoặc array pointer),
+thì type của `key` được suy ra là `int`.
+
+Tương tự code block `for` truyền thống, mỗi code block
+`for-range` tạo ra hai code block, một implicit và một explicit
+được tạo bằng `{}`.
+Code block explicit được lồng trong code block implicit.
+
+Tương tự code block `for`, các statement `break` và `continue`
+cũng có thể được dùng trong code block `for-range`.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m := map[string]int{"C": 1972, "C++": 1983, "Go": 2009}
+	for lang, year := range m {
+		fmt.Printf("%v: %v \n", lang, year)
+	}
+
+	a := [...]int{2, 3, 5, 7, 11}
+	for i, prime := range a {
+		fmt.Printf("%v: %v \n", i, prime)
+	}
+
+	s := []string{"go", "defer", "goto", "var"}
+	for i, keyword := range s {
+		fmt.Printf("%v: %v \n", i, keyword)
+	}
+}
+'''
+
+Dạng cú pháp code block `for-range` có một số biến thể:
+@@@ .line-numbers
+''' go
+// Bỏ qua key iteration variable.
+for _, element = range aContainer {
+	// ...
+}
+
+// Bỏ qua element iteration variable.
+for key, _ = range aContainer {
+	element = aContainer[key]
+	// ...
+}
+
+// Bỏ qua element iteration variable.
+// Dạng này tương đương với dạng ngay trước đó.
+for key = range aContainer {
+	element = aContainer[key]
+	// ...
+}
+
+// Bỏ qua cả key và element iteration variable.
+for _, _ = range aContainer {
+	// Biến thể này không hữu ích lắm.
+}
+
+// Bỏ qua cả key và element iteration variable.
+// Dạng này tương đương với dạng ngay trước đó.
+for range aContainer {
+	// Biến thể này không hữu ích lắm.
+}
+'''
+
+Được phép lặp qua nil map hoặc nil slice. Những lần lặp như vậy không làm gì.
+
+Một số chi tiết về việc lặp qua map được liệt kê ở đây.
+*
+   Với một map, thứ tự entry trong một lần lặp không được đảm bảo
+   giống với lần lặp tiếp theo, ngay cả khi map không bị sửa đổi giữa
+   hai lần lặp. Theo đặc tả Go, thứ tự không được xác định (gần như ngẫu nhiên).
+*
+   Nếu một entry map (một cặp key-element) chưa được duyệt đến
+   bị xóa trong khi lặp, thì entry đó chắc chắn sẽ không
+   được lặp trong cùng lần lặp.
+*
+   Nếu một entry map được tạo trong khi lặp,
+   entry đó có thể được lặp trong cùng lần lặp hoặc không.
+
+Nếu đảm bảo rằng không có goroutine nào khác
+đang thao tác trên map `m`, thì đoạn code sau được đảm bảo
+xóa mọi entry (ngoại trừ entry có key là `NaN`) được lưu trong map `m`:
+@@@ .line-numbers
+''' go
+for key := range m {
+	delete(m, key)
+}
+'''
+
+//
+(Lưu ý: Go 1.21 giới thiệu __hàm dựng sẵn `clear`__ #clear,
+có thể dùng hàm này để xóa mọi entry của map, bao gồm cả entry có key là `NaN`.)
+
+Dĩ nhiên, cũng có thể lặp qua element array và slice bằng code block loop `for` truyền thống:
+@@@ .line-numbers
+''' go
+for i := 0; i < len(anArrayOrSlice); i++ {
+	// ... dùng anArrayOrSlice[i]
+}
+'''
+
+Với một code block loop `for-range` (dù trước `range` là `=` hay `:=`)
+
+@@@ .disable-line-numbers111
+''' go
+for key, element = range aContainer {...}
+'''
+
+có hai sự thật quan trọng.
+
+    === ... được sao chép :: value-part.tmd#about-value-copy
+
+*.
+   Container được lặp là **một bản sao** của `aContainer`.
+   Lưu ý, __chỉ direct part của `aContainer` được copy__.
+   Bản sao container không có tên, nên không có cách nào sửa đổi nó.
+   -
+      Nếu `aContainer` là array, thì
+      các sửa đổi được thực hiện trên element array trong khi lặp
+      sẽ không được phản ánh vào các iteration variable.
+      Lý do là bản sao của array không dùng chung element với array.
+   -
+      Nếu `aContainer` là slice hoặc map, thì
+      các sửa đổi được thực hiện trên element slice hoặc map trong khi lặp
+      sẽ được phản ánh vào các iteration variable.
+      Lý do là bản sao của slice (hoặc map)
+      dùng chung mọi element (entry) với slice (hoặc map).
+
+*.
+   Một cặp key-element của bản sao `aContainer` sẽ được
+   assign (copy) cho cặp iteration variable ở mỗi bước lặp,
+   vì vậy các sửa đổi trên **direct part**
+   của các iteration variable sẽ không được phản ánh vào các element
+   (và key đối với map) được lưu trong `aContainer`.
+   (Vì sự thật này, và vì dùng code block loop `for-range` là cách duy nhất
+   để lặp qua key và element của map, ta không nên dùng type có kích thước lớn
+   làm type của key và element map, để tránh chi phí copy lớn.)
+
+Ví dụ chứng minh sự thật thứ nhất và thứ hai.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	type Person struct {
+		name string
+		age  int
+	}
+	persons := [2]Person {{"Alice", 28}, {"Bob", 25}}
+	for i, p := range persons {
+		fmt.Println(i, p)
+
+		// Sửa đổi này không ảnh hưởng đến
+		// lần lặp, vì array được lặp
+		// là bản sao của array persons.
+		persons[1].name = "Jack"
+
+		// Sửa đổi này không ảnh hưởng đến
+		// array persons, vì p chỉ là một
+		// bản sao của bản sao của một element persons.
+		p.age = 31
+	}
+	fmt.Println("persons:", &persons)
+}
+'''
+
+Kết quả:
+@@@ .output
+'''
+0 {Alice 28}
+1 {Bob 25}
+persons: &[{Alice 28} {Jack 25}]
+'''
+
+Nếu thay array trong ví dụ trên bằng slice, thì sửa đổi trên
+slice trong khi lặp sẽ ảnh hưởng đến lần lặp, nhưng
+sửa đổi trên iteration variable vẫn không ảnh hưởng đến slice.
+
+@@@ .line-numbers
+''' go
+...
+
+	// Một slice.
+	persons := []Person {{"Alice", 28}, {"Bob", 25}}
+	for i, p := range persons {
+		fmt.Println(i, p)
+
+		// Bây giờ sửa đổi này ảnh hưởng
+		// đến lần lặp.
+		persons[1].name = "Jack"
+
+		// Sửa đổi này vẫn không có
+		// ảnh hưởng thực sự nào.
+		p.age = 31
+	}
+	fmt.Println("persons:", &persons)
+}
+'''
+
+Output trở thành:
+@@@ .output
+'''
+0 {Alice 28}
+1 {Jack 25}
+persons: &[{Alice 28} {Jack 25}]
+'''
+
+Ví dụ sau chứng minh sự thật thứ hai.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	m := map[int]struct{ dynamic, strong bool } {
+		0: {true, false},
+		1: {false, true},
+		2: {false, false},
+	}
+
+	for _, v := range m {
+		// Dòng sau không ảnh hưởng đến map m.
+		v.dynamic, v.strong = true, true
+	}
+
+	fmt.Println(m[0]) // {true false}
+	fmt.Println(m[1]) // {false true}
+	fmt.Println(m[2]) // {false false}
+}
+'''
+
+Chi phí của slice assignment hoặc map assignment nhỏ,
+nhưng chi phí của array assignment lớn nếu kích thước của array type lớn.
+Vì vậy, nói chung, không nên range qua một array lớn.
+Ta có thể range qua một slice được tạo từ array, hoặc range qua một pointer
+đến array (xem section tiếp theo để biết chi tiết).
+
+Đối với array hoặc slice, nếu kích thước của element type lớn, thì
+nói chung cũng không nên dùng iteration variable thứ hai
+để lưu element được lặp ở mỗi bước lặp.
+Với những array và slice như vậy, ta nên dùng biến thể code block
+`for-range` có một iteration variable hoặc vòng lặp `for` truyền thống
+để lặp qua element của chúng.
+Trong ví dụ sau, loop trong function `fa` kém hiệu quả hơn nhiều
+so với loop trong function `fb`.
+
+@@@ .line-numbers
+''' go
+type Buffer struct {
+	start, end int
+	data       [1024]byte
+}
+
+func fa(buffers []Buffer) int {
+	numUnreads := 0
+	for _, buf := range buffers {
+		numUnreads += buf.end - buf.start
+	}
+	return numUnreads
+}
+
+func fb(buffers []Buffer) int {
+	numUnreads := 0
+	for i := range buffers {
+		numUnreads += buffers[i].end - buffers[i].start
+	}
+	return numUnreads
+}
+'''
+
+Trước Go 1.22, khi một code block loop `for-range`
+(lưu ý dấu đứng trước `range` là `:=`)
+
+@@@ .line-numbers
+''' go
+for key, element := range aContainer {...}
+'''
+
+được thực thi, mọi cặp key-element sẽ được assign cho **cùng một**
+cặp instance iteration variable.
+Tuy nhiên, từ Go 1.22, mỗi cặp key-element sẽ được assign cho một
+cặp instance iteration variable **riêng biệt**
+(hay còn gọi là một instance riêng biệt sẽ được tạo cho mỗi iteration variable
+trong mỗi lần lặp).
+
+Ví dụ sau cho thấy sự khác nhau về behavior giữa Go version 1.21- và 1.22+.
+
+@@@ .line-numbers
+''' go
+// forrange1.go
+package main
+
+import "fmt"
+
+func main() {
+	for i, n := range []int{0, 1, 2} {
+		defer func() {
+			fmt.Println(i, n)
+		}()
+	}
+}
+'''
+
+Bằng cách dùng các Go Toolchain version khác nhau để chạy code (__gotv__ là một tool
+dùng để quản lý và sử dụng nhiều bản cài đặt Go Toolchain chính thức cùng tồn tại),
+ta sẽ nhận được các output khác nhau:
+
+    === gotv :: https://go101.org/apps-and-libs/gotv.html
+
+@@@ .line-numbers
+''' go
+$ gotv 1.21. run forrange1.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.8/bin/go run forrange1.go
+2 2
+2 2
+2 2
+$ gotv 1.22. run forrange1.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.1/bin/go run forrange1.go
+2 2
+1 1
+0 0
+'''
+
+Một ví dụ khác:
+
+@@@ .line-numbers
+''' go
+// forrange2.go
+package main
+
+import "fmt"
+
+func main() {
+	var m = map[*int]uint32{}
+	for i, n := range []int{1, 2, 3} {
+		m[&i]++
+		m[&n]++
+	}
+	fmt.Println(len(m))
+}
+'''
+
+Dùng các Go Toolchain version khác nhau, ta sẽ nhận được các output sau:
+
+@@@ .line-numbers
+''' go
+$ gotv 1.21. run forrange2.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.8/bin/go run forrange2.go
+2
+$ gotv 1.22. run forrange2.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.1/bin/go run forrange2.go
+6
+'''
+
+Vì vậy, đây là một semantic change phá vỡ backward compatibility.
+Tuy nhiên, semantic mới thực sự phù hợp hơn với kỳ vọng của mọi người.
+Và về lý thuyết, không có code cũ nào được phát hiện là đúng về logic
+sẽ bị phá vỡ bởi thay đổi này.
+
+@@@ #use-pointer-as-array
+###=========== Dùng Array Pointer như Array
+
+Trong nhiều tình huống, ta có thể dùng một pointer tới array như array.
+
+Ta có thể range qua một pointer tới array để lặp qua các element của array.
+Đối với array có length lớn, cách này hiệu quả hơn nhiều, vì copy
+một pointer hiệu quả hơn nhiều so với copy một array có kích thước lớn.
+Trong ví dụ sau, hai code block loop là tương đương
+và đều hiệu quả.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var a [100]int
+
+	// Copy pointer tốn ít chi phí.
+	for i, n := range &a {
+		fmt.Println(i, n)
+	}
+
+	// Copy slice tốn ít chi phí.
+	for i, n := range a[:] {
+		fmt.Println(i, n)
+	}
+}
+'''
+
+Nếu iteration thứ hai trong một `for-range` loop không bị bỏ qua cũng không bị bỏ đi,
+thì range qua nil array pointer sẽ gây panic.
+Trong ví dụ sau, mỗi code block loop trong hai code block đầu
+sẽ in ra năm index, còn code block cuối sẽ gây panic.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	var p *[5]int // nil
+
+	for i, _ := range p { // hợp lệ
+		fmt.Println(i)
+	}
+
+	for i := range p { // hợp lệ
+		fmt.Println(i)
+	}
+
+	for i, n := range p { // panic
+		fmt.Println(i, n)
+	}
+}
+'''
+
+Array pointer cũng có thể được dùng để index array element.
+Indexing array element thông qua một nil array pointer sẽ gây panic.
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	a := [5]int{2, 3, 5, 7, 11}
+	p := &a
+	p[0], p[1] = 17, 19
+	fmt.Println(a) // [17 19 5 7 11]
+	p = nil
+	_ = p[0] // panic
+}
+'''
+
+Ta cũng có thể tạo slice từ array pointer.
+Tạo slice từ một nil array pointer sẽ gây panic.
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+	pa := &[5]int{2, 3, 5, 7, 11}
+	s := pa[1:3]
+	fmt.Println(s) // [3 5]
+	pa = nil
+	s = pa[0:0] // panic
+	// Nếu dòng này được thực thi, nó cũng gây panic.
+	_ = (*[0]byte)(nil)[:]
+}
+'''
+
+Ta cũng có thể truyền array pointer làm argument của các function built-in
+`len` và `cap`.
+Argument là nil array pointer cho hai function này sẽ không gây panic.
+
+@@@ .line-numbers
+''' go
+var pa *[5]int // == nil
+fmt.Println(len(pa), cap(pa)) // 5 5
+'''
+
+@@@ #clear
+###=========== Dùng built-in function `clear` để xóa map entry và reset slice element
+
+Go 1.21 giới thiệu built-in function `clear`.
+Function này được dùng để xóa map entry và reset slice element.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+func main() {
+s := []int{1, 2, 3}
+clear(s)
+fmt.Println(s) // [0 0 0]
+
+a := [4]int{5, 6, 7, 8}
+clear(a[1:3])
+fmt.Println(a) // [5 0 0 8]
+
+m := map[float64]float64{}
+x := 0.0
+m[x] = x
+x /= x // x bây giờ là NaN
+m[x] = x
+fmt.Println(len(m)) // 2
+for k := range m {
+delete(m, k)
+}
+fmt.Println(len(m)) // 1
+clear(m)
+fmt.Println(len(m)) // 0
+}
+'''
+
+Ta có thể thấy function `clear` thậm chí có thể delete map entry có key là `NaN`.
+
+@@@ #memclr
+###=========== Optimization `memclr`
+
+Go standard Go compiler thực hiện một số optimization để
+convert loop có một số pattern nhất định thành các lời gọi `memclr`
+nội bộ. Trước Go 1.21, ta có thể tận dụng các optimization này
+để reset array/slice element và xóa map entry.
+
+Các optimization này (và nhiều optimization khác) được tập hợp trong
+sách __Go Optimizations 101__.
+
+    === Go Optimizations 101 :: https://go101.org/optimizations/101.html
+
+@@@ #compile-time-evaluation
+###=========== Lời gọi built-in function `len` và `cap` có thể được evaluate tại compile time
+
+Nếu argument được truyền vào lời gọi built-in function `len` hoặc
+`cap` là một array hoặc array pointer value,
+thì lời gọi được evaluate tại compile time và result của lời gọi
+là một typed constant có type là built-in type `int`.
+Result có thể được bind vào named constant.
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+var a [5]int
+var p *[7]string
+
+// N và M đều là typed constant.
+const N = len(a)
+const M = cap(p)
+
+func main() {
+	fmt.Println(N) // 5
+	fmt.Println(M) // 7
+}
+'''
+
+Còn có nhiều tình huống khác trong đó lời gọi
+đến built-in function `len` và `cap`
+được evaluate lúc compile time.
+Vui lòng đọc sách __Go Details & Tips 101__ để biết các trường hợp đó.
+
+    === Go Details & Tips 101 :: https://go101.org/details-and-tips/101.html
+
+
+@@@ #modify-slice-length-and-capacity
+###=========== Sửa riêng lẻ thuộc tính Length và Capacity của Slice
+
+Ở trên đã đề cập rằng nói chung không thể sửa riêng lẻ length và capacity
+của một slice value.
+Một slice value chỉ có thể được ghi đè toàn bộ
+bằng cách assign một slice value khác cho nó.
+Tuy nhiên, ta có thể sửa riêng lẻ length và capacity của một slice
+bằng reflection.
+Reflection sẽ được giải thích chi tiết trong __một bài viết sau__.
+
+    === một bài viết sau :: reflection.tmd
+
+Ví dụ:
+@@@ .line-numbers
+''' go
+package main
+
+import (
+	"fmt"
+	"reflect"
+)
+
+func main() {
+	s := make([]int, 2, 6)
+	fmt.Println(len(s), cap(s)) // 2 6
+
+	reflect.ValueOf(&s).Elem().SetLen(3)
+	fmt.Println(len(s), cap(s)) // 3 6
+
+	reflect.ValueOf(&s).Elem().SetCap(5)
+	fmt.Println(len(s), cap(s)) // 3 5
+}
+'''
+
+Argument thứ hai truyền vào function `reflect.SetLen` không được
+lớn hơn capacity hiện tại của slice argument `s`.
+Argument thứ hai truyền vào function `reflect.SetCap` không được
+nhỏ hơn length hiện tại của slice argument `s` và
+lớn hơn capacity hiện tại của slice argument `s`.
+Nếu không, sẽ xảy ra panic.
+
+Cách dùng reflection rất kém hiệu quả, nó chậm hơn slice assignment.
+
+@@@ #slice-manipulations
+###=========== Các Thao tác Slice Khác
+
+@@@ #delete-slice-elements
+//
+
+@@@ #delete-one-slice-element
+//
+
+Go không hỗ trợ thêm các slice operation built-in,
+chẳng hạn như clone slice, xóa element và insert element.
+Ta phải kết hợp các cách built-in để thực hiện những operation đó.
+
+Vui lòng đọc chapter "Arrays and Slices" trong sách
+__Go Optimizations 101__ để biết cách thực hiện những operation như vậy hiệu quả.
+
+""" comment
+
+Trong các ví dụ ở section hiện tại,
+giả sử `s` là slice đang được nói đến,
+`T` là element type của nó và `t0`
+là biểu diễn literal zero value của `T`.
+
+###----------- Clone Slice
+
+Đối với Go version hiện tại (1.25), cách đơn giản nhất để clone một slice là:
+@@@ .disable-line-numbers111
+''' go
+sClone := append(s[:0:0], s...)
+'''
+
+Ta cũng có thể dùng dòng sau, nhưng so với cách trên, nó có một điểm chưa hoàn hảo.
+Nếu source slice `s` là blank non-nil slice, result slice sẽ là nil.
+@@@ .disable-line-numbers111
+''' go
+sClone := append([]T(nil), s...)
+'''
+
+Các cách dùng append trên có một nhược điểm.
+Cả hai đều có thể allocate (sau đó initialize) nhiều element hơn mức cần thiết.
+Ta cũng có thể dùng các cách sau để tránh nhược điểm này:
+@@@ .disable-line-numbers111
+''' go
+// Cách make+copy gồm hai dòng.
+sClone := make([]T, len(s))
+copy(sClone, s)
+
+// Hoặc cách make+append một dòng sau.
+// Tính đến Go Toolchain v1.25.n, cách này hơi
+// chậm hơn cách make+copy hai dòng ở trên.
+sClone := append(make([]T, 0, len(s)), s...)
+'''
+
+Các cách dùng "make" có nhược điểm là nếu `s` là nil slice,
+cả hai đều cho ra một blank slice non-nil.
+Tuy nhiên, trên thực tế, ta thường không cần theo đuổi sự hoàn hảo.
+Nếu cần, sẽ phải thêm ba dòng:
+@@@ .disable-line-numbers111
+''' go
+var sClone []T
+if s != nil {
+	sClone = make([]T, len(s))
+	copy(sClone, s)
+}
+'''
+
+{ %%
+Trước Go Toolchain 1.15, với một số trường hợp phổ biến, các cách dùng "append"
+__href="https://github.com/go101/go101/wiki/How-to-efficiently-clone-a-slice%3F">hiệu quả hơn nhiều so với__
+cách "make+copy". Tuy nhiên, từ version 1.15, "make+copy" đã được
+Go compiler chính thức optimization đặc biệt,
+khiến cách này luôn hiệu quả hơn các cách dùng "append".
+Nhưng lưu ý rằng optimization chỉ hoạt động nếu slice được clone
+xuất hiện dưới dạng pure hoặc qualified identifier trong code
+và lời gọi `make` chỉ nhận hai argument.
+Ví dụ, nó chỉ hoạt động với trường hợp đầu tiên trong code sau:
+
+@@@ .disable-line-numbers111
+''' go
+	// trường hợp 1:
+	var s = make([]byte, 10000)
+	y = make([]T, len(s)) // hoạt động
+	copy(y, s)
+
+	// trường hợp 2:
+	var s = make([]byte, 10000)
+	y = make([]T, len(s), len(s)) // không hoạt động
+	copy(y, s)
+
+	// trường hợp 3:
+	var a = [1][]byte{s}
+	y = make([]T, len(a[0])) // không hoạt động
+	copy(y, a[0])
+
+	// trường hợp 4:
+	type T struct {x []byte}
+	var t = T{x: s}
+	y = make([]T, len(t.x)) // không hoạt động
+	copy(y, t.x)
+'''
+}
+
+@@@ #delete-slice-elements
+@@@ #delete-one-slice-element
+###----------- Delete một đoạn slice element
+
+Ở trên đã đề cập rằng các element của một slice được lưu liên tiếp
+trong memory và không có khoảng trống giữa hai element kề nhau bất kỳ của slice.
+Vì vậy, khi một slice element bị remove,
+*
+   nếu phải giữ nguyên thứ tự element,
+   thì mỗi element tiếp theo sau các element bị remove
+   phải được di chuyển về phía trước.
+*
+   nếu không cần giữ nguyên thứ tự element,
+   thì ta có thể di chuyển các element cuối cùng trong slice đến các index bị remove.
+
+
+Trong ví dụ sau, giả sử `from` và `to` là
+hai index hợp lệ, `from` không lớn hơn `to`,
+và index `to` là exclusive.
+@@@ .line-numbers
+''' go
+// cách 1 (giữ nguyên thứ tự element):
+s = append(s[:from], s[to:]...)
+
+// cách 2 (giữ nguyên thứ tự element):
+s = s[:from + copy(s[from:], s[to:])]
+
+// Không giữ nguyên thứ tự element:
+if n := to-from; len(s)-to < n {
+	copy(s[from:to], s[to:])
+} else {
+	copy(s[from:to], s[len(s)-n:])
+}
+s = s[:len(s)-(to-from)]
+'''
+
+Nếu slice element tham chiếu đến value khác, ta nên reset tail element
+(trên các slot vừa được giải phóng) để tránh memory leaking.
+
+@@@ .line-numbers
+''' go
+// "len(s)+to-from" là length cũ của slice.
+temp := s[len(s):len(s)+to-from]
+for i := range temp {
+	temp[i] = t0
+}
+'''
+
+Như đã đề cập ở trên, code block loop `for-range` sẽ được
+Go compiler chuẩn tối ưu hóa thành một lời gọi `memclr`.
+
+@@@ #delete-one-slice-element
+###----------- Delete một slice element
+
+Delete một element tương tự, và cũng đơn giản hơn,
+so với delete một đoạn element.
+
+Trong ví dụ sau,
+giả sử `i` là index của element cần remove
+và `i` là một index hợp lệ.
+
+@@@ .line-numbers
+''' go
+// Cách 1 (giữ nguyên thứ tự element):
+s = append(s[:i], s[i+1:]...)
+
+// Cách 2 (giữ nguyên thứ tự element):
+s = s[:i + copy(s[i:], s[i+1:])]
+
+// Trong cả hai cách trên sẽ có len(s)-i-1 element được
+// copy.
+
+// Không giữ nguyên thứ tự element:
+s[i] = s[len(s)-1]
+s = s[:len(s)-1]
+'''
+
+Nếu slice element chứa pointer, sau thao tác delete,
+ta nên reset element cuối cùng của slice value cũ
+để tránh memory leaking:
+@@@ .line-numbers
+''' go
+s[len(s):len(s)+1][0] = t0
+// hoặc
+s[:len(s)+1][len(s)] = t0
+'''
+
+###----------- Delete Slice Element Có Điều kiện
+
+Đôi khi ta cần delete slice element theo một số điều kiện.
+
+@@@ .line-numbers
+''' go
+// Giả sử T là một type có kích thước nhỏ.
+func DeleteElements(s []T, keep func(T) bool, clear bool) []T {
+	//result := make([]T, 0, len(s))
+	result := s[:0] // không allocate slice mới
+	for _, v := range s {
+		if keep(v) {
+			result = append(result, v)
+		}
+	}
+	if clear { // tránh memory leaking
+		temp := s[len(result):]
+		for i := range temp {
+			// t0 là biểu diễn literal zero value của T.
+			temp[i] = t0
+		}
+	}
+	return result
+}
+'''
+
+Xin lưu ý, nếu `T` không phải type có kích thước nhỏ, thì nói chung ta nên __cố gắng__ tránh
+dùng `T` làm type parameter của function và dùng form code block
+`for-range` với hai iteration variable để lặp qua slice có element type là `T`.
+
+=== cố gắng :: value-copy-cost.tmd#copy-costs
+
+###----------- Insert tất cả element của một slice vào slice khác
+
+Giả sử vị trí insert là index hợp lệ `i`
+và `elements` là slice có các element sẽ được insert.
+
+@@@ .line-numbers
+''' go
+// Implementation một dòng:
+s = append(s[:i], append(elements, s[i:]...)...)
+
+// Cách một dòng luôn copy s[i:] hai lần và
+// có thể tạo tối đa hai allocation.
+// Cách dài dòng sau luôn copy s[i:]
+// một lần và chỉ tạo tối đa một allocation.
+// Tuy nhiên, tính đến Go Toolchain v1.25.n, lời gọi "make"
+// sẽ clear một phần các element vừa được allocate,
+// điều này thực sự không cần thiết. Vì vậy cách dài dòng
+// chỉ hiệu quả hơn cách một dòng
+// với slice nhỏ ở thời điểm hiện tại.
+
+if cap(s) >= len(s) + len(elements) {
+	s = s[:len(s)+len(elements)]
+	copy(s[i+len(elements):], s[i:])
+	copy(s[i:], elements)
+} else {
+	x := make([]T, 0, len(elements)+len(s))
+	x = append(x, s[:i]...)
+	x = append(x, elements...)
+	x = append(x, s[i:]...)
+	s = x
+}
+
+// Push:
+s = append(s, elements...)
+
+// Unshift (insert ở đầu):
+s = append(elements, s...)
+'''
+
+###----------- Insert một số element riêng lẻ
+
+Insert một số element riêng lẻ tương tự insert tất cả element của một slice.
+Ta có thể tạo một slice composite literal với các element cần insert,
+sau đó dùng các cách ở trên để insert những element này.
+
+###----------- Xóa và chèn đặc biệt: push front/back, pop front/back
+
+Giả sử element được push hoặc pop là `e` và slice
+`s` có ít nhất một element.
+
+@@@ .line-numbers
+''' go
+// Pop front (shift):
+s, e = s[1:], s[0]
+// Pop back:
+s, e = s[:len(s)-1], s[len(s)-1]
+// Push front
+s = append([]T{e}, s...)
+// Push back:
+s = append(s, e)
+'''
+
+Xin lưu ý, dùng `append` để insert element thường không hiệu quả,
+vì tất cả element sau vị trí insert cần được di chuyển về phía sau,
+và cần allocate một space lớn hơn để lưu tất cả element nếu free capacity không đủ.
+Những vấn đề này có thể không nghiêm trọng với slice nhỏ, nhưng với slice lớn,
+chúng thường nghiêm trọng. Vì vậy nếu số element cần di chuyển lớn,
+tốt nhất nên dùng linked list để insert.
+
+###----------- Thêm thao tác slice
+
+Trong thực tế, nhu cầu rất đa dạng.
+Với một số trường hợp cụ thể, có thể không cách nào trong các cách trên
+được trình bày ở các ví dụ trên là cách hiệu quả nhất. Và đôi khi,
+các cách trên có thể không đáp ứng một số yêu cầu cụ thể trong thực tế.
+Vì vậy, hãy học và áp dụng linh hoạt.
+Đây có thể là lý do Go không hỗ trợ các thao tác bổ sung
+được giới thiệu ở trên dưới dạng built-in.
+
+"""
+
+###=========== Dùng Map để Mô phỏng Set
+
+Go không hỗ trợ **set** type built-in.
+Tuy nhiên, dùng map type để mô phỏng set type rất dễ.
+Trên thực tế, ta thường dùng map type `map[K]struct{}`
+để mô phỏng một set type với element type là `K`.
+Kích thước của map element type `struct{}` là zero,
+element của value thuộc các map type như vậy không chiếm memory space.
+
+###=========== Các thao tác liên quan đến container không được đồng bộ nội bộ
+
+Xin lưu ý rằng mọi thao tác container đều không được đồng bộ nội bộ.
+Nếu không dùng bất kỳ kỹ thuật đồng bộ dữ liệu nào,
+nhiều goroutine có thể đọc một container đồng thời,
+nhưng không được phép nhiều goroutine cùng thao tác trên một container
+trong đó ít nhất một goroutine sửa đổi container.
+Trường hợp sau sẽ gây data race, thậm chí khiến goroutine panic.
+Ta phải tự đồng bộ các thao tác container.
+Hãy đọc các bài viết về __đồng bộ dữ liệu__ để biết chi tiết.
+
+    === đồng bộ dữ liệu :: concurrent-synchronization-overview.tmd

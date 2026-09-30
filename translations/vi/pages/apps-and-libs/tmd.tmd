@@ -1,0 +1,13 @@
+
+### tmd.go
+
+__**tmd.go**__ là một thư viện Go cho ngôn ngữ markup TapirMD,
+được sử dụng để tạo nội dung web.
+
+Đường dẫn module của thư viện là `go101.org/tmd.go` (__tài liệu__).
+
+Để biết cú pháp TapirMD, vui lòng truy cập __trang web chính thức của TapirMD__.
+
+    === tmd.go:: https://github.com/go101/tmd.go
+    === tài liệu:: https://pkg.go.dev/go101.org/tmd.go
+    === trang web chính thức của TapirMD...:: https://tmd.tapirgames.com

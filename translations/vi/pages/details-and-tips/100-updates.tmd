@@ -1,0 +1,43 @@
+
+##### Lịch sử cập nhật Go Details & Tips 101
+
+###========== v1.24.a (2024/Dec/16)
+
+*  "
+
+###========== v1.23.a (2024/Oct/16)
+
+*  chương "Liên quan đến package chuẩn và package người dùng":
+*  thêm "Hàm `N` trong package chuẩn `math/rand/v2` được giới thiệu trong Go 1.22 mang lại nhiều tiện ích trong một số tình huống"
+
+###========== v1.22.a (2024/Mar/18)
+
+*  chương "Liên quan đến cú pháp và ngữ nghĩa":
+*  Go 1.22 giới thiệu vòng lặp `for range Integer` và thay đổi ngữ nghĩa của các khối mã vòng lặp for. Một số nội dung liên quan được bổ sung.
+
+###========== v1.21.b
+
+*  chương "Liên quan đến package chuẩn và package người dùng":
+*  do __ https://github.com/golang/go/issues/57411 __, đã loại bỏ mẹo "Làm thế nào để thử chạy một hàm `init` tùy chỉnh sớm nhất có thể?"
+
+###========== v1.21.a (2023/OCT/11)
+
+*  chương "Liên quan đến cú pháp và ngữ nghĩa":
+*  đề cập rằng kết quả đánh giá của các lời gọi hàm `unsafe.Alignof`, `unsafe.Offsetof` và `unsafe.Sizeof` không phải là constant.
+*  chương "Liên quan đến compiler và runtime":
+*  thêm một mẹo "Làm thế nào để đảm bảo một trường của struct luôn được căn chỉnh theo 8 byte"
+
+###========== v1.20.a (2023/Feb/01)
+
+*  chương "Liên quan đến cú pháp và ngữ nghĩa":
+*  đề cập rằng Go 1.21 sẽ bổ sung một hàm builtin `clear`, hàm này có thể xóa các entry của map có key là NaN.
+*  trong mục "Chuẩn hóa các method selector", đề cập rằng một lỗi de-virtualize đã được sửa kể từ Go toolchain 1.20.
+*  trong mục "Một số thứ tự đánh giá expression không được đặc tả trong Go", đề cập rằng một khác biệt về thứ tự đánh giá giữa khai báo biến thông thường và khai báo lại đã được loại bỏ kể từ Go toolchain 1.20.
+
+###========== v1.19.e (2022/Nov/15)
+
+*  thêm một chi tiết mới "Compiler chính thức của Go kiểm tra một số bug tiềm ẩn do bẫy `:=` gây ra nhưng không phải tất cả" trong chương "Liên quan đến cú pháp và ngữ nghĩa".
+
+###========== v1.17 (2021/Dec/22)
+
+*  xuất bản

@@ -1,0 +1,352 @@
+<p id="f-6-map-md"></p>
+<h1>Maps</h1>
+
+<p>Trong Go, về lý thuyết capacity của một map là không giới hạn; trên thực tế, nó chỉ bị giới hạn bởi memory khả dụng.
+Đó là lý do hàm built-in <code>cap</code> không áp dụng cho map.</p>
+
+<p>Trong implementation runtime Go tiêu chuẩn chính thức, map được implement nội bộ dưới dạng hashtable.
+Mỗi map/hashtable duy trì một backing array để lưu các entry của map (các cặp key-value).
+Khi ngày càng có nhiều entry được đưa vào map,
+size của backing array có thể bị xem là quá nhỏ để lưu thêm entry,
+vì vậy một backing array mới lớn hơn sẽ được allocate
+và các entry hiện tại (trong backing array cũ) sẽ được chuyển sang đó,
+sau đó backing array cũ sẽ bị loại bỏ.</p>
+
+<p>Trong implementation runtime Go tiêu chuẩn chính thức, backing array của một map sẽ không bao giờ shrink,
+ngay cả khi mọi entry đã bị delete khỏi map. Đây là một dạng lãng phí memory.
+Nhưng trên thực tế, điều này hiếm khi là vấn đề và thực ra thường tốt cho performance của chương trình.</p>
+
+<h2>Xóa các entry của map</h2>
+
+<p>Có thể dùng loop sau để xóa mọi entry trong một map:</p>
+
+<pre><code class="language-Go">	for key := range aMap {
+		delete(aMap, key)
+	}
+</code></pre>
+
+<p>Loop này được tối ưu đặc biệt (trừ khi tồn tại các entry có key là NaN), nên việc thực thi nó rất nhanh.
+Tuy nhiên, cần lưu ý rằng như đã đề cập ở trên, backing array của map đã được clear không shrink sau loop.
+Vậy làm thế nào để release backing array của map? Có hai cách:</p>
+
+<pre><code class="language-Go">	aMap = nil
+	// hoặc
+	aMap = make(map[K]V)
+</code></pre>
+
+<p>Nếu backing array của map không được tham chiếu ở nơi khác, cuối cùng backing array sẽ được garbage collector thu gom sau khi được release.</p>
+
+<p>Nếu sẽ có nhiều entry mới được đưa vào map sau khi map được clear, cách thứ nhất được ưu tiên;
+nếu không, cách thứ hai (release) được ưu tiên.</p>
+
+<p>Kể từ Go 1.21, có một cách tốt hơn để thực hiện việc này.
+Go 1.21 đã giới thiệu một hàm built-in mới, <code>clear</code>, có thể được dùng để xóa mọi entry trong một map,
+bao gồm cả những entry có key là NaN.</p>
+
+<p>Lưu ý: hiện tại (Go toolchain 1.24), dùng hàm built-in <code>clear</code> để
+clear một map có ít nhất một entry mất thời gian tỷ lệ với size của backing array của map.</p>
+
+<h2><code>aMap[key]++</code> hiệu quả hơn <code>aMap[key] = aMap[key] + 1</code></h2>
+
+<p>Trong statement <code>aMap[key] = aMap[key] + 1</code>, <code>key</code> được hash hai lần,
+nhưng trong statement <code>aMap[key]++</code>, nó chỉ được hash một lần.</p>
+
+<p>Tương tự, <code>aMap[key] += value</code> hiệu quả hơn <code>aMap[key] = aMap[key] + value</code>.</p>
+
+<p>Điều này có thể được chứng minh bằng code benchmark sau:</p>
+
+<pre><code class="language-Go">package maps
+
+import &quot;testing&quot;
+
+var m = map[int]int{}
+
+func Benchmark_increment(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		m[99]++
+	}
+}
+
+func Benchmark_plusone(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		m[99] += 1
+	}
+}
+
+func Benchmark_addition(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		m[99] = m[99] + 1
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_increment-4  11.31 ns/op
+Benchmark_plusone-4    11.21 ns/op
+Benchmark_addition-4   16.10 ns/op	
+</code></pre>
+
+<h2>Pointer trong map</h2>
+
+<p>Nếu cả key type và element type của một map đều không chứa pointer,
+thì trong scan phase của một GC cycle, garbage collector sẽ không scan các entry của map.
+Điều này có thể tiết kiệm rất nhiều thời gian.</p>
+
+<p>Gợi ý này cũng đúng với các loại container khác trong Go, chẳng hạn như slice, array và channel.</p>
+
+<h2>Dùng byte array thay cho string ngắn làm key</h2>
+
+<p>Nội bộ, mỗi string chứa một pointer trỏ tới các byte underlying của string đó.
+Vì vậy, nếu key type hoặc element type của một map là string type, thì mọi entry của map
+đều cần được scan trong các GC cycle.</p>
+
+<p>Nếu có thể bảo đảm rằng các string value được dùng trong các entry của một map có một max length
+và max length đó nhỏ, thì có thể dùng array type <code>[N]byte</code> để thay thế các string type
+(trong đó <code>N</code> là max string length). Làm vậy sẽ tiết kiệm nhiều thời gian scan garbage collection
+nếu số lượng entry trong map rất lớn.</p>
+
+<p>Ví dụ, trong code sau,
+các entry của <code>mapB</code> không chứa pointer, nhưng các key (string) của <code>mapA</code> chứa pointer.
+Vì vậy garbage collector sẽ skip <code>mapB</code> trong scan phase của một GC cycle.</p>
+
+<pre><code class="language-Go">	var mapA = make(map[string]int, 1 &lt;&lt; 16)
+	var mapB = make(map[[32]byte]int, 1 &lt;&lt; 16)
+</code></pre>
+
+<p>Đồng thời, cần lưu ý rằng compiler tiêu chuẩn chính thức thực hiện các tối ưu hóa đặc biệt
+khi hash các map key có size là 4 hoặc 8 byte.
+Vì vậy, xét từ góc độ tiết kiệm CPU,
+tốt hơn là dùng <code>map[[8]byte]V</code> thay cho <code>map[[5]byte]V</code>,
+và tốt hơn là dùng <code>map[int32]V</code> thay cho <code>map[int16]V</code>.</p>
+
+<h2>Giảm tần suất modification của element map</h2>
+
+<p>Trong chapter &quot;strings and byte slices&quot; trước đó, đã đề cập rằng
+<a href="4-string-and-byte-slice.html#bytes-2-string-as-map-retrieval-key">một conversion từ byte-slice sang string xuất hiện làm index key trong một expression truy xuất element của map
+không allocate</a>,
+nhưng các conversion như vậy trong các L-value map element index expression sẽ allocate.</p>
+
+<p>Vì vậy, đôi khi có thể giảm tần suất sử dụng các conversion như vậy trong các L-value map element index expression
+để cải thiện performance của chương trình.</p>
+
+<p>Trong ví dụ sau, cách B (cách dùng pointer element) có performance tốt hơn cách A.
+Lý do là cách B modification các element value ít hơn.
+Các element trong cách B là pointer; một khi đã được tạo, chúng không bao giờ bị thay đổi.</p>
+
+<pre><code class="language-Go">package maps
+
+import &quot;testing&quot;
+
+var wordCounterA = make(map[string]int)
+var wordCounterB = make(map[string]*int)
+var key = make([]byte, 64)
+
+func IncA(w []byte) {
+	wordCounterA[string(w)]++
+}
+
+func IncB(w []byte) {
+	p := wordCounterB[string(w)]
+	if p == nil {
+		p = new(int)
+		wordCounterB[string(w)] = p
+	}
+	*p++
+}
+
+func Benchmark_A(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		for i := range key {
+			IncA(key[:i])
+		}
+	}
+}
+
+func Benchmark_B(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		for i := range key {
+			IncB(key[:i])
+		}
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_A-4  11600 ns/op  2336 B/op  62 allocs/op
+Benchmark_B-4   1543 ns/op     0 B/op   0 allocs/op
+</code></pre>
+
+<p>Mặc dù cách B tiêu tốn ít CPU hơn,
+nó tạo ra nhiều pointer, làm tăng burden của việc scan pointer trong một GC cycle.
+Nhưng nhìn chung, cách B hiệu quả hơn.</p>
+
+<p>Có thể dùng thêm một counter table (một slice) và để map ghi các index vào table,
+nhằm tránh tạo nhiều allocation và nhiều pointer, như code sau đây cho thấy:</p>
+
+<pre><code class="language-Go">var wordIndexes = make(map[string]int)
+var wordCounters []int
+
+func IncC(w []byte) {
+	if i, ok := wordIndexes[string(w)]; ok {
+		wordCounters[i]++
+	} else {
+		wordIndexes[string(w)] = len(wordCounters)
+		wordCounters = append(wordCounters, 1)
+	}
+}
+
+func Benchmark_C(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		for i := range key {
+			IncC(key[:i])
+		}
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_A-4  11600 ns/op  2336 B/op  62 allocs/op
+Benchmark_B-4   1543 ns/op     0 B/op   0 allocs/op
+Benchmark_C-4   1609 ns/op     0 B/op   0 allocs/op
+</code></pre>
+
+<p>Xét trong thời gian ngắn, cách C gần như có performance tương đương cách B,
+nhưng vì dùng ít pointer hơn nhiều, trên thực tế nó hiệu quả hơn cách B khi xét trong thời gian dài.</p>
+
+<p>Cần lưu ý rằng các kết quả benchmark ở trên cho thấy hai cách sau đều tạo ra zero allocation.
+Điều này thực ra không đúng. Chỉ là mỗi lần chạy benchmark của hai cách sau tạo ra trung bình ít hơn một allocation, nên bị truncate thành zero.
+Đây là một <a href="https://github.com/golang/go/issues/24631">thiết kế có chủ ý</a>
+của cách báo cáo benchmark trong các package tiêu chuẩn.</p>
+
+<h2>Cố gắng grow một map trong một bước</h2>
+
+<p>Nếu có thể dự đoán số lượng entry tối đa sẽ được đưa vào một map tại thời điểm viết code,
+nên tạo map bằng hàm <code>make</code> và truyền số lượng tối đa làm argument <code>size</code> của call <code>make</code>,
+để tránh phải grow map qua nhiều bước về sau.</p>
+
+<h2>Dùng index table thay cho map có key type chỉ có một tập nhỏ các value khả dĩ</h2>
+
+<p>Một số programmer thích dùng map có bool key để giảm việc sử dụng các code block <code>if-else</code> dài dòng.
+Ví dụ, code sau</p>
+
+<pre><code class="language-Go">	// Bên trong một function ...
+	var condition bool
+	condition = evaluateCondition()
+	...
+	if condition {
+		counter++
+	} else {
+		counter--
+	}
+	...
+	if condition {
+		f()
+	} else {
+		g()
+	}
+	...
+</code></pre>
+
+<p>có thể được thay thế bằng</p>
+
+<pre><code class="language-Go">// Các map ở cấp package.
+var boolToInt = map[bool]int{true: 1, false: 0}
+var boolToFunc = map[bool]func(){true: f, false: g}
+
+	// Bên trong một function ...
+	var condition bool
+	condition = evaluateCondition()
+	...
+	counter += boolToInt[condition]
+	...
+	boolToFunc[condition]()
+	...
+</code></pre>
+
+<p>Nếu có nhiều code block <code>if-else</code> giống hệt như vậy được dùng trong code,
+việc dùng map có bool key sẽ giảm nhiều boilerplate và làm code trông sạch hơn.
+Với hầu hết use case, cách này nhìn chung là tốt.
+Tuy nhiên, tính đến Go toolchain v1.24.n, <a href="https://github.com/golang/go/issues/44578">cách dùng map không thực sự hiệu quả xét từ góc độ performance khi thực thi code</a>.
+Các benchmark sau cho thấy sự khác biệt về performance.</p>
+
+<pre><code class="language-Go">package maps
+
+import &quot;testing&quot;
+
+//go:noiline
+func f() {}
+
+//go:noiline
+func g() {}
+
+func IfElse(x bool) func() {
+	if x {
+		return f
+	} else {
+		return g
+	}
+}
+
+var m = map[bool]func() {true: f, false: g}
+func MapSwitch(x bool) func() {
+	return m[x]
+}
+
+func Benchmark_IfElse(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		IfElse(true)()
+		IfElse(false)()
+	}
+}
+
+func Benchmark_MapSwitch(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		MapSwitch(true)()
+		MapSwitch(false)()
+	}
+}
+</code></pre>
+
+<p>Kết quả benchmark:</p>
+
+<pre><code>Benchmark_IfElse-4      4.155 ns/op
+Benchmark_MapSwitch-4  47.46 ns/op
+</code></pre>
+
+<p>Từ kết quả benchmark, có thể thấy cách dùng block <code>if-else</code>
+có performance tốt hơn nhiều so với cách dùng map-switch.</p>
+
+<p>Với các use case yêu cầu performance code cao,
+có thể mô phỏng một map có bool key bằng cách dùng index table để giảm boilerplate <code>if-else</code>,
+nhưng vẫn giữ được sự đơn giản của cách map switch,
+với sự trợ giúp của một hàm bool-to-int.
+Các benchmark sau cho thấy cách dùng index table.</p>
+
+<pre><code class="language-Go">func b2i(b bool) (r int) {
+	if b {
+		r = 1
+	}
+	return
+}
+
+var boolMap = [2]func(){g, f}
+
+func Benchmark_BoolMap(b *testing.B) {
+	for i := 0; i &lt; b.N; i++ {
+		boolMap[b2i(true)]()
+		boolMap[b2i(false)]()
+	}
+}
+</code></pre>
+
+<p>Từ code trên, có thể thấy cách dùng index table gần như sạch sẽ như cách map-switch,
+dù cần thêm một hàm <code>b2i</code> nhỏ.
+Và từ các kết quả benchmark sau, có thể biết rằng cách dùng index table có performance tương đương cách dùng block <code>if-else</code>.</p>
+
+<pre><code>Benchmark_IfElse-4      4.155 ns/op
+Benchmark_MapSwitch-4  47.46 ns/op
+Benchmark_BoolMap-4     4.135 ns/op
+</code></pre>

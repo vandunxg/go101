@@ -1,0 +1,57 @@
+
+##### reflect 1
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+import "reflect"
+
+type I interface {
+	foo()
+	Bar()
+}
+
+type T struct {}
+
+func (T) foo() {}
+func (T) Bar() {}
+
+func main() {
+	var t T
+	var i I = t
+	var x = reflect.ValueOf(t)
+	var y = reflect.ValueOf(&i).Elem()
+	println(x.NumMethod(), y.NumMethod())
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+1 1
+1 2
+2 1
+2 2
+"""
+
+@@@ #answer
+{
+Đáp án: 1 2
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/f8V9JXl4Das __.
+
+Điểm chính:
+*
+   method `reflect.Value.NumMethod` đếm các method không được export đối với các type/value interface,
+   nhưng chỉ đếm các method được export đối với các type/value không phải interface.
+
+
+}
+

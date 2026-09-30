@@ -1,0 +1,28 @@
+
+### Blog Go 101
+
+""" html
+<!-- index starts (don't remove) -->
+"""
+
+*  __ Một số điểm tinh tế (thực sự) của Go
+       === ...`` 2025-10-22-some-real-go-subtleties.tmd
+*  __ Một số sự thật về iterator của Go
+       === ...`` 2025-03-15-some-facts-about-iterators.tmd
+*  __ Những thay đổi về ngữ nghĩa của vòng lặp `for` trong Go 1.22: hãy lưu ý đến tác động
+       === ...`` 2024-03-01-for-loop-semantic-changes-in-go-1.22.tmd
+*  __ Các thao tác built-in trên slice của Go chưa đầy đủ
+       === ...`` 2022-12-30-go-builtin-slice-manipulations-are-incomplete.tmd
+*  __ Thật đáng tiếc là các phần tử byte của các string constant trong Go không phải là constant. Và đó là một điều may mắn.
+       === ...`` 2022-11-18-constant-string-elements-are-not-constants.tmd
+*  __ Không có cách an toàn và hiệu quả nào để thực hiện các phép so sánh string ba chiều trong Go
+       === ...`` 2022-10-01-three-way-string-comparison.tmd
+*  __ Một số thay đổi chưa được tài liệu hóa trong Go 1.18 và 1.19
+       === ...`` 2022-08-22-some-undocumented-changes-in-go-1.18-and-1.19.tmd
+*  __ Lịch sử cập nhật của các sách Go 101
+       === ...`` 2022-02-22-history.tmd
+
+
+""" html
+<!-- index ends (don't remove) -->
+"""

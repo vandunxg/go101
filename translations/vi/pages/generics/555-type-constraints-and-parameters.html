@@ -1,0 +1,729 @@
+<p id="f-555-type-constraints-and-parameters-md"></p>
+<h1>Các type constraint và type parameter</h1>
+
+<p>Constraint có nghĩa là type constraint, được dùng để ràng buộc một số type parameter.
+Ta có thể xem constraint là type của các type.</p>
+
+<p>Mối quan hệ giữa constraint và type parameter giống như
+mối quan hệ giữa type và value.
+Nếu ta nói type là template của value (và value là instance của type),
+thì constraint là template của type (và type là instance của constraint).</p>
+
+<p>Type parameter là một type được khai báo trong một type parameter list
+và có thể được dùng trong một generic type specification hoặc khai báo generic function/method.
+Mỗi type parameter là một named type riêng biệt.</p>
+
+<p>Type parameter list sẽ được giải thích chi tiết trong một section sau.</p>
+
+<p>Như đã đề cập trong chapter trước, type constraint thực chất là
+<a href="https://go101.org/article/interface.html">interface type</a>.
+Để interface type có thể đảm nhiệm vai trò constraint,
+Go 1.18 mở rộng khả năng biểu đạt của interface type bằng cách hỗ trợ một số notation mới.</p>
+
+<h2>Cú pháp interface mở rộng</h2>
+
+<p>Một số notation mới được đưa vào Go để có thể dùng interface type làm constraint.</p>
+
+<ul>
+<li>Dạng <code>~T</code>, trong đó <code>T</code> là một type literal hoặc type name.
+<code>T</code> phải biểu thị một non-interface type có underlying type là chính nó
+(vì vậy <code>T</code> không thể là type parameter, nội dung này được giải thích bên dưới).
+Dạng này biểu thị một type set, bao gồm mọi type có
+<a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a> là <code>T</code>.
+Dạng <code>~T</code> được gọi là tilde form hoặc type tilde trong cuốn sách này
+(hoặc underlying term và approximation type ở những nơi khác).</li>
+<li>Dạng <code>T1 | T2 | ... | Tn</code>, được gọi là union of terms (hoặc type/term union trong cuốn sách này).
+Mỗi term <code>Tx</code> phải là một tilde form, type literal hoặc type name,
+và không được biểu thị một type parameter.
+Có một số yêu cầu đối với union term.
+Các yêu cầu này sẽ được mô tả trong một section bên dưới.</li>
+</ul>
+
+<p>Lưu ý rằng type literal luôn biểu thị một unnamed type,
+trong khi type name có thể biểu thị một named type hoặc unnamed type.</p>
+
+<p>Một số ví dụ hợp lệ của các notation mới:</p>
+
+<pre><code class="language-Go">// các tilde form
+~int
+~[]byte
+~map[int]string
+~chan struct{}
+~struct{x int}
+
+// các union của term
+uint8 | uint16 | uint32 | uint64
+~[]byte | ~string
+map[int]int | []int | [16]int | any
+chan struct{} | ~struct{x int}
+</code></pre>
+
+<p>Ta biết rằng, trước Go 1.18, một interface type có thể embed</p>
+
+<ul>
+<li>số lượng tùy ý method specification (method element, một loại interface element);</li>
+<li>số lượng tùy ý type name (type element, loại interface element còn lại),
+nhưng type name phải biểu thị interface type.</li>
+</ul>
+
+<p>Go 1.18 đã nới lỏng các giới hạn của type element, vì vậy hiện nay một interface type
+có thể embed các type element sau:</p>
+
+<ul>
+<li>bất kỳ type literal hoặc type name nào, dù chúng có biểu thị interface type hay không, nhưng chúng không được biểu thị type parameter.</li>
+<li>tilde form.</li>
+<li>term union.</li>
+</ul>
+
+<p>Thứ tự của các interface element được embed trong một interface type không quan trọng.</p>
+
+<p>Đoạn code sau cho thấy một số khai báo interface type,
+trong đó các interface type literal trong khai báo của <code>N</code> và <code>O</code>
+chỉ hợp lệ từ Go 1.18.</p>
+
+<pre><code class="language-Go">type L interface {
+	Run() error
+	Stop()
+}
+
+type M interface {
+	L
+	Step() error
+}
+
+type N interface {
+	M
+	interface{ Resume() }
+	~map[int]bool
+	~[]byte | string
+}
+
+type O interface {
+	Pause()
+	N
+	string
+	int64 | ~chan int | any
+}
+</code></pre>
+
+<p>Embedding một interface type trong một interface type khác tương đương với việc (đệ quy) mở rộng các element của interface type trước vào interface type sau. Trong ví dụ trên, các khai báo của <code>M</code>, <code>N</code> và <code>O</code> tương đương với các khai báo sau:</p>
+
+<pre><code class="language-Go">type M interface {
+	Run() error
+	Stop()
+	Step() error
+}
+
+type N interface {
+	Run() error
+	Stop()
+	Step() error
+	Resume()
+	~map[int]bool
+	~[]byte | string
+}
+
+type O interface {
+	Run() error
+	Stop()
+	Step() error
+	Pause()
+	Resume()
+	~map[int]bool
+	~[]byte | string
+	string
+	int64 | ~chan int | any
+}
+</code></pre>
+
+<p>Ta có thể xem một type literal, type name hoặc tilde form đơn lẻ là một term union chỉ có một term.
+Nói đơn giản, kể từ Go 1.18, một interface type có thể chỉ định một số method và embed một số term union.</p>
+
+<p>Một interface type không có embedding element nào được gọi là empty interface.
+Ví dụ, type alias dựng sẵn <code>any</code> biểu thị một empty interface type.</p>
+
+<h2 id="type-sets-and-implementations">Type set và type implementation</h2>
+
+<p>Trước Go 1.18, một interface type được định nghĩa là một method set.
+Kể từ Go 1.18, một interface type được định nghĩa là một type set.
+Một type set chỉ bao gồm các non-interface type.</p>
+
+<p>Thực tế, mỗi type term đều định nghĩa một method set.
+Việc tính toán type set tuân theo các quy tắc sau:</p>
+
+<ul>
+<li>Type set của một non-interface type literal hoặc type name chỉ chứa type được type literal hoặc type name đó biểu thị.</li>
+<li>Như đã đề cập ở trên, type set của một tilde form <code>~T</code> là tập các type có underlying type là <code>T</code>. Về lý thuyết, đây là một tập vô hạn.</li>
+<li>Type set của một method specification là tập các non-interface type có method set bao gồm method specification đó. Về lý thuyết, đây là một tập vô hạn.</li>
+<li>Type set của một empty interface (chẳng hạn type <code>any</code> dựng sẵn) là tập của mọi non-interface type. Về lý thuyết, đây là một tập vô hạn.</li>
+<li>Type set của một union of terms <code>T1 | T2 | ... | Tn</code> là union của các type set của các term.</li>
+<li>Type set của một non-empty interface là intersection của các type set của những interface element của nó.</li>
+</ul>
+
+<p>Theo specification hiện tại, hai unnamed constraint tương đương nhau nếu type set của chúng bằng nhau.</p>
+
+<p>Với các type được khai báo trong đoạn code sau,
+type set của mỗi interface type được mô tả trong comment ngay trước interface type đó.</p>
+
+<pre><code class="language-Go">type Bytes []byte  // underlying type là []byte
+type Letters Bytes // underlying type là []byte
+type Blank struct{}
+type MyString string // underlying type là string
+
+func (MyString) M() {}
+func (Bytes) M() {}
+func (Blank) M() {}
+
+// Type set của P chỉ chứa một type:
+// []byte.
+type P interface {[]byte}
+
+// Type set của Q chứa
+// []byte, Bytes và Letters.
+type Q interface {~[]byte}
+
+// Type set của R chỉ chứa hai type:
+// []byte và string.
+type R interface {[]byte | string}
+
+// Type set của S rỗng.
+type S interface {R; M()}
+
+// Type set của T chứa:
+// []byte, Bytes, Letters, string và MyString.
+type T interface {~[]byte | ~string}
+
+// Type set của U chứa:
+// MyString, Bytes và Blank.
+type U interface {M()}
+
+// V &lt;=&gt; P
+type V interface {[]byte; any}
+
+// Type set của W chứa:
+// Bytes và MyString.
+type W interface {T; U}
+
+// Z &lt;=&gt; any. Z là một blank interface. Type set của nó
+// chứa mọi non-interface type.
+type Z interface {~[]byte | ~string | any}
+</code></pre>
+
+<p>Xin lưu ý, interface element được phân tách bằng dấu chấm phẩy (<code>;</code>),
+dù là tường minh hay ngầm định (Go compiler sẽ
+<a href="https://go101.org/article/line-break-rules.html">chèn một số dấu chấm phẩy bị thiếu khi cần trong quá trình compile</a>).
+Các interface type literal sau tương đương với nhau,
+chúng đều biểu thị một unnamed interface type có type set rỗng.
+Unnamed interface type được biểu thị và underlying type của type <code>S</code>
+trong đoạn code trên thực tế là đồng nhất.</p>
+
+<pre><code class="language-Go">interface {~string; string; M();}
+interface {~string; string; M()}
+interface {
+	~string
+	string
+	M()
+}
+</code></pre>
+
+<p>Nếu type set của một type <code>X</code> là subset của một interface type <code>Y</code>, ta nói <code>X</code> implement <code>Y</code>.
+Ở đây, <code>X</code> có thể là một interface type hoặc non-interface type.</p>
+
+<p>Vì type set của một empty interface type là superset của type set của mọi type,
+mọi type đều implement một empty interface type.
+Mặt khác, vì empty type set là subset của mọi type set,
+một empty-type-set interface type implement mọi interface type.</p>
+
+<p>Lấy các type được khai báo ở trên làm ví dụ,</p>
+
+<ul>
+<li>interface type <code>S</code>, có type set rỗng, implement mọi interface type.</li>
+<li>mọi type đều implement interface type <code>Z</code>, vốn thực chất là một blank interface type.</li>
+</ul>
+
+<p>Danh sách các method được chỉ định bởi một interface type được gọi là method set của interface type đó.
+Nếu một interface type <code>X</code> implement một interface type khác <code>Y</code>, thì method set của <code>X</code> phải là superset của <code>Y</code>.</p>
+
+<p>Interface type có type set có thể được định nghĩa hoàn toàn bằng một method set (có thể rỗng)
+được gọi là basic interface type.
+Trước 1.18, Go chỉ hỗ trợ basic interface type.
+Basic interface có thể được dùng làm value type hoặc type constraint,
+nhưng non-basic interface chỉ có thể được dùng làm type constraint (tính đến Go 1.25).</p>
+
+<p>Lấy các type được khai báo ở trên làm ví dụ, <code>L</code>, <code>M</code>, <code>U</code>, <code>Z</code> và <code>any</code> là basic type.</p>
+
+<p>Trong code sau, các dòng khai báo <code>x</code> và <code>y</code> đều compile thành công,
+nhưng dòng khai báo <code>z</code> compile thất bại.</p>
+
+<pre><code class="language-Go">var x any
+var y interface {M()}
+
+// error: interface contains type constraints
+var z interface {~[]byte}
+</code></pre>
+
+<p>Hiện chưa rõ trong các phiên bản Go tương lai có hỗ trợ non-basic interface type làm value type hay không.</p>
+
+<p>Lưu ý, trước Go toolchain 1.19, alias cho non-basic interface type không được hỗ trợ.
+Các khai báo type alias sau <a href="https://github.com/golang/go/issues/51616">chỉ hợp lệ từ Go toolchain 1.19</a>.</p>
+
+<pre><code class="language-Go">type C[T any] interface{~int; M() T}
+type C1 = C[bool]
+type C2 = comparable
+type C3 = interface {~[]byte | ~string}
+</code></pre>
+
+<h2>Thêm về constraint <code>comparable</code> dựng sẵn</h2>
+
+<p>Như đã nói ở trên, ngoài <code>any</code>, Go 1.18 còn giới thiệu một identifier dựng sẵn mới là <code>comparable</code>,
+identifier này biểu thị một interface type có method set gồm tất cả các strictly comparable (non-interface) type
+("strictly comparable" được giải thích trong section tiếp theo).</p>
+
+<p>Interface type <code>comparable</code> có thể được embed trong các interface type khác
+để lọc các type không strictly comparable khỏi type set của chúng.
+Ví dụ, type set của constraint <code>C</code> được khai báo sau chỉ chứa một type: <code>string</code>,
+vì các type còn lại trong union hoặc là
+<a href="https://go101.org/article/type-system-overview.html#types-not-support-comparison">incomparable</a>
+(ba type đầu tiên) hoặc không <a href="#strictly-comparable">strictly comparable</a> (type cuối cùng).</p>
+
+<pre><code class="language-Go">type C interface {
+	comparable
+	[]byte | func() | map[int]bool | string | [2]any
+}
+</code></pre>
+
+<p><em>(Lưu ý, một số phiên bản Go toolchain 1.18 và 1.19 đầu tiên không loại <code>[2]any</code> khỏi type set của <code>C</code>. Bug này đã được sửa trong các phiên bản Go toolchain 1.18 và 1.19 mới hơn.)</em></p>
+
+<p>Hiện tại (Go 1.25), interface <code>comparable</code> được xem là một non-basic interface type.
+Vì vậy, hiện nay nó chỉ có thể được dùng làm type parameter constraint, không phải value type.
+Code sau là không hợp lệ:</p>
+
+<pre><code class="language-Go">var x comparable = 123
+</code></pre>
+
+<p>Type set của interface <code>comparable</code> rõ ràng là subset của type set của interface <code>any</code>,
+vì vậy <code>comparable</code> chắc chắn implement <code>any</code>, còn chiều ngược lại thì không.</p>
+
+<h2 id="strictly-comparable">Comparable và strictly comparable</h2>
+
+<p>Ta biết rằng, mặc dù interface type là comparable, việc compare hai value của một interface type
+sẽ gây panic lúc runtime nếu dynamic type
+của hai interface value giống nhau và dynamic type giống nhau đó là incomparable.
+Việc compare các value của struct hoặc array type có chứa interface component cũng có thể gây panic.</p>
+
+<p>Ví dụ, bất kỳ phép compare nào được thể hiện trong function <code>main</code> cũng sẽ gây panic lúc runtime.</p>
+
+<pre><code class="language-Go">package main
+
+var m any = map[int]string{}
+var a = [2]any{1, func(){}}
+var s = struct{x any}{x: m}
+
+func main() {
+	_ = m == m
+	_ = a == a
+	_ = s == s
+}
+</code></pre>
+
+<p>Khái niệm "strictly comparable" được giới thiệu trong Go 1.20.
+Compare các value của một strictly comparable type được đảm bảo không gây panic lúc runtime.
+Một type thông thường là strictly comparable nếu nó comparable và không phải interface type cũng như không được cấu thành từ interface type.</p>
+
+<p>Các value type sau không strictly comparable:</p>
+
+<ul>
+<li>(basic) interface type.</li>
+<li>struct type có field chứa interface.</li>
+<li>array type có element chứa interface.</li>
+<li>type parameter có type set chứa ít nhất một type thuộc một trong hai trường hợp trên (struct và array).</li>
+</ul>
+
+<p>Trong ví dụ trên, các type <code>any</code>, <code>[2]any</code> và <code>struct{x any}</code> đều comparable nhưng không strictly comparable.</p>
+
+<p>Như đã đề cập trong section trước, mọi type trong type set của interface <code>comparable</code> dựng sẵn đều strictly comparable.</p>
+
+<h2 id="implementation-vs-satisfaction">Type implementation và type satisfaction</h2>
+
+<p>Trước Go 1.20, hai thuật ngữ này được dùng thay thế cho nhau.
+Nói cách khác, hai mô tả sau tương đương với nhau trước Go 1.20:</p>
+
+<ul>
+<li>type <code>X</code> implement interface type <code>Y</code>.</li>
+<li>type <code>X</code> satisfy interface type <code>Y</code>.</li>
+</ul>
+
+<p>Trước Go 1.20, cả hai đều có nghĩa là type set của type <code>X</code> là subset của interface type <code>Y</code>.
+Vì vậy, trước Go 1.20, nếu type <code>X</code> implement interface type <code>Y</code>,
+thì nó cũng phải satisfy <code>Y</code>; và ngược lại.</p>
+
+<p>Kể từ Go 1.20, ý nghĩa của type implementation vẫn giữ nguyên.
+Tuy nhiên, đôi khi một ordinary value type <code>X</code> có thể satisfy một interface type <code>Y</code>, ngay cả khi nó không implement <code>Y</code>.
+Nói cách khác, kể từ Go 1.20, nếu một ordinary value type <code>X</code> implement một interface type <code>Y</code>,
+thì nó cũng phải satisfy <code>Y</code>; nhưng chiều ngược lại thì không.</p>
+
+<p>Cụ thể, kể từ Go 1.20, nếu một comparable ordinary value type <code>X</code> không strictly comparable
+và nó không implement một type constraint <code>Y</code>,
+nhưng underlying type của <code>Y</code> có thể được viết là <code>interface{ comparable; E }</code>,
+trong đó <code>E</code> là một basic interface type và ordinary value type <code>X</code> implement <code>E</code>,
+thì <code>X</code> cũng satisfy <code>Y</code>.</p>
+
+<p>Ví dụ, type <code>any</code> chắc chắn không implement type constraint <code>comparable</code>.
+Nhưng khi được dùng làm ordinary value type, nó satisfy <code>comparable</code>.
+Vì underlying type của <code>comparable</code> có thể được viết là <code>interface{ comparable; any }</code>
+và <code>any</code> implement <code>any</code>.</p>
+
+<p>Trong code sau, các type <code>*A</code> và <code>*B</code> đều satisfy (nhưng không implement) interface type <code>C</code>.
+Vì <code>C</code> có thể được viết là <code>interface{ comparable; interface{ M() } }</code> và
+cả <code>*A</code> lẫn <code>*B</code> đều implement <code>interface{ M() }</code>.</p>
+
+<pre><code class="language-Go">type A [2]any
+
+func (a *A) M() {}
+
+type B struct{
+	A
+	x any
+}
+
+type C interface {
+	comparable
+	M()
+}
+</code></pre>
+
+<p>Tính đến Go 1.25, type satisfaction được dùng để xác minh liệu một ordinary value type
+có thể được dùng làm type argument trong một instantiation của generic type/function hay không.
+Vui lòng đọc chapter tiếp theo để biết chi tiết.</p>
+
+<h2>Các yêu cầu khác đối với union term</h2>
+
+<p>Ở trên đã đề cập rằng union term không được là type parameter. Có hai yêu cầu khác đối với union term.</p>
+
+<p>Yêu cầu đầu tiên là một yêu cầu phụ thuộc implementation: term union có nhiều hơn một term không được chứa identifier <code>comparable</code> dựng sẵn hoặc interface có method.
+Ví dụ, cả hai term union sau đều không hợp lệ (tính đến Go toolchain 1.25):</p>
+
+<pre><code class="language-Go">[]byte | comparable
+string | error
+</code></pre>
+
+<p>Để đơn giản hóa cách mô tả, cuốn sách này sẽ xem interface type <code>comparable</code> dựng sẵn
+là một interface type có method (nhưng không xem nó là basic interface type).</p>
+
+<p>Một yêu cầu (restriction) khác là type set của mọi non-interface type term trong một term union không được có intersection. Ví dụ, trong đoạn code sau, term union trong khai báo đầu tiên compile thất bại, nhưng hai khai báo cuối compile thành công.</p>
+
+<pre><code class="language-Go">type _ interface {
+	int | ~int // error
+}
+
+type _ interface {
+	interface{int} | interface{~int} // okay
+}
+
+type _ interface {
+	int | interface{~int} // okay
+}
+</code></pre>
+
+<p>Ba term union trong đoạn code trên tương đương nhau về mặt logic,
+điều đó có nghĩa là restriction này không hợp lý lắm.
+Vì vậy, restriction có thể bị loại bỏ trong các phiên bản Go sau,
+hoặc trở nên chặt chẽ hơn để vô hiệu hóa workaround.</p>
+
+<h2>Type parameter list</h2>
+
+<p>Từ các ví dụ trong chapter trước, ta biết type parameter list
+được dùng trong generic type specification, khai báo method cho generic base type
+và khai báo generic function.</p>
+
+<p>Một type parameter list chứa ít nhất một type parameter declaration
+và được đặt trong dấu ngoặc vuông.
+Mỗi parameter declaration gồm một phần name và một phần constraint
+(ta có thể xem constraint là ngầm định trong khai báo method cho generic base type).
+Name biểu thị một type parameter bị ràng buộc bởi constraint đó.
+Các parameter declaration được phân tách bằng dấu phẩy trong một type parameter list.</p>
+
+<p>Trong một type parameter list, mọi type parameter name đều phải xuất hiện.
+Chúng có thể là blank identifier <code>_</code> (được gọi là blank name).
+Mọi name không phải blank trong một type parameter list phải là duy nhất.</p>
+
+<p>Tương tự value parameter list, nếu constraint của một số type parameter declaration liên tiếp trong một type parameter list giống nhau,
+thì các type parameter declaration này có thể dùng chung một phần constraint trong type parameter list.
+Ví dụ, hai type parameter list sau tương đương.</p>
+
+<pre><code class="language-Go">[A any, B any, X comparable, _ comparable]
+[A, B any, X, _ comparable]
+</code></pre>
+
+<p>Tương tự value parameter list, nếu token <code>]</code> bên phải trong một type parameter list
+và constraint cuối cùng trong list nằm trên cùng một dòng, có thể chèn dấu phẩy tùy chọn giữa chúng.
+<a href="https://go101.org/article/line-break-rules.html#commas">Dấu phẩy là bắt buộc</a> nếu hai phần không nằm trên cùng một dòng.</p>
+
+<p>Ví dụ, trong code sau, các dòng đầu là hợp lệ, các dòng cuối thì không.</p>
+
+<pre><code class="language-Go">// Các dòng hợp lệ:
+[T interface{~map[int]string}]
+[T interface{~map[int]string},]
+[T interface{~map[int]string},
+]
+[A, B any, _, _ comparable]
+[A, B any, _, _ comparable,]
+[A, B any, _, _ comparable,
+]
+[A, B any,
+_, _ comparable]
+
+// Các dòng không hợp lệ:
+[A, B any, _, _ comparable
+]
+[T interface{~map[int]string}
+]
+</code></pre>
+
+<p>Variadic type parameter không được hỗ trợ.</p>
+
+<p>Để đơn giản hóa cách mô tả, trong cuốn sách này type set của constraint của một type parameter
+cũng được gọi là type set của type parameter và type set của một value thuộc type parameter đó.</p>
+
+<h2>Dạng constraint rút gọn</h2>
+
+<p>Trong một type parameter list, nếu một constraint chỉ chứa một element
+và element đó là một type element,
+thì có thể bỏ <code>interface{}</code> bao quanh cho thuận tiện.
+Ví dụ, hai type parameter list sau tương đương.</p>
+
+<pre><code class="language-Go">[X interface{string|[]byte}, Y interface{~int}]
+[X string|[]byte, Y ~int]
+</code></pre>
+
+<p>Dạng constraint rút gọn khiến code trông gọn hơn nhiều.
+Trong hầu hết trường hợp, chúng không gây vấn đề.
+Tuy nhiên, chúng có thể gây ra ambiguity khi parsing trong một số trường hợp đặc biệt.
+Đặc biệt, ambiguity khi parsing có thể xảy ra khi type parameter list
+của một generic type specification khai báo một type parameter duy nhất
+có constraint ở dạng rút gọn và bắt đầu bằng <code>*</code> hoặc <code>(</code>.</p>
+
+<p>Ví dụ, code sau có khai báo một generic type không?</p>
+
+<pre><code class="language-Go">type G[T *int] struct{}
+</code></pre>
+
+<p>Điều này phụ thuộc vào việc identifier <code>int</code> biểu thị gì.
+Nếu nó biểu thị một type (rất có thể, nhưng không tuyệt đối),
+thì compiler nên hiểu code này khai báo một generic type.
+Nếu nó biểu thị một constant (điều này có thể xảy ra),
+thì compiler sẽ xem <code>T *int</code> là một multiplication expression và
+hiểu code này khai báo một array type thông thường.</p>
+
+<p>Compiler có thể phân biệt identifier <code>int</code> biểu thị gì,
+nhưng để đạt được điều đó phải trả một số chi phí. Để tránh chi phí này,
+compiler luôn xem identifier <code>int</code> là một value expression
+và hiểu khai báo trên là một khai báo array type thông thường.
+Vì vậy, dòng khai báo trên sẽ compile thất bại
+nếu <code>T</code> hoặc <code>int</code> không biểu thị integer constant.</p>
+
+<p>Vậy làm thế nào để khai báo một generic type với một type parameter duy nhất có <code>*int</code> làm constraint?
+Có hai cách để thực hiện điều này:</p>
+
+<ol>
+<li>dùng dạng constraint đầy đủ, hoặc</li>
+<li>đặt một dấu phẩy sau dạng constraint rút gọn.</li>
+</ol>
+
+<p>Hai cách này được thể hiện trong đoạn code sau:</p>
+
+<pre><code class="language-Go">// Giả sử int là một type dựng sẵn.
+type G[T interface{*int}] struct{}
+type G[T *int,] struct{}
+</code></pre>
+
+<p>Hai cách trên cũng hữu ích cho một số trường hợp đặc biệt khác, vốn cũng có thể gây ambiguity khi parsing.
+Ví dụ:</p>
+
+<pre><code class="language-Go">// PA có thể là array pointer variable hoặc type name.
+// Compiler không xem nó là type name.
+type K[cap (*PA)] struct{}
+
+// S có thể là string constant hoặc type name.
+// Compiler không xem nó là type name.
+type L[len (S)] struct{}
+</code></pre>
+
+<p>Sau đây là một trường hợp khác có thể gây ambiguity khi parsing.</p>
+
+<pre><code class="language-Go">// T, int và bool có thể là ba integer constant,
+// hoặc int và bool đều là type dựng sẵn.
+type C5[T *int|bool] struct{}
+</code></pre>
+
+<p>Ta nên chèn một dấu phẩy sau constraint được giả định là <code>*int|bool</code> để loại bỏ ambiguity.</p>
+
+<pre><code class="language-Go">type C5[T *int|bool, ] struct{} // compile thành công
+</code></pre>
+
+<p>(Lưu ý: cách này không hoạt động với Go toolchain 1.18. Đó là <a href="https://github.com/golang/go/issues/51488">một bug</a> và đã được sửa từ Go toolchain 1.19.)</p>
+
+<p>Ta cũng có thể dùng dạng constraint đầy đủ hoặc đổi vị trí của <code>*int</code> và <code>bool</code> để code compile thành công.</p>
+
+<pre><code class="language-Go">// Giả sử int và bool là các type dựng sẵn.
+type C5[T interface{*int|bool}] struct{}
+type C5[T bool|*int] struct{}
+</code></pre>
+
+<p>Mặt khác, hai khai báo generic type kỳ lạ sau đều hợp lệ.</p>
+
+<pre><code class="language-Go">// "make" là một type parameter được khai báo.
+// Constraint của nó là interface{chan int}.
+type PtrToChan[make (chan int)] *make
+
+// "new" là một type parameter được khai báo.
+// Constraint của nó là interface{[3]float64}.
+type Matrix33[new ([3]float64)] [3]new
+</code></pre>
+
+<p>Hai khai báo trên thực sự là các thực hành rất tệ. Đừng dùng chúng trong code nghiêm túc.</p>
+
+<h2 id="type-parameters-are-interfaces">Mỗi type parameter là một named type riêng biệt</h2>
+
+<p>Kể từ Go 1.18, named type bao gồm</p>
+
+<ul>
+<li>type dựng sẵn, chẳng hạn <code>int</code>, <code>bool</code> và <code>string</code>.</li>
+<li>non-generic type được định nghĩa.</li>
+<li>type được instantiate từ generic type.</li>
+<li>type của type parameter (các type được khai báo trong type parameter list).</li>
+</ul>
+
+<p>Hai type parameter khác nhau không bao giờ đồng nhất.</p>
+
+<p>Type của một type parameter là một constraint, còn gọi là interface type.
+Điều này có nghĩa là underlying type của type parameter type phải là một interface type.
+Tuy nhiên, điều này không có nghĩa là type parameter hoạt động như một interface type.
+Value của nó không thể box non-interface value cũng như không thể được type assert (tính đến Go 1.25).
+Thực tế, nói về underlying type của type parameter gần như hoàn toàn không có ý nghĩa.
+Ta chỉ cần biết rằng underlying type của một type parameter không phải chính nó.
+Và ta nên nghĩ rằng hai type parameter không bao giờ chia sẻ một underlying type đồng nhất,
+ngay cả khi constraint của hai type parameter giống hệt nhau.</p>
+
+<p>Thực tế, type parameter chỉ là placeholder cho các type trong type set của nó.
+Nói chung, nó đại diện cho một type sở hữu các đặc tính chung của các type trong type set của nó.</p>
+
+<p>Vì underlying type của type parameter type không phải chính type parameter type,
+tilde form <code>~T</code> là không hợp lệ nếu <code>T</code> là type parameter.
+Vì vậy, các type parameter list (tương đương) sau không hợp lệ.</p>
+
+<pre><code class="language-Go">[A int, B ~A]                       // error
+[A interface{int}, B interface{~A}] // error
+</code></pre>
+
+<p>Như đã đề cập ở trên, type parameter cũng không được phép được embed
+như type name và type term trong một interface type.
+Các khai báo sau cũng không hợp lệ.</p>
+
+<pre><code class="language-Go">type Cx[T int] interface {
+	T
+}
+
+type Cy[T int] interface {
+	T | []string
+}
+</code></pre>
+
+<p>Thực tế, hiện tại (Go 1.25), <a href="888-the-status-quo-of-go-custom-generics.html#embed-type-parameter">type parameter cũng không được embed trong struct type</a>.</p>
+
+<h2 id="type-parameter-scope">Scope của các type parameter</h2>
+
+<p>Go specification nói:</p>
+
+<ul>
+<li>Scope của identifier biểu thị một type parameter của function hoặc được khai báo bởi một method receiver bắt đầu sau name của function và kết thúc ở cuối function body.</li>
+<li>Scope của identifier biểu thị một type parameter của type bắt đầu sau name của type và kết thúc ở cuối specification của type.</li>
+</ul>
+
+<p>Vì vậy, khai báo type sau hợp lệ, ngay cả khi việc dùng type parameter <code>E</code> nằm trước khai báo của nó.
+Type parameter <code>E</code> được dùng trong constraint của type parameter <code>S</code>,</p>
+
+<pre><code class="language-Go">type G[S ~[]E, E int] struct{}
+</code></pre>
+
+<p>Xin lưu ý,</p>
+
+<ul>
+<li>như đã đề cập trong section trước, mặc dù <code>E</code> là một type parameter type, <code>[]E</code> là một type (slice) thông thường.</li>
+<li>underlying type của <code>S</code> là <code>interface{~[]E}</code>, không phải <code>[]E</code>.</li>
+<li>underlying type của <code>E</code> là <code>interface{int}</code>, không phải <code>int</code>.</li>
+</ul>
+
+<p>Theo Go specification, các khai báo function và method trong code sau đều compile thất bại.</p>
+
+<pre><code class="language-Go">type C any
+func foo1[C C]() {}    // error: cannot use a type parameter as constraint
+func foo2[T C](T T) {} // error: T redeclared
+
+type G[G any] struct{x G} // okay
+func (E G[E]) Bar1() {}   // error: E redeclared
+</code></pre>
+
+<p>Khai báo method <code>Bar2</code> sau đáng lẽ compile thành công, nhưng chỉ với Go toolchain v1.24+.</p>
+
+<pre><code class="language-Go">type G[G any] struct{x G}
+func (v G[G]) Bar2() {}
+</code></pre>
+
+<h2>Các composite type literal (unnamed type) chứa type parameter biểu thị các ordinary type</h2>
+
+<p>Ví dụ, <code>*T</code> luôn là một type (pointer) thông thường.
+Nó là một type literal, vì vậy underlying type của nó là chính nó, bất kể <code>T</code> có phải type parameter hay không.
+Type parameter list sau là hợp lệ.</p>
+
+<pre><code class="language-Go">[A int, B *A] // okay
+</code></pre>
+
+<p>Vì cùng lý do, các type parameter list sau cũng hợp lệ.</p>
+
+<pre><code class="language-Go">[T ~string|~int, A ~[2]T, B ~chan T]            // okay
+[T comparable, M ~map[T]int32, F ~func(T) bool] // okay
+</code></pre>
+
+<h2>Thêm về khai báo generic type và function</h2>
+
+<p>Ta đã thấy một khai báo generic type và một số khai báo generic function trong chapter trước.
+Khác với khai báo type và function thông thường, mỗi khai báo generic đều có một phần type parameter list.</p>
+
+<p>Cuốn sách này không dự định nói thêm về cú pháp khai báo generic type và function.</p>
+
+<p>Phần source type của một khai báo generic type phải là một ordinary type.
+Vì vậy, nó có thể là</p>
+
+<ul>
+<li>một composite type literal. Như đã đề cập ở trên, composite type literal luôn biểu thị một ordinary type.</li>
+<li>một type name biểu thị một ordinary type.</li>
+<li>một instantiated type. Type instantiation sẽ được giải thích chi tiết trong chapter tiếp theo.
+Hiện tại, ta chỉ cần biết mỗi instantiated type là một named ordinary type.</li>
+</ul>
+
+<p>Code sau cho thấy một số khai báo generic type với đủ loại source type.
+Tất cả các khai báo này đều hợp lệ.</p>
+
+<pre><code class="language-Go">// Các source type là ordinary type name.
+type (
+	Fake1[T any] int
+	Fake2[_ any] []bool
+)
+
+// Source type là một unnamed type (composite type).
+type MyData [A any, B ~bool, C comparable] struct {
+	x A
+	y B
+	z C
+}
+
+// Source type là một instantiated type.
+type YourData[C comparable] MyData[string, bool, C]
+</code></pre>
+
+<p>Không được dùng type parameter làm source type trong khai báo generic type.
+Ví dụ, code sau không compile.</p>
+
+<pre><code class="language-Go">type G[T any] T // error
+</code></pre>

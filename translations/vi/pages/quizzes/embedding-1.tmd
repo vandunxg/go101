@@ -1,0 +1,78 @@
+
+##### embedding 1
+
+@@@ #question
+{
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+type A struct {
+	g int
+}
+
+func (A) m() int {
+	return 1
+}
+
+type B int
+
+func (B) g() {}
+
+func (B) f() {}
+
+type C struct{
+	A
+	B
+}
+
+func (C) m() int {
+	return 9
+}
+
+func main() {
+	var c interface{} = C{}
+	_, bf := c.(interface{f()})
+	_, bg := c.(interface{g()})
+	i := c.(interface{m() int})
+	println(bf, bg, i.m())
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+false false 9
+false true 9
+true false 9
+true true 9
+false false 1
+false true 1
+true false 1
+true true 1
+"""
+
+@@@ #answer
+{
+Đáp án: true false 9
+
+Chạy thử trên __ Go play`` https://go.dev/play/p/8afpI_sARYh __.
+
+Điểm chính:
+*
+   Field `C.A.g` và method `C.B.g` xung đột, nên cả hai đều không được promotion.
+*
+   Method `C.B.f` được promotion thành `C.f`.
+*
+   Method `C.m` ghi đè `C.A.m`.
+
+
+
+Hãy đọc __ type embedding`` https://go101.org/article/type-embedding.html __ để xem phần giải thích chi tiết hơn.
+
+
+
+}

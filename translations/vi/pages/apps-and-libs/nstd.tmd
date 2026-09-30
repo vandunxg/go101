@@ -1,0 +1,175 @@
+
+################################## nstd (Thư viện Go không chuẩn)
+
+`nstd` là một Go module chỉ gồm một package, cung cấp
+một số type và function còn thiếu trong standard library.
+
+Trang dự án: __https://github.com/go101/nstd__
+
+Trang tài liệu: __https://docs.go101.org/std/pkg/go101.org/nstd.html__
+
+Đường dẫn module: **// go101.org/nstd
+
+Hãy theo dõi __@zigo_101__ để cập nhật tin tức mới nhất về `nstd`
+(và đủ loại chi tiết/sự thật/mẹo/... về Go).
+
+    === @zigo_101 `` https://x.com/zigo_101
+
+###================================ Một số ví dụ sử dụng `nstd`
+
+Ví dụ 1:
+''' Go
+package main
+
+import (
+	"go101.org/nstd"
+	"log"
+)
+
+const debug = true
+
+const foo = "foo"
+
+func debugPrint(s string) {
+	if debug {
+		log.Print(s)
+	}
+}
+
+func main() {
+	var bar = "bar"
+	_ = debug && nstd.Logf(foo + ":" + bar)
+	// Cách này gọn hơn
+	//    if debug {
+	//         log.Print(foo + " " + bar)
+	//    }
+	//
+	// Và có hiệu năng tốt hơn
+	//    debugPrint(foo + " " + bar)
+	// khi debug là false.
+}
+'''
+
+Ví dụ 2:
+''' Go
+package main
+
+import (
+	"go101.org/nstd"
+)
+
+func ExampleMutexAndWaitGroup() {
+	const N = 1000
+	var n = 0
+	defer func() {
+		nstd.Printfln("n = %d", n) // sẽ in thêm một dòng mới ở cuối
+		if expected := N*7; n != expected {
+			nstd.Panicf("n (%d) != %d", n, expected) // panic với format
+		}
+	}()
+
+	var wg nstd.WaitGroup
+	defer wg.Wait()
+
+	var m nstd.Mutex
+	for range [1000]struct{}{} {
+		// WaitGroup.Go khởi chạy nhiều task.
+		wg.Go(func() {
+			defer m.Lock().Unlock() // gọi Lock và Unlock theo chuỗi
+			n += 2
+		}, func() {
+			defer m.Lock().Unlock()
+			n += 1
+		})
+
+		// WaitGroup.GoN khởi chạy một task nhiều lần.
+		wg.GoN(3, func() {
+			defer m.Lock().Unlock()
+			n += 1
+		})
+	}
+
+	// Mutex.Do bảo vệ việc thực thi một function.
+	m.Do(func() {
+		n += N
+	})
+}
+
+func main() {
+	ExampleMutexAndWaitGroup()
+}
+'''
+
+Ví dụ 3:
+''' Go
+package main
+
+import (
+	"go101.org/nstd"
+)
+
+func main() {
+	pInt := nstd.New(123)
+	nstd.Printfln("%T: %v", pInt, *pInt) // *int: 123
+	pBool := nstd.New(true)
+	nstd.Printfln("%T: %v", pBool, *pBool) // *bool: true
+
+	nstd.Printfln("%v", nstd.ZeroOf[int]())  // 0
+	nstd.Printfln("%v", nstd.ZeroOf[bool]()) // false
+
+	nstd.Zero(pInt)
+	nstd.Printfln("%v", *pInt) // 0
+	nstd.Zero(pBool)
+	nstd.Printfln("%v", *pBool) // false
+}
+'''
+
+Ví dụ 4:
+''' Go
+package main
+
+import (
+	"go101.org/nstd"
+)
+
+func main() {
+	var aCondition = true
+
+	var m = map[string]int{"Zig": 2016}
+	_ = aCondition && nstd.HasEntry(m, "Go")
+	// Vì vậy, không cần viết thành hai dòng:
+	//     _, ok := m["Go"]
+	//     _ = aCondition && ok
+
+	var x any = 123
+	var n int
+	_ = aCondition && nstd.TypeAssert(x, &n)
+	// Vì vậy, không cần viết thành hai dòng:
+	//     n, ok := x.(int)
+	//      _ = aCondition && ok
+	nstd.Printfln("n = %v", n) // n = 123
+	_ = aCondition && nstd.TypeAssert[int](x, nil)
+	_ = aCondition && nstd.TypeAssert(x, (*int)(nil))
+}
+'''
+
+Ví dụ 5:
+''' go
+package main
+
+import (
+	"reflect"
+	"go101.org/nstd"
+)
+
+func main() {
+	var n int = 123
+	var x any = n
+
+	nstd.Printfln("type of x: %s", reflect.TypeOf(x)) // type of x: int
+	nstd.Printfln("type of x: %s", nstd.TypeOf(x))    // type of x: interface {}
+
+	nstd.Printfln("type of x: %s", reflect.ValueOf(x).Type()) // type of x: int
+	nstd.Printfln("type of x: %s", nstd.ValueOf(x).Type())    // type of x: interface {}
+}
+'''

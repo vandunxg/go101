@@ -1,0 +1,47 @@
+
+##### toán tử 2
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	count := 0
+	for i := range [256]struct{}{} {
+		if n := byte(i); n == -n {
+			count++
+		}
+	}
+	println(count)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+0
+1
+2
+3
+"""
+
+
+@@@ #answer
+{
+Đáp án: 2
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/qbtozNmX-Pv __.
+
+Các điểm chính:
+* 
+	Trong Go, với một giá trị `x` khác `0` và không phải constant, có kiểu `byte` (còn gọi là `uint8`), `-x` overflow phạm vi của kiểu `byte` và được wrap thành `(-x + 256) % 256`.
+* 
+	Với một biến `x` có kiểu `byte`, `x == -x` chỉ xảy ra khi `x` là `0` hoặc `128`.
+
+}

@@ -1,0 +1,449 @@
+
+####### Một số sự thật về iterator trong Go
+
+Mục lục:
+###---
+
+@@@ #introduction
+###========== Giới thiệu đơn giản về iterator trong Go
+
+    === iterators :: https://go.dev/blog/range-functions
+
+Go 1.23 giới thiệu __iterator__,
+Iterator trong Go là các function có thể được dùng trong range.
+Cụ thể, các function expression có type mà underlying type
+thuộc một trong các dạng sau có thể được dùng trong range.
+
+''' Go
+func(func() bool)
+func(func(V) bool)
+func(func(K, V) bool)
+
+// K và V đều biểu thị các type.
+'''
+
+Tất cả các type này đều nhận một callback function parameter, theo quy ước được gọi là `yield`.
+Các callback function này có thể nhận không, một hoặc hai parameter và luôn trả về
+một kết quả bool.
+
+@@@ #example-1
+Ví dụ, chương trình Go sau in ra `abc` (kể từ Go 1.23).
+
+''' Go
+package main
+
+import "fmt"
+
+func main() {
+	for v := range abc {
+		fmt.Print(v)
+	}
+}
+
+func abc(yield func(string) bool) {
+	if yield("a") {
+		if yield("b") {
+			yield("c")
+		}
+	}
+}
+'''
+
+Function `abc` được dùng làm một iterator ở đây.
+Parameter `yield` của nó là một callback function nhận một parameter `string`
+và trả về một kết quả `bool`.
+*  Ba argument `"a"`, `"b"` và `"c"` lần lượt được truyền vào
+   parameter `string` và được dùng làm
+   các value của (các instance của) loop variable `v`.
+*  Về cơ bản, loop body có thể được xem là function body của function `yield`.
+   Chỉ cần lưu ý rằng, nếu việc thực thi một loop step trong quá trình duyệt
+   một iterator function kết thúc toàn bộ loop (chẳng hạn `break` loop),
+   thì `yield` call tương ứng trả về false (cho iterator function);
+   nếu không, `yield` call tương ứng trả về true.
+
+Iterator function trong ví dụ trên cũng có thể được viết như sau:
+
+''' Go
+func abc(yield func(string) bool) {
+	_ = yield("a") && yield("b") && yield("c")
+}
+'''
+
+@@@ #dont-call-yield-if-it-ever-returned-false
+###========== Không gọi lại callback `yield` nếu một lần gọi callback đã từng trả về false
+
+Callback function của một iterator function không được gọi thêm nữa
+nếu một lần gọi callback function đã từng trả về false.
+Ví dụ, chương trình sau crash khi chạy.
+
+''' Go
+package main
+
+import "fmt"
+
+func main() {
+	for v := range ab {
+		fmt.Println(v)
+		break // xóa dòng này để tránh crash.
+	}
+}
+
+func ab(yield func(string) bool) {
+	var done = yield("a")
+	fmt.Println(done) // false
+	
+	yield("b") // runtime error: range function
+	           // continued iteration after function
+	           // for loop body returned false.
+}
+'''
+
+Go compiler chính thức không kiểm tra những cách sử dụng không hợp lệ như vậy.
+Vì thế, một cách sử dụng không hợp lệ như vậy tạo ra một runtime error (có thể recover).
+
+Lưu ý, `go vet` cũng không kiểm tra những cách sử dụng không hợp lệ như vậy (cho đến v1.24.x).
+
+@@@ #dont-call-yield-if-it-caller-has-returned
+###========== Không gọi callback `yield` của một iterator function nếu iterator function đã return
+
+Callback function của một iterator function không được gọi thêm nữa
+nếu iterator function đã return.
+Ví dụ, chương trình sau crash khi chạy.
+
+''' Go
+package main
+
+import "fmt"
+
+var f func(string) bool
+
+func main() {
+	for v := range abc {
+		fmt.Print(v)
+	}
+	f("d") // runtime error: range function
+	       // continued iteration after
+	       // whole loop exit
+}
+
+func abc(yield func(string) bool) {
+	_ = yield("a") && yield("b") && yield("c")
+	f = yield
+}
+'''
+
+@@@ #calling-yield-concurrently-needs-synchronizations
+###========== Việc gọi một callback function `yield` đồng thời cần synchronization cẩn thận
+
+__Các lệnh gọi song song đến một callback function `yield` không được synchronize__
+theo mặc định. Bạn phải tự thực hiện synchronization.
+
+    === Các lệnh gọi song song ... :: https://github.com/golang/go/issues/68897
+
+Ví dụ, chương trình sau crash với một panic khó hiểu.
+
+''' Go
+package main
+
+import "fmt"
+import "sync"
+
+var c = make(chan int)
+
+func main() {
+	// runtime error: range function continued iteration after loop body panic
+	for v := range oneHundred {
+		<-c
+		fmt.Println(v)
+	}
+}
+
+func oneHundred(yield func(int) bool) {
+	var wg sync.WaitGroup
+	for v := range 100 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			yield(v)
+		}()
+	}
+	close(c)
+	wg.Wait()
+}
+'''
+
+Để chương trình hoạt động, cần synchronize nó, như sau:
+
+''' Go
+func abc(yield func(int) bool) {
+	var wg sync.WaitGroup
+	var mu sync.Mutex // dùng mutex để sync
+	for v := range 100 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mu.Lock()         // ngăn yield bị
+			defer mu.Unlock() // gọi song song.
+			yield(v)
+		}()
+	}
+	close(c)
+	wg.Wait()
+}
+'''
+
+Tuy nhiên, khuyến nghị mạnh mẽ là không sử dụng callback function `yield`
+trong các goroutine khác.
+
+@@@ #impact-on-goroutine-execution
+###========== Các function call ở trên cùng trong call stack của một goroutine
+    sẽ được thực thi đồng thời nhưng không bao giờ cùng một lúc
+    khi dùng range với các iterator function
+
+Khi một iterator function được dùng với range, nó được gọi một cách ngầm định.
+Trong quá trình duyệt iterator function, việc thực thi của một goroutine sẽ
+nhảy qua lại giữa iterator function call và loop body
+(loop body là một statement bên trong caller của iterator function call).
+
+Ví dụ, chương trình sau in ra `0a1b2c`.
+
+''' Go
+package main
+
+import "fmt"
+
+func main() {
+	for v := range abc {
+		fmt.Print(v)
+	}
+}
+
+func abc(yield func(string) bool) {
+	for i, v := range "abc" {
+		fmt.Print(i)
+		if (!yield(string(v))) {
+			break
+		}
+	}
+}
+'''
+
+Sau đây là một ví dụ khác, trong đó việc thực thi của một goroutine sẽ
+nhảy qua lại giữa 2^$$22$$ iterator function call và loop body
+trong function `main`.
+Cuối cùng, chương trình lần lượt in ra `4194304`, `4194305` và `4194306`.
+
+''' Go
+package main
+
+func wrap(it func(yield func(int) bool)) func(yield func(int) bool) {
+	return func(yield func(int) bool) {
+		for v := range it {
+			yield(v+1)
+		}
+	}
+}
+
+func main() {
+	iterator := func(yield func(int) bool) {
+		_ = yield(0) && yield(1) && yield (2)
+	}
+	for range 1 << 22 { // 23 làm chương trình crash
+		iterator = wrap(iterator)
+	}
+	for v := range iterator {
+		println(v)
+	}
+}
+'''
+
+@@@ #equivalence-between-range-over-and-direct-call
+###========== Gọi tường minh một iterator function có thể tương đương hoặc không tương đương với việc dùng range trên iterator function
+
+Đối với iterator function được hiển thị ở trên:
+
+''' Go
+func abc(yield func(string) bool) {
+	_ = yield("a") && yield("b") && yield("c")
+}
+'''
+
+hai cách sau để sử dụng nó là tương đương.
+
+*  ### Cách 1
+   ''' Go
+	for v := range abc {
+		fmt.Print(v)
+	}
+   '''
+
+*  ### Cách 2
+   ''' Go
+	abc(func(v string) bool {
+		fmt.Print(v)
+		return true
+	})
+   '''
+
+Tuy nhiên, đối với iterator function sau:
+
+''' Go
+func abcThenPanic(yield func(string) bool) {
+	_ = yield("a") && yield("b") && yield("c")
+	panic("bye")
+}
+'''
+
+hai cách sau để sử dụng nó không tương đương.
+
+*  ### Cách 1
+   ''' Go
+	for v := range abcThenPanic {
+		defer func() {
+			recover()
+		}()
+		fmt.Print(v)
+	}
+   '''
+
+*  ### Cách 2
+   ''' Go
+	abcThenPanic(func(v string) bool {
+		defer func() {
+			recover()
+		}()
+		fmt.Print(v)
+		return true
+	})
+   '''
+
+Khi loop body chứa các statement `goto` hoặc `return`,
+sự tương đương giữa hai cách thậm chí còn khó xảy ra hơn.
+
+@@@ #design-flaws
+###========== Thiết kế iterator có một khiếm khuyết
+
+Hai chương trình sau đây đáng lẽ phải có cùng hành vi,
+nhưng hiện tại không như vậy (tính đến Go toolchain v1.24.1):
+
+*  ### Chương trình 1
+   ''' Go
+package main
+
+func main() {
+	defer func() {
+		var v = recover()
+		println(v == 123)
+	}()
+	for range iter {
+		panic(123)
+	}
+}
+
+func iter(yield func() bool) {
+	defer func() {
+		recover()
+	}()
+	yield()
+}
+   '''
+   ;;;
+   Chương trình in ra `false`.
+
+*  ### Chương trình 2
+   ''' Go
+package main
+
+func main() {
+	defer func() {
+		var v = recover()
+		println(v == 123)
+	}()
+	for range iter {}
+	panic(123)
+}
+
+func iter(yield func() bool) {
+	defer func() {
+		recover()
+	}()
+	yield()
+}
+   '''
+   ;;;
+   Chương trình in ra `true`.
+
+Nguyên nhân của sự khác biệt về hành vi là, theo thiết kế hiện tại,
+*. __panic được tạo trong loop body của việc dùng range trên một iterator function
+   sẽ propagate đến iterator function__.
+*. iterator function không nên recover panic được tạo trong loop body.
+   Nếu iterator function recover panic được propagate từ loop body,
+   thì runtime sẽ ngầm định tạo ra một runtime panic mới.
+
+    === ... propagate đến iterator function :: https://github.com/golang/go/issues/71830
+
+Nếu yield call chỉ trả về false khi loop body tạo ra một panic,
+thì sẽ không có sự khác biệt về hành vi giữa hai chương trình.
+
+@@@ #implementation-bugs
+###========== Implementation của iterator vẫn còn một số bug
+
+Ví dụ, hai chương trình sau đây đáng lẽ phải có cùng hành vi,
+nhưng hiện tại không như vậy (tính đến Go toolchain v1.24.1).
+
+*  ### Chương trình 1
+   ''' Go
+package main
+
+import "fmt"
+
+func main() {
+	defer foo()
+	panic(123)
+}
+
+func foo() {
+	for range iter {
+		fmt.Println(recover())
+	}
+}
+
+func iter(yield func() bool) {
+	yield()
+}
+   '''
+   ;;;
+   Chương trình in ra `<nil>` rồi crash.
+
+*  ### Chương trình 2
+   ''' Go
+package main
+
+import "fmt"
+
+func main() {
+	defer foo()
+	panic(123)
+}
+
+func foo() {
+	for range 1 {
+		fmt.Println(recover())
+	}
+}
+   '''
+   ;;;
+   Chương trình in ra `123` rồi thoát bình thường.
+
+@@@ #importance
+###========== Tầm quan trọng của iterator vẫn chưa được chứng minh
+
+Iterator chắc chắn hữu ích ở một mức độ nào đó.
+Tuy nhiên, vẫn chưa chứng minh được rằng việc thêm nhiều
+độ phức tạp như vậy vào ngôn ngữ là đáng giá.
+
+
+
+"""
+https://github.com/golang/go/issues/71164
+

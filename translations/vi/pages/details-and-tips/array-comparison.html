@@ -1,0 +1,23 @@
+
+<h1>Các giá trị array được so sánh từng element một</h1>
+
+<p>Khi so sánh hai giá trị array, các element của chúng sẽ được so sánh từng cái một.
+Ngay khi phát hiện hai element tương ứng không bằng nhau, toàn bộ phép so sánh sẽ dừng lại và cho kết quả false. Toàn bộ phép so sánh cũng có thể dừng lại do một panic phát sinh khi so sánh hai interface.</p>
+
+<p>Ví dụ, phép so sánh đầu tiên trong đoạn code sau cho kết quả false, nhưng phép so sánh thứ hai gây ra panic.</p>
+
+<pre><code class="language-Go">package main
+
+type T [2]interface{}
+
+func main() {
+	var a = T{1, func(){}}
+	var b = T{2, func(){}}
+	println(a == b) // false
+	
+	var c = T{2, func(){}}
+	var d = T{2, func(){}}
+	println(c == d) // gây panic
+}
+</code></pre>
+

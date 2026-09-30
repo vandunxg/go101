@@ -1,0 +1,280 @@
+<p id="f-888-the-status-quo-of-Go-custom-generics-md"></p>
+<h1>Hiện trạng của Go custom generics</h1>
+
+<p>Các chương trước giải thích những kiến thức cơ bản về custom generics của Go.
+Chương này sẽ liệt kê một số tính năng còn thiếu trong thiết kế và
+implementation hiện tại của custom generics trong Go.</p>
+
+<h2 id="embed-type-parameter">Hiện không cho phép embedding type parameters</h2>
+
+<p>Do những phức tạp trong thiết kế và implementation, hiện tại (Go 1.25), không cho phép
+embedding type parameters trong cả interface type lẫn struct type.</p>
+
+<p>Ví dụ, khai báo type sau đây là không hợp lệ.</p>
+
+<pre><code class="language-Go">type Derived[Base any] struct {
+	Base // error
+	
+	x bool
+}
+</code></pre>
+
+<p>Vui lòng xem <a href="https://github.com/golang/go/issues/43621">issue này</a> để biết lý do.</p>
+
+<h2>Trong một số trường hợp, method set của constraint không được tính đầy đủ</h2>
+
+<p>Go specification nêu:</p>
+
+<blockquote>
+<p>Method set của một interface type là giao của method set của từng type trong type set của interface đó.</p>
+</blockquote>
+
+<p>Tuy nhiên, hiện tại (Go toolchain 1.25), chỉ các method được chỉ định tường minh trong interface type mới được tính vào method set.
+Ví dụ, trong code sau đây, method set của constraint đáng lẽ phải chứa cả <code>Foo</code> và <code>Bar</code>,
+và code đáng lẽ phải compile được, nhưng thực tế không phải vậy (tính đến Go toolchain 1.25).</p>
+
+<pre><code class="language-Go">package main
+
+type S struct{}
+
+func (S) Bar() {}
+
+type C interface {
+	S
+	Foo()
+}
+
+func foobar[T C](v T) {
+	v.Foo() // okay
+	v.Bar() // v.Bar undefined
+}
+
+func main() {}
+</code></pre>
+
+<p>Hạn chế này được lên kế hoạch <a href="https://github.com/golang/go/issues/51183">loại bỏ trong các phiên bản Go toolchain tương lai</a>.</p>
+
+<h2>Không có cách chỉ định một field set cho constraint</h2>
+
+<p>Chúng ta biết rằng một interface type có thể chỉ định một method set.
+Nhưng cho đến nay (Go 1.25), nó không thể chỉ định một field set (của struct).</p>
+
+<p>Có một proposal cho việc này: <a href="https://github.com/golang/go/issues/51259">https://github.com/golang/go/issues/51259</a>.</p>
+
+<p>Hạn chế này có thể được gỡ bỏ trong các phiên bản Go tương lai.</p>
+
+<h2>Không thể truy cập các field của value có type là type parameter</h2>
+
+<p>Hiện tại (Go 1.25), ngay cả khi mọi type trong type set của một constraint đều là struct
+và chúng có chung một số field, các field chung đó vẫn không thể được sử dụng.</p>
+
+<p>Ví dụ, tất cả generic function trong ví dụ sau đây đều không compile được.</p>
+
+<pre><code class="language-Go">package main
+
+type S1 struct {
+	X int
+}
+
+type S2 struct {
+	X int `json:X`
+}
+
+type S3 struct {
+	X int
+	Z bool
+}
+
+type S4 struct {
+	S1
+}
+
+func F12[T S1 | S2](v T) {
+	_ = v.X // error: v.x undefined
+}
+
+func F13[T S1 | S3](v T) {
+	_ = v.X // error: v.x undefined
+}
+
+func F14[T S1 | S4](v T) {
+	_ = v.X // error: v.x undefined
+}
+
+func main() {}
+</code></pre>
+
+<p>Trong một trường hợp đặc biệt, code sau đây cũng không compile được.</p>
+
+<pre><code class="language-Go">type S struct{x, y, z int}
+
+func mod[T S](v T) {
+	_ = v.x // error: v.x undefined
+}
+</code></pre>
+
+<p>Một workaround tạm thời (khá dài dòng) là chỉ định/khai báo một số getter và setter method
+cho các constraint và concrete type liên quan.</p>
+
+<p>Hạn chế (được mô tả trong section hiện tại) đã được <a href="https://github.com/golang/go/issues/51576">thêm vào ngay trước khi
+Go 1.18 được phát hành</a>.
+Nó có thể bị loại bỏ kể từ một phiên bản Go tương lai.</p>
+
+<h2>Hiện chưa hỗ trợ type switch trên value có type là type parameter</h2>
+
+<p>Đã đề cập rằng <a href="555-type-constraints-and-parameters.html#type-parameters-are-interfaces">type parameter là một interface type xét về mặt ngữ nghĩa</a>.
+Mặt khác, type parameter có tính hai mặt sóng-hạt.
+Trong một số tình huống, nó hoạt động như các type trong type set của nó.</p>
+
+<p>Cho đến nay (Go 1.25), không thể thực hiện type assertion trên value có type là type parameter.
+Hai function sau đây đều không compile được.</p>
+
+<pre><code class="language-Go">func tab[T any](x T) {
+	if n, ok := x.(int); ok { // error
+		_ = n
+	}
+}
+
+func kol[T any]() {
+	var x T
+	switch x.(type) { // error
+	case int:
+	case []bool:
+	default:
+	}
+}
+</code></pre>
+
+<p>Các phiên bản đã sửa đổi sau đây của hai function trên compile được:</p>
+
+<pre><code class="language-Go">func tab2[T any](x T) {
+	if n, ok := any(x).(int); ok {
+		_ = n
+	}
+}
+
+func kol2[T any]() {
+	var x T
+	switch any(x).(type) {
+	case int:
+	case []bool:
+	default:
+	}
+}
+</code></pre>
+
+<p>Có một proposal sử dụng type switch trực tiếp trên type parameter, như sau:</p>
+
+<pre><code class="language-Go">func kol3[T any]() {
+	switch T {
+	case int:
+	case []bool:
+	default:
+	}
+}
+</code></pre>
+
+<p>Vui lòng subscribe <a href="https://github.com/golang/go/issues/45380">issue này</a> để theo dõi tiến triển của vấn đề.</p>
+
+<h2>Không hỗ trợ generic method</h2>
+
+<p>Hiện tại (Go 1.25), do những khó khăn trong thiết kế và implementation,
+generic method (không phải method của generic type)
+<a href="https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#methods-may-not-take-additional-type-arguments">không được hỗ trợ</a>.</p>
+
+<p>Ví dụ, code sau đây là không hợp lệ.</p>
+
+<pre><code class="language-Go">import &quot;sync&quot;
+
+type Lock struct {
+	mu sync.Mutex
+}
+
+func (l *Lock) Inc[T ~uint32 | ~uint64](x *T) {
+	l.Lock()
+	defer l.Unlock()
+	*x++
+}
+</code></pre>
+
+<p>Type <code>Lock</code> có bao nhiêu concrete method?
+Vô hạn! Bởi vì có vô hạn type uint32 và uint64.
+Điều này gây ra rất nhiều khó khăn để standard package <code>reflect</code> duy trì backwards compatibility.</p>
+
+<p>Có <a href="https://github.com/golang/go/issues/49085">một issue</a> về việc này.</p>
+
+<h2>Không có cách xây dựng một constraint cho phép assignment liên quan đến các type có underlying type không xác định cụ thể</h2>
+
+<p>Và không có các constraint được predeclare như các constraint <code>assignableTo</code> và <code>assignableFrom</code> giả định sau đây.</p>
+
+<pre><code class="language-Go">// Các function này không compile được.
+
+func yex0[Tx assignableTo[Ty], Ty assignableFrom[Tx]](x Tx, y Ty) {
+	y = x
+}
+
+func yex1[Tx any, Ty assignableFrom[Tx]](x Tx, y Ty) {
+	y = x
+}
+
+func yex2[Tx assignableTo[Ty], Ty any](x Tx, y Ty) {
+	y = x
+}
+</code></pre>
+
+<h2>Không có cách xây dựng một constraint cho phép conversion liên quan đến các type có underlying type không xác định cụ thể</h2>
+
+<p>Và <a href="https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#no-way-to-express-convertibility">không có các constraint được predeclare</a> như các constraint <code>convertibleTo</code> và <code>convertibleFrom</code> giả định sau đây.</p>
+
+<pre><code class="language-Go">// Function này không compile được.
+func x2y[Tx convertibleTo[Ty], Ty convertibleFrom[Tx],
+		// Đối số value thứ hai là
+		// để phục vụ type inference.
+		](xs []Tx, _ Ty) []Ty {
+	if xs == nil {
+		return nil
+	}
+	ys := make([]Ty, len(xs))
+	for i := range xs {
+		ys[i] = Ty(xs[i])
+	}
+	return ys
+}
+
+var bs = []byte{61, 62, 63, 64, 65, 66}
+var ss = x2y(bs, &quot;&quot;)
+var is = x2y(bs, 0)
+var fs = x2y(bs, .0)
+</code></pre>
+
+<p>Hiện tại có một implementation workaround không thanh lịch:</p>
+
+<pre><code class="language-Go">func x2y[Tx any, Ty any](xs []Tx, f func(Tx) Ty) []Ty {
+	if xs == nil {
+		return nil
+	}
+	ys := make([]Ty, len(xs))
+	for i := range xs {
+		ys[i] = f(xs[i])
+	}
+	return ys
+}
+
+var bs = []byte{61, 62, 63, 64, 65, 66}
+var ss = x2y(bs, func(x byte) string {
+	return string(x)
+})
+var is = x2y(bs, func(x byte) int {
+	return int(x)
+})
+var fs = x2y(bs, func(x byte) float64 {
+	return float64(x)
+})
+</code></pre>
+
+<p>Workaround này cần một callback function, khiến code khá dài dòng và kém hiệu quả hơn nhiều,
+dù tôi thừa nhận nó có nhiều tình huống sử dụng hơn.</p>
+
+<h2>Không có cách xây dựng một constraint chỉ được thỏa mãn bởi interface type hoặc non-interface type</h2>
+
+<p>Không có cách nào.</p>

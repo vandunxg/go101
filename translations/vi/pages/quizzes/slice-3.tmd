@@ -1,0 +1,64 @@
+
+##### slice 3
+
+@@@ #question
+{
+
+Chương trình sau in ra gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+import "fmt"
+
+var x = []int{2: 5, 6, 0: 7}
+
+func main() {
+	fmt.Println(x)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+[7 0 5 6]
+[7 6 5]
+"""
+
+
+@@@ #answer
+{
+Đáp án: [7 0 5 6]
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/Sap3OfyWD7u __.
+
+Các điểm chính:
+*
+   Các element có key (ở đây là `2: 5` và `0: 7`) và các element không có key (ở đây là `6`) có thể được trộn lẫn trong các array và slice composite literal.
+*
+   Index của một element không có key được xác định bởi index của element có key cuối cùng.
+   Nếu tất cả các element trước đó đều không có key, thì index của nó là số thứ tự của nó (bắt đầu từ zero).
+   Vì vậy, index của element `6` là 3.
+*
+   Độ dài của một array hoặc slice composite literal là index lớn nhất của element cộng một.
+*
+   Các element không được chỉ định được xem là zero value của element type.
+
+
+Ví dụ sau đây cũng in ra `7 88`.
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	var x = []int{4:44, 55, 66, 1:77, 88}
+	println(len(x), x[2])
+}
+'''
+
+}
+
+

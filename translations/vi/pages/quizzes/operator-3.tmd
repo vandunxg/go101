@@ -1,0 +1,58 @@
+
+##### toán tử 3
+
+@@@ #question
+{
+
+Chương trình sau in ra nội dung gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+const N = 1
+var n = N
+var a byte = 128 << N >> N
+var b byte = 128 << n >> n
+
+func main() {
+	println(a, b)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+128 128
+128 0
+0 128
+0 0
+"""
+
+
+@@@ #answer
+{
+Đáp án: 128 0
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/cam2cOt7UnS __.
+
+Các điểm chính:
+*
+   Nếu các toán hạng trong một biểu thức toán tử đều là hằng số, thì biểu thức được đánh giá tại thời điểm biên dịch.
+   Trong chương trình trên, `128 << N >> N` là một biểu thức như vậy.
+   Trong biểu thức này, `128` được suy luận là một giá trị `int` chưa định kiểu.
+*
+   Trong một biểu thức dịch bit, nếu toán hạng bên trái là một hằng số chưa định kiểu còn toán hạng bên phải không phải là hằng số,
+   thì __ kiểu của toán hạng bên trái sẽ được suy luận là kiểu giả định cuối cùng`` https://go101.org/article/operators.html#bitwise-shift-left-operand-type-deduction __.
+   Trong chương trình trên, `128 << n >> n` là một biểu thức như vậy.
+   Trong biểu thức này, kiểu của `128` được suy luận là kiểu giả định `byte`.
+   `128 << n` tràn khỏi phạm vi giá trị của `byte`, nên nó bị cắt cụt thành 0.
+
+
+
+Đây là một chi tiết nhỏ trong lập trình Go. Nếu quan tâm đến những chi tiết khác, hãy đọc cuốn sách __ Go Details & Tips 101`` https://go101.org/details-and-tips/101.html __.
+
+
+}
+

@@ -9,7 +9,7 @@
 
 ## Đã dịch
 
-Đã dịch và đối chiếu cấu trúc 86 trang trên nhiều nhóm tài liệu. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`.
+Đã dịch và đối chiếu cấu trúc 153 trang trên nhiều nhóm tài liệu. Source blob SHA của từng trang đã được ghi trong `.sync-state.json`.
 
 - `pages/fundamentals/101.tmd`
 - `pages/fundamentals/introduction.tmd`
@@ -65,6 +65,7 @@
 - `pages/fundamentals/acknowledgements.tmd`
 - `pages/fundamentals/blocks-and-scopes.tmd`
 - `pages/fundamentals/bounds-check-elimination-old.tmd`
+- `pages/fundamentals/container.tmd`
 - `pages/fundamentals/generic.tmd`
 - `pages/fundamentals/go-sdk.tmd`
 - `pages/fundamentals/panic-and-recover-more-newer.tmd`
@@ -76,8 +77,27 @@
 - `pages/fundamentals/tool-gold.tmd`
 - `pages/fundamentals/tool-golds.tmd`
 - `pages/generics/100-updates.tmd`
+- `pages/generics/101.html`
+- `pages/generics/222-about-this-book.html`
+- `pages/generics/333-about-go-generics.html`
+- `pages/generics/444-first-look-of-custom-generics.html`
+- `pages/generics/555-type-constraints-and-parameters.html`
+- `pages/generics/666-generic-instantiations-and-type-argument-inferences.html`
+- `pages/generics/777-operations-on-values-of-type-parameter-types.html`
+- `pages/generics/777-operatons-within-generic-function-bodies.html`
+- `pages/generics/888-the-status-quo-of-go-custom-generics.html`
 - `pages/generics/111-acknowledgements.html`
 - `pages/optimizations/0.1-introduction.html`
+- `pages/optimizations/0.0-acknowledgements.html`
+- `pages/optimizations/0.3-memory-allocations.html`
+- `pages/optimizations/1-pointer.html`
+- `pages/optimizations/100-updates.tmd`
+- `pages/optimizations/101.html`
+- `pages/optimizations/5-bce.html`
+- `pages/optimizations/6-map.html`
+- `pages/details-and-tips/0.0-acknowledgements.html`
+- `pages/details-and-tips/0.1-introduction.html`
+- `pages/details-and-tips/100-updates.tmd`
 - `pages/q-and-a/canonicalize-strings.tmd`
 - `pages/q-and-a/clone-slices.tmd`
 - `pages/q-and-a/create-slices.tmd`
@@ -98,6 +118,53 @@
 - `pages/bugs/go-build-directive-not-work.tmd`
 - `pages/quizzes/loop-1.tmd`
 - `pages/quizzes/slice-1.tmd`
+- `pages/apps-and-libs/101.tmd`
+- `pages/apps-and-libs/golds.tmd`
+- `pages/apps-and-libs/gotv.tmd`
+- `pages/apps-and-libs/nstd.tmd`
+- `pages/apps-and-libs/tmd.tmd`
+- `pages/blog/101.tmd`
+- `pages/blog/2022-02-22-history.tmd`
+- `pages/blog/2022-08-22-some-undocumented-changes-in-go-1.18-and-1.19.tmd`
+- `pages/blog/2022-10-01-three-way-string-comparison.tmd`
+- `pages/blog/2022-11-18-constant-string-elements-are-not-constants.tmd`
+- `pages/blog/2022-12-30-go-builtin-slice-manipulations-are-incomplete.tmd`
+- `pages/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.tmd`
+- `pages/blog/2025-03-15-some-facts-about-iterators.tmd`
+- `pages/blog/2025-10-22-some-real-go-subtleties.tmd`
+- `pages/bugs/101.tmd`
+- `pages/bugs/a-switch-case-channel-comparison-bug.tmd`
+- `pages/bugs/go-version-in-mod-file-not-work.tmd`
+- `pages/bugs/json-unmarshal-bug.tmd`
+- `pages/bugs/package-level-variable-initialization-order-bugs.tmd`
+- `pages/bugs/recover-calls-in-loop-bodies-of-ranging-over-iterators-not-work.tmd`
+- `pages/bugs/string-builders-as-iteration-variables-in-traditional-for-loops-are-bad-implemented.tmd`
+- `pages/details-and-tips/101.html`
+- `pages/details-and-tips/array-comparison.html`
+- `pages/details-and-tips/json-unmarshal-is-case-insensitive.html`
+- `pages/details-and-tips/method-selector-normalization.html`
+- `pages/details-and-tips/pointer-indirect-conversion.html`
+- `pages/details-and-tips/semicolon-insertion.html`
+- `pages/quizzes/101.tmd`
+- `pages/quizzes/const-iota-1.tmd`
+- `pages/quizzes/embedding-1.tmd`
+- `pages/quizzes/loop-2.tmd`
+- `pages/quizzes/loop-3.tmd`
+- `pages/quizzes/loop-4.tmd`
+- `pages/quizzes/map-1.tmd`
+- `pages/quizzes/nil-1.tmd`
+- `pages/quizzes/operator-1.tmd`
+- `pages/quizzes/operator-2.tmd`
+- `pages/quizzes/operator-3.tmd`
+- `pages/quizzes/panic-recover-1.tmd`
+- `pages/quizzes/panic-recover-2.tmd`
+- `pages/quizzes/reflect-1.tmd`
+- `pages/quizzes/reflect-2.tmd`
+- `pages/quizzes/scope-1.tmd`
+- `pages/quizzes/scope-2.tmd`
+- `pages/quizzes/slice-2.tmd`
+- `pages/quizzes/slice-3.tmd`
+- `pages/quizzes/switch-1.tmd`
 
 ## Tiếp tục
 

@@ -1,0 +1,135 @@
+
+##### Các câu đố Go 101
+
+Cuốn sách này cung cấp một số câu đố Go dưới dạng các câu hỏi có lựa chọn.
+Tham gia các câu đố giúp hiểu rõ hơn về Go.
+
+Mỗi câu đố sẽ được giải đáp chi tiết sau khi hoàn tất việc chọn.
+
+//::
+(Hãy theo dõi tài khoản X chính thức của Go 101 __ @zigo_101`` https://x.com/zigo_101 __
+để nhận tin tức mới nhất về Go 101 và học đủ loại kiến thức về Go.)
+
+""" html
+<div id="ebooks" class="alert alert-success row item-row">
+	<div class="col-xs-12 col-sm-3 text-center" style="font-size: small;">
+		<img src="res/cover-1000x-a.jpg" style="width: 160px;" alt="Các câu đố Go 101"></img>
+		<p></p>
+	</div>
+	<div class="col-xs-12 col-sm-9" style="padding-top: 6px; font-size: smaller;">
+		<p>
+		Cuốn sách này hiện có thể <a href="#index">đọc trực tuyến</a> miễn phí.
+		</p>
+
+		<p>
+		Tapir, tác giả của Go 101, đã dành hơn 5 năm để viết các cuốn sách thuộc series Go 101
+		và duy trì website go101.org.
+		Series sách và website sẽ liên tục được bổ sung nội dung mới theo thời gian.
+		Tapir cũng là một nhà phát triển game độc lập.
+		Nếu muốn, bạn có thể ủng hộ cuốn sách và website bằng cách
+		chơi <a href="https://www.tapirgames.com">các game của Tapir</a>
+		(dành cho cả Android và iPhone/iPad).
+		Các khoản quyên góp riêng lẻ cũng được chấp nhận <a href="https://paypal.me/tapirliu">qua PayPal</a>.
+		</p>
+
+		<p>
+		Cảm ơn Maria Letta đã cho phép sử dụng một trong những
+		<a href="https://github.com/MariaLetta/free-gophers-pack">hình ảnh biểu tượng gopher tuyệt vời</a>
+		trong bìa sách.
+		</p>
+	</div>
+</div>
+"""
+
+
+
+@@@ #index
+###========== Các câu đố:
+
+""" html
+<!-- index starts (don't remove) -->
+"""
+
+
+
+*  slice:
+   %%  data-topics="slice" data-date="2021-12-22"
+   __ 1`` slice-1.tmd __,
+   %%  data-topics="slice" data-date="2021-12-31"
+   __ 2`` slice-2.tmd __,
+   %%  data-topics="slice" data-date="2022-07-11"
+   __ 3`` slice-3.tmd __
+ *  map:
+   %%  data-topics="map, make" data-date="2022-09-06"
+   __ 1`` map-1.tmd __
+ *  channel:
+   %%  data-topics="channel" data-date="2021-12-22"
+   __ 1`` channel-1.tmd __
+ *  loop:
+   %%  data-topics="loop" data-date="2021-12-22"
+   __ 1`` loop-1.tmd __,
+   %%  data-topics="loop" data-date="2021-12-22"
+   __ 2`` loop-2.tmd __,
+   %%  data-topics="loop" data-date="2021-12-22"
+   __ 3`` loop-3.tmd __,
+   %%  data-topics="loop" data-date="2021-12-22"
+   __ 4`` loop-4.tmd __
+ *  switch:
+   %%  data-topics="switch" data-date="2021-12-22"
+   __ 1`` switch-1.tmd __
+ *  defer:
+   %%  data-topics="defer" data-date="2021-12-22"
+   __ 1`` defer-1.tmd __,
+   %%  data-topics="defer" data-date="2021-12-22"
+   __ 2`` defer-2.tmd __
+ *  panic/recover:
+   %%  data-topics="panic-recover" data-date="2021-12-22"
+   __ 1`` panic-recover-1.tmd __,
+   %%  data-topics="panic-recover" data-date="2021-12-22"
+   __ 2`` panic-recover-2.tmd __
+ *  reflect:
+   %%  data-topics="reflect" data-date="2021-12-31"
+   __ 1`` reflect-1.tmd __,
+   %%  data-topics="reflect" data-date="2022-08-08"
+   __ 2`` reflect-2.tmd __
+ *  const:
+   %%  data-topics="const, iota" data-date="2022-07-09"
+   __ 1`` const-1.tmd __,
+   %%  data-topics="const" data-date="2022-07-09"
+   __ 2`` const-2.tmd __,
+   %%  data-topics="const, untyped, type-inference" data-date="2022-07-11"
+   __ 3`` const-3.tmd __,
+   %%  data-topics="const, string" data-date="2023-07-01"
+   __ 4`` const-4.tmd __
+ *  operator:
+   %%  data-topics="operator, iota" data-date="2022-07-11"
+   __ 1`` operator-1.tmd __,
+   %%  data-topics="operator, overflow" data-date="2022-08-08"
+   __ 2`` operator-2.tmd __,
+   %%  data-topics="operator, shift" data-date="2022-11-18"
+   __ 3`` operator-3.tmd __
+ *  function call:
+   %%  data-topics="call, variadic" data-date="2022-07-11"
+   __ 1`` call-1.tmd __
+ *  scope:
+   %%  data-topics="scope, redeclare" data-date="2022-07-19"
+   __ 1`` scope-1.tmd __,
+   %%  data-topics="scope" data-date="2022-08-08"
+   __ 2`` scope-2.tmd __
+ *  nil:
+   %%  data-topics="nil, new" data-date="2022-07-19"
+   __ 1`` nil-1.tmd __
+ *  embedding:
+   %%  data-topics="embedding" data-date="2022-08-08"
+   __ 1`` embedding-1.tmd __
+
+
+//
+(sẽ có thêm ...)
+
+
+""" html
+<!-- index ends (don't remove) -->
+"""
+
+

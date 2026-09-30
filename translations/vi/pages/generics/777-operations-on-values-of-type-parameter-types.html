@@ -1,0 +1,822 @@
+<p id="f-777-operations-on-values-of-type-parameter-types-md"></p>
+<h1>Các phép toán trên các giá trị thuộc kiểu type parameter</h1>
+
+<p>Chương này sẽ nói về những phép toán nào trên các giá trị của type parameter
+là hợp lệ và những phép toán nào không hợp lệ trong thân function generic.</p>
+
+<p>Trong thân một function generic,
+một phép toán trên một giá trị của type parameter chỉ hợp lệ khi nó
+hợp lệ với các giá trị của mọi kiểu trong type set của constraint của type parameter đó.
+Trong thiết kế và triển khai generic tùy chỉnh hiện tại (Go 1.25),
+chiều ngược lại không phải lúc nào cũng đúng.
+Phải đáp ứng thêm một số yêu cầu để phép toán hợp lệ.</p>
+
+<p>Hiện tại có nhiều hạn chế như vậy. Một số là tạm thời
+và có thể được loại bỏ trong các phiên bản Go tương lai, một số là vĩnh viễn.
+Các hạn chế tạm thời chủ yếu do khối lượng công việc triển khai gây ra,
+nên sẽ cần thêm thời gian và công sức để cuối cùng loại bỏ chúng.
+Các hạn chế vĩnh viễn do những nguyên tắc thiết kế generic tùy chỉnh gây ra.</p>
+
+<p>Nội dung sau đây của chương này sẽ liệt kê các hạn chế đó.
+Một số sự thật và khái niệm liên quan cũng sẽ được liệt kê.</p>
+
+<h2>Mỗi giá trị có kiểu phải có một kiểu được xác định, các giá trị được dùng trong function generic cũng vậy</h2>
+
+<p>Như đã đề cập trong chương trước, kể từ Go 1.18,
+các kiểu giá trị trong Go có thể được phân thành hai nhóm:</p>
+
+<ul>
+<li>kiểu type parameter: các kiểu được khai báo trong danh sách type parameter.</li>
+<li>kiểu thông thường: các kiểu giá trị không được khai báo trong danh sách type parameter.
+Trước Go 1.18, chỉ có các kiểu thông thường.</li>
+</ul>
+
+<p>Generic tùy chỉnh của Go không được triển khai như các template văn bản code đơn giản.
+Đây là một khác biệt nền tảng so với việc sinh code.
+Trong lập trình Go có một quy tắc cơ bản:
+mọi expression có kiểu đều phải có một kiểu được xác định,
+có thể là một kiểu thông thường hoặc một type parameter.</p>
+
+<p>Ví dụ, trong đoạn code sau, chỉ function <code>dot</code> không compile.
+các function còn lại đều compile bình thường.
+Lý do rất đơn giản:</p>
+
+<ul>
+<li>trong function <code>foo</code>, kiểu của <code>x</code> là <code>T</code>, một type parameter.
+Chắc chắn rằng trong các lần sử dụng function, <code>x</code> có thể được khởi tạo với kiểu <code>int</code> hoặc <code>string</code>,
+nhưng điều đó không thay đổi sự thật rằng, theo góc nhìn của compiler,
+kiểu của nó là một type parameter.</li>
+<li>trong function <code>bar</code>, kiểu của <code>x[i]</code> và <code>x[y]</code> đều là một type parameter, <code>E</code>.</li>
+<li>trong function <code>win</code>, kiểu của <code>x[1]</code> và <code>x[y]</code> đều là một kiểu thông thường được xác định, <code>int</code>.</li>
+<li>trong function <code>dot</code>, kiểu của <code>x[1]</code> và <code>x[y]</code> có thể là <code>int</code> hoặc <code>string</code> (hai kiểu thông thường khác nhau), dù chúng luôn giống hệt nhau.</li>
+</ul>
+
+<pre><code class="language-Go">func foo[T int | string](x T) {
+	var _ interface{} = x // okay
+}
+
+func bar[T []E, E any](x T, i, j int) () {
+	x[i] = x[j] // okay
+}
+
+func win[T ~[2]int | ~[8]int](x T, i, j int) {
+	x[i] = x[j] // okay
+}
+
+func dot[T [2]int | [2]string](x T, i, j int) {
+	x[i] = x[j]      // error: invalid operation
+	var _ any = x[i] // error: invalid operation
+}
+</code></pre>
+
+<p>Các element của string được xem là <code>byte</code>, nên code sau compile được,</p>
+
+<pre><code class="language-Go">func ele[ByteSeq ~string|~[]byte](x ByteSeq, n int) {
+	_ = x[n] // okay
+}
+</code></pre>
+
+<p>Vì cùng lý do (quy tắc cơ bản), trong đoạn code sau,
+cả hai function <code>nop</code> và <code>jam</code> đều compile bình thường,
+nhưng function <code>mud</code> thì không.</p>
+
+<pre><code class="language-Go">func nop[T *Base, Base int32|int64](x T) {
+	*x = *x + 1 // okay
+}
+
+func jam[T int32|int64](x *T) {
+	*x = *x + 1 // okay
+}
+
+func mud[T *int32|*int64](x T) {
+	*x = *x + 1 // error: invalid operation
+}
+</code></pre>
+
+<p>Tương tự, trong đoạn code sau, chỉ function <code>box</code> không compile,
+hai function còn lại đều compile bình thường.</p>
+
+<pre><code class="language-Go">func box[T chan int | chan byte](c T) {
+	_ = &lt;-c // error
+}
+
+
+func sed[T chan E, E int | byte](c T) {
+	_ = &lt;-c // okay
+}
+
+type Ch &lt;-chan int
+func cat[T chan int | Ch](c T) {
+	_ = &lt;-c // okay
+}
+</code></pre>
+
+<h2>Có thể type assert type parameter</h2>
+
+<p>Vì type parameter là một kiểu được xác định, nó có thể được type assert.
+Code sau compile được, ngay cả khi tại runtime có các expression kiểu <code>case</code> trùng nhau
+trong block code <code>type-switch</code> bên trong function <code>wua</code>.</p>
+
+<pre><code class="language-Go">import &quot;fmt&quot;
+
+func nel[T int | string](x any) {
+	if v, ok := x.(T); ok {
+		fmt.Printf(&quot;x is a %T\n&quot;, v)
+	} else {
+		fmt.Printf(&quot;x is not a %T\n&quot;, v)
+	}
+}
+
+func wua[T int | string](x any) {
+	switch v := x.(type) {
+	case T:
+		fmt.Println(v)
+	case int:
+		fmt.Println(&quot;int&quot;)
+	case string:
+		fmt.Println(&quot;string&quot;)
+	}
+}
+</code></pre>
+
+<h2>Không được dùng type parameter làm kiểu của named constant (cục bộ)</h2>
+
+<p>Điều đó có nghĩa là mọi giá trị của type parameter đều không phải constant.</p>
+
+<p>Ví dụ, function sau không compile.</p>
+
+<pre><code class="language-Go">func f[P int]() {
+	const y P = 5 // error: invalid constant type P
+}
+</code></pre>
+
+<p>Sự thật này <a href="https://github.com/golang/go/issues/50202">sẽ không bao giờ thay đổi</a>.</p>
+
+<p>Do sự thật này, việc convert một constant sang type parameter tạo ra một giá trị không phải constant
+của argument được truyền vào type parameter.
+Ví dụ, trong code sau, function <code>h</code> compile được,
+nhưng function <code>g</code> thì không.</p>
+
+<pre><code class="language-Go">const N = 5
+
+func g[P int]() {
+	const _ = P(N) // error: P(N) is not constant
+}
+
+func h[P int]() {
+	var _ = P(N) // okay
+}
+</code></pre>
+
+<p>Do quy tắc convert, kết quả trả về của hai function <code>mud</code> và <code>tex</code> khác nhau.</p>
+
+<pre><code class="language-Go">package main
+
+const S = &quot;Go&quot;
+
+func mud() byte {
+	return 64 &lt;&lt; len(string(S)) &gt;&gt; len(string(S))
+}
+
+func tex[T string]() byte {
+	return 64 &lt;&lt; len(T(S)) &gt;&gt; len(T(S))
+}
+
+func main() {
+	println(mud()) // 64
+	println(tex()) // 0
+}
+</code></pre>
+
+<p>Hãy đọc bài viết <a href="https://go101.org/article/string.html">strings trong Go</a>
+và <a href="https://github.com/golang/go/issues/28591">issue này</a>
+để biết vì sao hai function trả về các kết quả khác nhau.</p>
+
+<h2>Function của một type parameter chỉ có thể được gọi khi tất cả các kiểu trong type set của type parameter đó có cùng một <a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a></h2>
+
+<p>Ví dụ, hiện tại (Go 1.25), trong code sau, các function <code>foo</code> và <code>bar</code> không compile,
+nhưng function <code>tag</code> thì có.</p>
+
+<pre><code class="language-Go">func foo[F func(int) | func(any)] (f F, x int) {
+	f(x) // error: invalid operation: cannot call non-function f
+}
+
+func bar[F func(int) | func(int)int] (f F, x int) {
+	f(x) // error: invalid operation: cannot call non-function f
+}
+
+type Fun func(int)
+
+func tag[F func(int) | Fun] (f F, x int) {
+	f(x) // okay
+}
+</code></pre>
+
+<p>Không rõ quy tắc này có được nới lỏng trong các phiên bản Go tương lai hay không.</p>
+
+<h2>Nếu kiểu <code>T</code> trong composite literal là một type parameter, thì tất cả các kiểu trong type set của type parameter đó phải có cùng một <a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a></h2>
+
+<p>Ví dụ, hiện tại (Go 1.25), trong đoạn code sau,
+các function <code>foo</code> và <code>bar</code> compile bình thường, nhưng các function còn lại thì không.</p>
+
+<pre><code class="language-Go">func foo[T ~[]int] () {
+	_ = T{}
+}
+
+type Ints []int
+
+func bar[T []int | Ints] () {
+	_ = T{} // okay
+}
+
+func ken[T []int | []string] () {
+	_ = T{} // error: invalid composite literal type T
+}
+
+func jup[T [2]int | map[int]int] () {
+	_ = T{} // error: invalid composite literal type T
+}
+</code></pre>
+
+<h2>Một phép toán index element yêu cầu type set của operand container không đồng thời chứa map và non-map</h2>
+
+<p>Và nếu tất cả các kiểu trong type set là map, thì underlying type của chúng phải giống hệt nhau.
+Nếu không, kiểu element của chúng phải giống hệt nhau.
+Các element của string được xem là các giá trị <code>byte</code>.</p>
+
+<p>Ví dụ, hiện tại (Go 1.25), trong đoạn code sau, chỉ các function <code>foo</code> và <code>bar</code> compile bình thường.</p>
+
+<pre><code class="language-Go">func foo[T []byte | [2]byte | string](c T) {
+	_ = c[0] // okay
+}
+
+type Map map[int]string
+func bar[T map[int]string | Map](c T) {
+	_ = c[0] // okay
+}
+
+func lag[T []int | map[int]int](c T) {
+	_ = c[0] // invalid operation: cannot index c
+}
+
+func vet[T map[string]int | map[int]int](c T) {
+	_ = c[0] // invalid operation: cannot index c
+}
+</code></pre>
+
+<p>Hạn chế này có thể được loại bỏ trong các phiên bản Go tương lai
+(thực ra đây chỉ là hy vọng của tôi, tôi không chắc về điều này).</p>
+
+<p>Nếu kiểu của index expression là một type parameter,
+thì tất cả các kiểu trong type set của nó phải là kiểu số nguyên.
+Function sau compile bình thường.</p>
+
+<pre><code class="language-Go">func ind[K byte | int | int16](s []int, i K) {
+	_ = s[i] // okay
+}
+</code></pre>
+
+<h2>Suy ra một slice từ một giá trị của type parameter yêu cầu tất cả các kiểu trong type set của type parameter đó có cùng một <a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a></h2>
+
+<p>Ví dụ, hiện tại (Go 1.25), cả hai function sau đều không compile,
+ngay cả khi các phép toán subslice đều hợp lệ với mọi kiểu trong type set tương ứng.</p>
+
+<pre><code class="language-Go">func foo[T []int | [2]int](c T) {
+	_ = c[:] // cannot slice c
+}
+
+func bar[T [8]int | [2]int](c T) {
+	_ = c[:] // cannot slice c
+}
+</code></pre>
+
+<p>Hạn chế này có thể được loại bỏ trong các phiên bản Go tương lai
+(một lần nữa, đây chỉ là hy vọng của tôi, thực ra tôi không chắc về điều này).</p>
+
+<p>Lưu ý rằng việc suy ra từ một giá trị của type parameter
+mà type set của nó chỉ chứa các kiểu string và byte slice được cho phép.
+Ví dụ, function sau compile bình thường.</p>
+
+<pre><code class="language-Go">func lol[T string | []byte](c T) {
+	_ = c[:] // okay
+}
+</code></pre>
+
+<h2>Nếu container được range trong vòng lặp <code>for-range</code> là một type parameter, thì tất cả các kiểu trong type set của type parameter đó phải có cùng một <a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a></h2>
+
+<p>Ví dụ, hiện tại (Go 1.25), trong code sau,
+chỉ hai function cuối, <code>dot1</code> và <code>dot2</code>, compile bình thường.</p>
+
+<pre><code class="language-Go">func values[T []E | map[int]E, E any](kvs T) []E {
+	r := make([]E, 0, len(kvs))
+	// error: cannot range over kvs
+	for _, v := range kvs {
+		r = append(r, v)
+	}
+	return r
+}
+
+func keys[T map[int]string | map[int]int](kvs T) []int {
+	r := make([]int, 0, len(kvs))
+	for k := range kvs { // error: cannot range over kvs
+		r = append(r, k)
+	}
+	return r
+}
+
+func sum[M map[int]int | map[string]int](m M) (sum int) {
+	for _, v := range m { // error: cannot range over m
+		sum += v
+	}
+	return
+}
+
+func foo[T []int | []string] (v T) {
+	for range v {} // error: cannot range over v
+}
+
+func bar[T [3]int | [6]int] (v T) {
+	for range v {} // error: cannot range over v
+}
+
+type MyInt int
+
+func cat[T []int | []MyInt] (v T) {
+	for range v {} // error: cannot range over v
+}
+
+type Slice []int
+
+func dot1[T []int | Slice] (v T) {
+	for range v {} // okay
+}
+
+func dot2[T ~[]int] (v T) {
+	for range v {} // okay
+}
+</code></pre>
+
+<p>Hạn chế này là có chủ ý. Theo tôi, mục đích của nó là bảo đảm cả hai
+iteration variable luôn có một kiểu được xác định
+(hoặc là một kiểu thông thường, hoặc là một kiểu type parameter).
+Tuy nhiên, hạn chế này quá chặt đối với mục đích đó.
+Vì trên thực tế, kiểu key hoặc kiểu element của một số container là giống nhau,
+ngay cả khi underlying type của các container khác nhau.
+Và trong nhiều trường hợp sử dụng, một trong hai iteration variable bị bỏ qua.</p>
+
+<p>Tôi không chắc <a href="https://github.com/golang/go/issues/49551">hạn chế này có được loại bỏ trong các phiên bản Go tương lai hay không</a>.
+Theo ý kiến của tôi, hạn chế này làm giảm phần nào tính hữu ích của generic tùy chỉnh trong Go.</p>
+
+<p>Nếu tất cả các kiểu có thể có là slice và array, và kiểu element của chúng giống nhau,
+ta có thể dùng các vòng lặp <code>for</code> thông thường để tránh hạn chế này.</p>
+
+<pre><code class="language-Go">func cat[T [3]int | [6]int | []int] (v T) {
+	for i := 0; i &lt; len(v); i++ { // okay
+		_ = v[i] // okay
+	}
+}
+</code></pre>
+
+<p>Lời gọi function predeclared <code>len</code> ở đây là hợp lệ.
+Một section sau sẽ nói về điều này.</p>
+
+<p>Code sau cũng không compile, nhưng điều đó là hợp lý.
+Vì các element được iterate của <code>string</code> là các giá trị <code>rune</code>,
+trong khi các element được iterate của <code>[]byte</code> là các giá trị <code>byte</code>.</p>
+
+<pre><code class="language-Go">func mud[T string | []byte] (v T) {
+	for range v {} // error: cannot range over v
+}
+</code></pre>
+
+<p>Nếu mục đích là iterate các byte trong byte slice hoặc string,
+ta có thể dùng code sau để đạt được mục tiêu.</p>
+
+<pre><code class="language-Go">func mud[T string | []byte] (v T) {
+	for range []byte(v) {} // okay
+}
+</code></pre>
+
+<p>Phép convert <code>[]byte(v)</code> (nếu nó theo sau keyword <code>range</code>) được <a href="https://go101.org/article/string.html#conversion-optimizations">official standard Go compiler tối ưu hóa riêng</a>
+để không duplicate các byte underlying.</p>
+
+<p>Function sau hiện tại không compile (Go 1.25),
+ngay cả khi kiểu của hai iteration variable luôn là <code>int</code> và <code>rune</code>.
+Không rõ nó có compile trong các phiên bản Go tương lai hay không.</p>
+
+<pre><code class="language-Go">func aka[T string | []rune](runes T) {
+	for i, r := range runes { // cannot range over runes
+		_ = i
+		_ = r
+	}
+}
+</code></pre>
+
+<h2>Các phép convert có type parameter tham gia</h2>
+
+<p>Trước hết, ta cần biết <a href="https://go101.org/article/value-conversions-assignments-and-comparisons.html">các quy tắc convert đối với kiểu/giá trị thông thường</a>.</p>
+
+<p>Theo đặc tả hiện tại (Go 1.25),
+cho hai kiểu <code>From</code> và <code>To</code>, giả sử ít nhất một trong hai là type parameter,
+thì một giá trị của <code>From</code> có thể được convert sang <code>To</code> nếu một giá trị của mỗi kiểu trong
+type set của <code>From</code> có thể được convert sang mỗi kiểu trong type set của <code>T</code>
+(lưu ý rằng type set của một kiểu thông thường chỉ chứa chính kiểu thông thường đó).</p>
+
+<p>Ví dụ, tất cả các function sau đều compile bình thường.</p>
+
+<pre><code class="language-Go">func pet[A ~int32 | ~int64, B ~float32 | ~float64](x A, y B){
+	x = A(y)
+	y = B(x)
+}
+
+func dig[From ~byte | ~rune, To ~string | ~int](x From) To {
+	return To(x)
+}
+
+func cov[V ~[]byte | ~[]rune](x V) string {
+	return string(x)
+}
+
+func voc[V ~[]byte | ~[]rune](x string) V {
+	return V(x)
+}
+</code></pre>
+
+<p>Nhưng function sau không compile,
+vì các giá trị <code>string</code> không thể được convert sang <code>int</code>.</p>
+
+<pre><code class="language-Go">func eve[X, Y int | string](x X) Y {
+	return Y(x) // error
+}
+</code></pre>
+
+<p>Function sau không compile, ngay cả khi phép convert trong nó
+hợp lệ với mọi type argument có thể có.
+Lý do là <code>[]T</code> là một kiểu thông thường, không phải type parameter,
+và underlying type của nó chính là nó.
+Không có quy tắc nào cho phép convert các giá trị từ <code>[]T</code> sang <code>string</code>.</p>
+
+<pre><code class="language-Go">func jon[T byte](x string) []T {
+	return []T(x) // error
+}
+</code></pre>
+
+<p>Các phiên bản Go tương lai <a href="https://github.com/golang/go/issues/50421">có thể nới lỏng các quy tắc</a>
+để làm cho phép convert trong ví dụ trên hợp lệ.</p>
+
+<p>Khi dùng official standard Go compiler, trong program sau,</p>
+
+<ul>
+<li>các function <code>tup</code> và <code>pad</code> không compile.
+Lý do là các giá trị có kiểu <code>AgePtr</code> không thể được convert trực tiếp sang <code>*int</code>.</li>
+<li>cả ba function generic còn lại đều compile bình thường.
+Tuy nhiên, function <code>dot</code> không nên compile theo quy tắc đã mô tả ở trên.
+Đây có thể là <a href="https://github.com/golang/go/issues/50815#issuecomment-1087579365">một bug của standard compiler, hoặc quy tắc được mô tả trong đặc tả Go hiện tại cần một điều chỉnh nhỏ</a>.</li>
+</ul>
+
+<pre><code class="language-Go">package main
+
+type Age int
+type AgePtr *Age
+
+func dot[T ~*Age](x T) *int {
+	return (*int)(x) // okay
+}
+
+func tup(x AgePtr) *int {
+	// error: cannot convert x (variable of type AgePtr)
+	//        to type *int
+	return (*int)(x)
+}
+
+func tup2(x AgePtr) *int {
+	return (*int)((*Age)(x))
+}
+
+func pad[T AgePtr](x T) *int {
+	// error: cannot convert x to type *int
+	return (*int)(x)
+}
+
+func pad2[T AgePtr](x T) *int {
+	return (*int)((*Age)(x))
+}
+
+func main() {
+	var x AgePtr
+	var _ = dot[AgePtr](x)
+	var _ = tup2(x)
+	var _ = pad2[AgePtr](x)
+}
+</code></pre>
+
+<h2>Các phép gán có type parameter tham gia</h2>
+
+<p>Trước hết, ta cần biết <a href="https://go101.org/article/value-conversions-assignments-and-comparisons.html">các quy tắc gán đối với kiểu/giá trị thông thường</a>.</p>
+
+<p>Trong các mô tả sau, kiểu của giá trị đích được gọi là kiểu đích, và kiểu của giá trị nguồn được gọi là kiểu nguồn.</p>
+
+<p>Theo đặc tả hiện tại (Go 1.25), đối với một phép gán có type parameter tham gia,</p>
+
+<ul>
+<li>nếu kiểu đích là một type parameter và giá trị nguồn là một giá trị không có kiểu,
+thì phép gán chỉ hợp lệ khi
+giá trị không có kiểu đó assignable cho mọi kiểu trong type set của
+type parameter đích.</li>
+<li>nếu kiểu đích là một type parameter nhưng kiểu nguồn là một kiểu thông thường,
+thì phép gán chỉ hợp lệ khi kiểu thông thường nguồn là kiểu <a href="https://go101.org/article/type-system-overview.html#named-type">không có tên</a>
+và các giá trị của nó assignable cho mọi kiểu trong type set của type parameter đích.</li>
+<li>nếu kiểu nguồn là một type parameter nhưng kiểu đích là một kiểu thông thường,
+thì phép gán chỉ hợp lệ khi kiểu thông thường đích là kiểu không có tên
+và các giá trị của mọi kiểu trong type set của type parameter nguồn
+assignable cho kiểu thông thường đích.</li>
+<li>nếu cả kiểu đích và kiểu nguồn đều là type parameter,
+thì phép gán không hợp lệ.</li>
+</ul>
+
+<p>Từ các quy tắc trên, ta có thể thấy rằng giá trị của một kiểu có tên không thể được gán cho một kiểu có tên khác.</p>
+
+<p>Trong đoạn code sau, có bốn phép gán không hợp lệ.</p>
+
+<pre><code class="language-Go">func dat[T ~int | ~float64, S *int | []bool]() {
+	var _ T = 123 // okay
+	var _ S = nil // okay
+}
+
+func zum[T []byte](x []byte) {
+	var t T = x // okay
+	type Bytes []byte
+	var y Bytes = x // okay (cả hai đều là kiểu thông thường)
+	x = t // okay
+	x = y // okay
+	
+	// Cả hai đều là kiểu có tên.
+	t = y // error
+	y = t // error
+	
+	// Để làm cho hai phép gán trên hợp lệ,
+	// các giá trị nguồn trong đó phải được convert.
+	t = T(y)     // okay
+	y = Bytes(t) // okay
+}
+
+
+func pet[A, B []byte](x A, y B){
+	// Cả hai đều là type parameter.
+	x = y // error: cannot use y as type A in assignment
+	y = x // error: cannot use x as type B in assignment
+}
+</code></pre>
+
+<p>Không rõ các quy tắc gán có được nới lỏng trong các phiên bản Go tương lai hay không.
+Có vẻ <a href="https://github.com/golang/go/issues/51501">khả năng này là thấp</a>.</p>
+
+<h2>Các lời gọi function predeclared</h2>
+
+<p>Sau đây là một số quy tắc và chi tiết về lời gọi một số function predeclared
+khi có type parameter tham gia.</p>
+
+<h2>Lời gọi function predeclared <code>len</code> hoặc <code>cap</code> hợp lệ nếu nó hợp lệ với mọi kiểu trong type set của argument</h2>
+
+<p>Trong đoạn code sau, function <code>capacity</code> không compile,
+hai function còn lại đều compile bình thường.</p>
+
+<pre><code class="language-Go">type Container[T any] interface {
+	~chan T | ~[]T | ~[8]T | ~*[8]T | ~map[int]T | ~string
+}
+
+func size[T Container[int]](x T) int {
+	return len(x) // okay
+}
+
+func capacity[T Container[int]](x T) int {
+	return cap(x) // error: invalid argument x for cap
+}
+
+func capacity2[T ~chan int | ~[]int](x T) int {
+	return cap(x) // okay
+}
+</code></pre>
+
+<p>Lưu ý rằng lời gọi <code>len</code> hoặc <code>cap</code> luôn trả về một giá trị không phải constant
+nếu kiểu của argument trong lời gọi là một type parameter,
+ngay cả khi type set của argument chỉ chứa array và pointer tới array.
+Ví dụ, trong code sau, lời gọi <code>cap</code> và <code>len</code> đầu tiên trong hai function đầu
+đều không compile.</p>
+
+<pre><code class="language-Go">func f[T [2]int](x T) {
+	const _ = cap(x) // error: cap(x) is not constant
+	const _ = len(x) // error: len(x) is not constant
+
+	var _ = cap(x) // okay
+	var _ = len(x) // okay
+}
+
+func g[P *[2]int](x P) {
+	const _ = cap(x) // error: cap(x) is not constant
+	const _ = len(x) // error: len(x) is not constant
+
+	var _ = cap(x) // okay
+	var _ = len(x) // okay
+}
+
+func h(x [2]int) {
+	const _ = cap(x) // okay
+	const _ = len(x) // okay
+	const _ = cap(&amp;x) // okay
+	const _ = len(&amp;x) // okay
+}
+</code></pre>
+
+<p>Quy tắc này <a href="https://github.com/golang/go/issues/50226">có thể được thay đổi</a>.
+Nhưng nói thật, khả năng này rất thấp.
+Cá nhân tôi cho rằng hành vi hiện tại hợp lý hơn.</p>
+
+<p>Do quy tắc này, hai function sau trả về các kết quả khác nhau.</p>
+
+<pre><code class="language-Go">package main
+
+const S = &quot;Go&quot;
+
+func ord(x [8]int) byte {
+	return 1 &lt;&lt; len(x) &gt;&gt; len(x)
+}
+
+func gen[T [8]int](x T) byte {
+	return 1 &lt;&lt; len(x) &gt;&gt; len(x)
+}
+
+func main() {
+	var x [8]int
+	println(ord(x), gen(x)) // 1 0
+}
+</code></pre>
+
+<p>Một lần nữa, hãy đọc bài viết <a href="https://go101.org/article/string.html">strings trong Go</a>
+và <a href="https://github.com/golang/go/issues/28591">issue này</a>
+để biết vì sao hai function trả về các kết quả khác nhau.</p>
+
+<p>Lưu ý rằng function sau không compile,
+vì kiểu của <code>&amp;x</code> là <code>*T</code>, một pointer
+tới một type parameter, thay vì pointer tới một array.</p>
+
+<pre><code class="language-Go">func e[T [2]int]() {
+	var x T
+	var _ = len(&amp;x) // invalid argument: &amp;x for len
+	var _ = cap(&amp;x) // invalid argument: &amp;x for cap
+}
+</code></pre>
+
+<p>Nói cách khác, một type parameter mà type set của nó chỉ chứa một kiểu
+không tương đương với chính kiểu duy nhất đó.
+Type parameter có tính hai mặt sóng-hạt.
+Trong một số tình huống, nó hoạt động như các kiểu trong type set của nó.
+Trong một số tình huống khác, nó hoạt động như một kiểu riêng biệt.
+Cụ thể hơn, một type parameter hoạt động như một kiểu riêng biệt
+(không có underlying type chung với bất kỳ kiểu nào khác)
+khi nó được dùng làm một thành phần của kiểu tổ hợp.
+Trong ví dụ trên, <code>*T</code> và <code>*[2]int</code> là hai kiểu thông thường khác nhau.</p>
+
+<h2>Lời gọi function predeclared <code>new</code> không có yêu cầu thêm đối với argument</h2>
+
+<p>Function sau compile bình thường.</p>
+
+<pre><code class="language-Go">func MyNew[T any]() *T {
+	return new(T)
+}
+</code></pre>
+
+<p>Nó tương đương với</p>
+
+<pre><code class="language-Go">func MyNew[T any]() *T {
+	var t T
+	return &amp;t
+}
+</code></pre>
+
+<h2>Yêu cầu đối với lời gọi function predeclared <code>make</code> khi argument thứ nhất là một type parameter</h2>
+
+<p>Yêu cầu đối với type set của type parameter:</p>
+
+<ul>
+<li>Tất cả các kiểu trong type set phải có cùng một <a href="https://go101.org/article/type-system-overview.html#underlying-type">underlying type</a>, hoặc</li>
+<li>Tất cả các kiểu trong type set phải là kiểu channel có cùng kiểu element và hướng của channel không được xung đột (type set không được đồng thời chứa channel chỉ nhận và channel chỉ gửi).</li>
+</ul>
+
+<p>Hiện tại (Go 1.25), trong đoạn code sau, cả hai function <code>voc</code> và <code>ted</code>
+đều không compile, hai function còn lại compile bình thường.</p>
+
+<pre><code class="language-Go">func voc[T chan bool | chan int]() {
+	_ = make(T) // error: invalid argument: cannot make T
+}
+
+func ted[T chan&lt;- int | &lt;-chan int]() {
+	_ = make(T) // error: invalid argument: cannot make T
+}
+
+type Stream chan int
+type Queue Stream
+
+func fat[T Stream | chan int | Queue | chan&lt;- int]() {
+	_ = make(T) // okay
+}
+
+func nub[T Stream | chan int | Queue | &lt;-chan int]() {
+	_ = make(T) // okay
+}
+</code></pre>
+
+<p>Theo cách hiểu của tôi, yêu cầu này nhằm làm cho các phép toán tiếp theo
+trên các container được tạo (chúng là channel trong ví dụ trên) luôn hợp lệ.
+Ví dụ, để bảo đảm một giá trị nhận từ channel được tạo có một kiểu được xác định
+(hoặc là một type parameter, hoặc là một kiểu thông thường).</p>
+
+<p>Cá nhân tôi cho rằng yêu cầu này quá chặt.
+Sau cùng, trong một số trường hợp, các phép toán tiếp theo được giả định đó không xảy ra.</p>
+
+<p>Do cùng yêu cầu đó, cả hai function sau cũng không compile.</p>
+
+<pre><code class="language-Go">func zig[T ~[]int | map[int]int](c T) {
+	_ = make(T) // error: invalid argument: cannot make T
+}
+
+func rat[T ~[]int | ~[]bool](c T) {
+	_ = make(T) // error: invalid argument: cannot make T
+}
+</code></pre>
+
+<p>Lời gọi function predeclared <code>new</code> không có yêu cầu này.</p>
+
+<h2>Lời gọi function predeclared <code>delete</code> yêu cầu tất cả các kiểu trong type set của argument thứ nhất có cùng một kiểu key</h2>
+
+<p>Lưu ý, kiểu key giống nhau này có thể là kiểu thông thường hoặc kiểu type parameter.</p>
+
+<p>Cả hai function sau đều compile bình thường.</p>
+
+<pre><code class="language-Go">func zuk[M ~map[int]string | ~map[int]bool](x M, k int) {
+	delete(x, k)
+}
+
+func pod[M map[K]int | map[K]bool, K ~int | ~string](x M, k K) {
+	delete(x, k)
+}
+</code></pre>
+
+<h2>Lời gọi function predeclared <code>close</code> yêu cầu tất cả các kiểu trong type set của argument là kiểu channel</h2>
+
+<p>Function sau compile bình thường.</p>
+
+<pre><code class="language-Go">func dig[T ~chan int | ~chan bool | ~chan&lt;- string](x T) {
+	close(x)
+}
+</code></pre>
+
+<h2>Các function predeclared <code>complex</code>, <code>real</code> và <code>imag</code> hiện không chấp nhận argument có kiểu type parameter</h2>
+
+<p>Việc gọi ba function này với argument là type parameter có thể phá vỡ quy tắc cơ bản được đề cập trong section đầu tiên của chương hiện tại.</p>
+
+<p>Đây là một vấn đề mà thiết kế generic tùy chỉnh hiện tại không thể giải quyết.
+Đã có <a href="https://github.com/golang/go/issues/50937">một issue</a> cho vấn đề này.</p>
+
+<h2>Về các constraint có type set rỗng</h2>
+
+<p>Type set của một số kiểu interface có thể rỗng.
+Một kiểu interface có type set rỗng implement mọi kiểu interface,
+bao gồm chính nó.</p>
+
+<p>Các kiểu interface có type set rỗng hoàn toàn vô dụng trong thực tế,
+nhưng chúng có thể ảnh hưởng đến mức độ hoàn thiện của triển khai xét từ góc nhìn lý thuyết.</p>
+
+<p>Thực sự có một số điểm chưa hoàn thiện trong triển khai
+của official standard Go compiler hiện tại (v1.25.n).</p>
+
+<p>Ví dụ sau đây là <a href="https://github.com/golang/go/issues/51917#issuecomment-1084188702">một ví dụ</a>,
+trong đó mọi lời gọi function trong function <code>g</code> đều đáng lẽ compile bình thường.
+Tuy nhiên, hai lời gọi không compile với official standard Go compiler mới nhất (v1.25.n).</p>
+
+<pre><code class="language-Go">func f1[T any](x T) {}
+func f2[T comparable](x T) {}
+func f3[T []int](x T) {}
+func f4[T int](x T) {}
+
+// Đây là một kiểu interface có type set rỗng.
+type C interface {
+	[]int
+	m()
+}
+
+func g[V C](v V) {
+	f1(v) // okay
+	f2(v) // error: V does not implement comparable
+	f3(v) // okay
+	f4(v) // error: V does not implement int
+}
+</code></pre>
+
+<p>Đặc tả Go hiện tại nêu rõ:</p>
+
+<blockquote>
+<p>Hạn chế triển khai: Compiler không bắt buộc phải báo lỗi nếu kiểu của một operand là một type parameter có type set rỗng. Các function có những type parameter như vậy không thể được khởi tạo; mọi nỗ lực khởi tạo sẽ dẫn đến lỗi tại vị trí khởi tạo.</p>
+</blockquote>
+
+<p>Vì vậy, các điểm chưa hoàn thiện nêu trên không phải là bug của official standard Go compiler.</p>

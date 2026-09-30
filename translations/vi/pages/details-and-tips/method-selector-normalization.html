@@ -1,0 +1,143 @@
+
+<h1>Chuẩn hóa các method selector</h1>
+
+<p>Go cho phép các dạng rút gọn của một số selector.</p>
+
+<p>Ví dụ, trong chương trình sau, <code>t1.M1</code> là dạng rút gọn của <code>(*t1).M1</code>,
+và <code>t2.M2</code> là dạng rút gọn của <code>(&amp;t2).M2</code>. Khi compile, compiler sẽ chuẩn hóa các dạng rút gọn thành các dạng đầy đủ ban đầu tương ứng.</p>
+
+<p>Chương trình sau in ra <code>0</code> và <code>9</code>, vì việc sửa đổi <code>t1.X</code> không ảnh hưởng đến kết quả đánh giá của <code>*t1</code> trong quá trình đánh giá <code>(*t1).M1</code>.</p>
+
+<pre><code class="language-Go">package main
+
+type T struct {
+	X int
+}
+
+func (t T) M1() int {
+	return t.X
+}
+
+func (t *T) M2() int {
+	return t.X
+}
+
+func main() {
+	var t1 = new(T)
+	var f1 = t1.M1 // &lt;=&gt; (*t1).M1
+	t1.X = 9
+	println(f1()) // 0 
+	
+	var t2 T
+	var f2 = t2.M2 // &lt;=&gt; (&amp;t2).M2
+	t2.X = 9
+	println(f2()) // 9
+}
+</code></pre>
+
+<p>Trong đoạn code sau, function <code>foo</code> chạy bình thường, nhưng function <code>bar</code> sẽ gây ra một panic. Lý do là <code>s.M</code> là dạng rút gọn của <code>(*s.T).M</code>. Khi compile, compiler sẽ chuẩn hóa dạng rút gọn thành dạng đầy đủ ban đầu của nó. Khi runtime, nếu <code>s.T</code> là nil, việc đánh giá <code>*s.T</code> sẽ gây ra một panic. Hai lần sửa đổi <code>s.T</code> không ảnh hưởng đến kết quả đánh giá của <code>*s.T</code>.</p>
+
+<pre><code class="language-Go">package main
+
+type T struct {
+	X int
+}
+
+func (t T) M() int {
+	return t.X
+}
+
+type S struct {
+	*T
+}
+
+func foo() {
+	var s = S{T: new(T)}
+	var f = s.M // &lt;=&gt; (*s.T).M
+	s.T = nil
+	f()
+}
+
+func bar() {
+	var s S
+	var f = s.M // panic
+	s.T = new(T)
+	f()
+}
+
+func main() {
+	foo()
+	bar()
+}
+</code></pre>
+
+<p>Lưu ý rằng interface method value và method value lấy được qua reflection sẽ được mở rộng thành promoted method value với một độ trễ.
+Ví dụ, trong chương trình sau, việc sửa đổi <code>s.T.X</code>
+ảnh hưởng đến kết quả trả về của các method value lấy được qua reflection và qua interface.</p>
+
+<pre><code class="language-Go">package main
+
+import &quot;reflect&quot;
+
+type T struct {
+	X int
+}
+
+func (t T) M() int {
+	return t.X
+}
+
+type S struct {
+	*T
+}
+
+func main() {
+	var s = S{T: new(T)}
+	var f = s.M // &lt;=&gt; (*s.T).M
+	var g = reflect.ValueOf(&amp;s).Elem().
+		MethodByName(&quot;M&quot;).
+		Interface().(func() int)
+	var h = interface{M() int}(s).M
+	s.T.X = 3
+	println( f() ) // 0
+	println( g() ) // 3
+	println( h() ) // 3
+}
+</code></pre>
+
+<p>Nguồn: <a href="https://github.com/golang/go/issues/47863">https://github.com/golang/go/issues/47863</a></p>
+
+<p>Lưu ý, official standard Go compiler có một bug trước version 1.20.
+Các compiler cũ de-virtualize một số interface method ở compile time, nhưng việc de-virtualize được thực hiện quá mức nên không đúng.
+Ví dụ, chương trình sau đáng lẽ phải in ra <code>2 2</code>,
+nhưng sẽ in ra <code>1 2</code> nếu được compile bằng official standard Go compiler v1.19.</p>
+
+<pre><code class="language-Go">package main
+
+type I interface{ M() }
+
+type T struct{
+	x int
+}
+
+func (t T) M() {
+	println(t.x)
+}
+
+func main() {
+	var t = &amp;T{x: 1}
+	var i I = t
+	
+	var f = i.M
+	defer f() // 2 (đúng)
+
+	// i.M được de-virtualize thành (*t).M tại compile time (bug).
+	defer i.M() // 1 (sai)
+	
+	t.x = 2
+}
+</code></pre>
+
+<p>Bug này đã được sửa trong Go toolchain 1.20.</p>
+
+<p>Nguồn: <a href="https://github.com/golang/go/issues/52072">https://github.com/golang/go/issues/52072</a></p>

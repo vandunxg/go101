@@ -1,0 +1,66 @@
+
+### Một lỗi so sánh channel khi channel được dùng làm biểu thức `case` của các block code `switch` (trong Go toolchain v1.20 - v1.23.x)
+
+// (Issue liên quan: __https://github.com/golang/go/issues/67190__.)
+
+Trong Go toolchain v1.20 - v1.23.x, có một lỗi so sánh channel value,
+được minh họa trong chương trình sau:
+
+''' Go
+// chan-cmp-bug.go
+package main
+
+import "fmt"
+
+func main() {
+	x := make(chan struct{})
+
+	var y <-chan struct{} = x
+
+	switch x {
+	case y: fmt.Print(1)
+	default: fmt.Print(0)
+	}
+
+	switch y {
+	case x: fmt.Print(1)
+	default: fmt.Print(0)
+	}
+
+	fmt.Println(x == y)
+}
+'''
+
+Chương trình phải in ra `11true`. Nhưng với các phiên bản Go toolchain từ v1.20
+đến trước v1.23.0, nó lại in ra `01true` __#gotv__.
+
+'''
+$ gotv 1.19. run chan-cmp-bug.go
+[Run]: $HOME/.cache/gotv/tag_go1.19.13/bin/go run chan-cmp-bug.go
+11true
+$ gotv 1.20 run chan-cmp-bug.go
+[Run]: $HOME/.cache/gotv/tag_go1.20/bin/go run chan-cmp-bug.go
+01true
+$ gotv 1.21. run chan-cmp-bug.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.12/bin/go run chan-cmp-bug.go
+01true
+$ gotv 1.22. run chan-cmp-bug.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.5/bin/go run chan-cmp-bug.go
+01true
+$ gotv 1.23.0 run chan-cmp-bug.go
+[Run]: $HOME/.cache/gotv/tag_go1.23rc1/bin/go run chan-cmp-bug.go
+11true
+'''
+
+Lỗi bắt đầu từ phiên bản Go toolchain v1.20 và đã được sửa kể từ v1.23.0.
+
+Nếu bạn đang sử dụng phiên bản Go toolchain nằm trong khoảng từ v1.20
+đến trước v1.23.0, bạn nên lưu ý lỗi này.
+
+---
+
+{ %%
+@@@ #gotv
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ được dùng để cài đặt và sử dụng đồng thời
+các bản Go toolchain một cách hài hòa.
+}

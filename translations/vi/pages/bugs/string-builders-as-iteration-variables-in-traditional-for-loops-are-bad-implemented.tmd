@@ -1,0 +1,95 @@
+
+### Các biến lặp `strings.Builder` trong các vòng lặp `for;;` 3 mệnh đề truyền thống được triển khai không đúng
+
+Go 1.22 đã thay đổi ngữ nghĩa của các vòng lặp `for`,
+bao gồm cả vòng lặp `for-range` và các vòng lặp
+`for ..; ..; .. {...}` 3 mệnh đề truyền thống.
+Để biết chi tiết, hãy đọc __Các thay đổi ngữ nghĩa của vòng lặp `for` trong Go 1.22: Hãy lưu ý về tác động__.
+
+    === ...về tác động `` https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+
+Theo ý kiến thành thật của tôi, tác động tổng thể của ngữ nghĩa mới của các vòng lặp `for-range` là tích cực,
+trong khi tác động tổng thể của ngữ nghĩa mới của các vòng lặp `for;;` 3 mệnh đề truyền thống là tiêu cực.
+Bài viết được tham chiếu ở trên trình bày tất cả các tác động xấu của thay đổi ngữ nghĩa của các vòng lặp `for;;` 3 mệnh đề truyền thống
+mà tôi đã tìm thấy cho đến nay.
+
+Một thực tế là hiện tại Go toolchain chính thức mới nhất không triển khai đúng ngữ nghĩa mới
+trong một số trường hợp mà các value `strings.Builder` được dùng làm các biến lặp (mới khai báo) của các vòng lặp `for;;` 3 mệnh đề truyền thống.
+Ví dụ sau cho thấy một trường hợp như vậy:
+
+''' Go
+package main
+
+import (
+	"fmt"
+	"strings"
+)
+
+func foo() string {
+	for b, i := (strings.Builder{}), byte('a'); ; i++ {
+		b.WriteByte(i) // không panic
+		if i == 'z' {
+			return b.String()
+		}
+	}
+}
+
+func bar(callback func(*strings.Builder)) string {
+	for b, i := (strings.Builder{}), byte('a'); ; i++ {
+		b.WriteByte(i) // panic tại đây
+		callback(&b)
+		if i == 'z' {
+			return b.String()
+		}
+	}
+}
+
+func main() {
+	fmt.Println(foo())
+	debugProcess := func(pb *strings.Builder) {
+		//fmt.Println(pb.String()) // không làm gì cả
+	}
+	fmt.Println(bar(debugProcess))
+}
+'''
+
+Chương trình ví dụ trên không panic với các phiên bản Go toolchain chính thức
+trước v1.22: __#gotv__
+
+'''
+$ gotv 1.21 run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.21.12/bin/go run main.go
+abcdefghijklmnopqrstuvwxyz
+abcdefghijklmnopqrstuvwxyz
+'''
+
+Tuy nhiên, khi dùng Go toolchain chính thức v1.22+, chương trình ví dụ
+panic:
+
+'''
+$ gotv 1.22 run main.go
+[Run]: $HOME/.cache/gotv/tag_go1.22.5/bin/go run main.go
+abcdefghijklmnopqrstuvwxyz
+panic: strings: illegal use of non-zero Builder copied by value
+'''
+
+Hành vi của các function `foo` và `bar` phải nhất quán với nhau,
+nhưng Go toolchain chính thức v1.22+ không đảm bảo được điều đó.
+Thực tế, theo ngữ nghĩa mới từ Go 1.22 trở lên, cả hai function `foo` và `bar`
+đều phải panic, vì các value no-copy không nên được dùng làm các biến lặp (mới khai báo)
+kể từ Go 1.22.
+
+Lưu ý: lệnh `go vet` được cung cấp trong các phiên bản Go toolchain 1.22 và 1.23 không cảnh báo về những trường hợp như vậy.
+
+Go core team __đã từ chối sửa bug này__. Bạn cần lưu ý bug này.
+
+    === đã từ chối sửa bug này `` https://github.com/golang/go/issues/66070#issuecomment-1981642904
+
+
+---
+
+{ %%
+@@@ #gotv
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ giúp cài đặt và sử dụng đồng thời
+nhiều bản Go toolchain một cách thuận tiện.
+}

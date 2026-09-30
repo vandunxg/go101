@@ -1,0 +1,139 @@
+<h1>Go Details &amp; Tips 101</h1>
+
+
+<p>
+Cuốn sách này tập hợp nhiều chi tiết và cung cấp một số mẹo trong lập trình Go.
+Các chi tiết và mẹo được phân loại theo
+</p>
+
+<ul>
+<li>liên quan đến syntax và semantics</li>
+<li>liên quan đến conversion</li>
+<li>liên quan đến comparison</li>
+<li>liên quan đến compiler và runtime</li>
+<li>liên quan đến standard và user package</li>
+</ul>
+
+<p>
+Cuốn sách hiện đã sẵn sàng cho Go 1.25 (<a href="100-updates.html">lịch sử cập nhật</a>).
+</p>
+
+<p style="font-size: smaller;"><i>
+(Hãy theo dõi tài khoản X chính thức của Go 101 <a href="https://x.com/zigo_101">@zigo_101</a>
+để cập nhật những tin tức Go 101 mới nhất và tìm hiểu đủ loại kiến thức về Go.)
+</i></p>
+
+<div id="ebooks" class="alert alert-success row item-row">
+	<div class="col-xs-12 col-sm-3 text-center" style="font-size: small;">
+		<img src="res/cover-1000x.jpg" style="width: 160px;" alt="Go Details&Tips 101"></img>
+		<p>(khoảng 80 trang, chính xác 101 chi tiết và mẹo)</p>
+	</div>
+	<div class="col-xs-12 col-sm-9" style="padding-top: 6px; font-size: smaller;">
+		Các phiên bản kỹ thuật số của cuốn sách này có tại những nơi sau:
+		<ul>
+		<li>
+			<a href="https://leanpub.com/go-details-and-tips-101">cửa hàng Leanpub</a>,
+			<i>$8.99+</i>
+		</li>
+		<li>
+			<a href="https://www.amazon.com/dp/B09NT56PW8">cửa hàng Amazon Kindle</a>,
+			<i>$8.99</i>.
+		</li>
+		<li>
+			<a href="https://books.apple.com/book/id1609931638">cửa hàng Apple Books</a>,
+			<i>$8.99</i>.
+		</li>
+		<li>
+			<a href="https://play.google.com/store/books/details?id=A81wEAAAQBAJ">cửa hàng Google Play</a>,
+			<i>$8.99</i>.
+		</li>
+		</ul>
+
+		<p>
+		Tapir, tác giả của Go 101, đã viết loạt sách Go 101 và duy trì website go101.org từ tháng 7 năm 2016.
+		Nội dung mới vẫn đang (và sẽ tiếp tục được) thường xuyên bổ sung vào loạt sách và website theo thời gian.
+		</p>
+
+		<p>
+		Tapir cũng là một nhà phát triển game độc lập.
+		Nếu muốn, bạn cũng có thể ủng hộ cuốn sách và website bằng cách
+		chơi <a href="https://www.tapirgames.com">các game của Tapir</a>
+		(được phát triển cho cả Android và iPhone/iPad).
+		Các khoản quyên góp cá nhân cũng được chấp nhận <a href="https://paypal.me/tapirliu">qua PayPal</a>.
+		</p>
+
+		<p>
+		Cảm ơn Olexandr Shalakhin đã cho phép sử dụng một trong những
+		<a href="https://github.com/shalakhin/gophericons">hình ảnh biểu tượng gopher tuyệt vời</a>
+		trên bìa sách.
+		</p>
+		
+	</div>
+</div>
+
+
+
+<div>
+
+<h3>Mục lục:</h3>
+
+<!-- index starts (don't remove) -->
+
+<div id="book-index">
+
+<ul class="index part">
+	<li><a class="index" href="0.0-acknowledgements.html">Lời cảm ơn</a></li>
+	<li><a class="index" href="0.1-introduction.html">Về Go Details &amp; Tips 101</a></li>
+</ul>
+	
+<ul class="index part">
+<li>Liên quan đến syntax và semantics
+<ul>
+	
+	<li><a class="index" href="semicolon-insertion.html">Các compiler Go sẽ tự động chèn một số semicolon vào code</a></li>
+	<li><a class="index" href="method-selector-normalization.html">Chuẩn hóa method selector</a></li>
+	<li>khoảng 50 chi tiết khác có trong <a href="#ebooks">các ebook trả phí</a>.</li>
+</ul>
+</li>
+</ul>
+
+<ul class="index part">
+<li>Liên quan đến conversion
+<ul>
+	<li><a class="index" href="pointer-indirect-conversion.html">Các value của hai pointer type được định nghĩa khác nhau có thể được convert gián tiếp sang type của nhau nếu base type của hai type có cùng underlying type</a></li>
+	<li>thêm 4 chi tiết có trong <a href="#ebooks">các ebook trả phí</a>.</li>
+</ul>
+</li>
+</ul>
+
+<ul class="index part">
+<li>Liên quan đến comparison
+<ul>
+	<li><a class="index" href="array-comparison.html">Các array value được so sánh theo từng element</a></li>
+	<li>thêm 11 chi tiết có trong <a href="#ebooks">các ebook trả phí</a>.</li>
+</ul>
+</li>
+</ul>
+
+<ul class="index part">
+<li>Liên quan đến compiler và runtime
+<ul>
+	<li>khoảng 10 chi tiết có trong <a href="#ebooks">các ebook trả phí</a>.</li>
+</ul>
+</li>
+</ul>
+	
+<ul class="index part">
+<li>Liên quan đến standard và user package
+<ul>
+	<li><a class="index" href="json-unmarshal-is-case-insensitive.html">Function <code>json.Unmarshal</code> chấp nhận việc khớp key của object không phân biệt chữ hoa chữ thường</a></li>
+	<li>thêm 10+ chi tiết có trong <a href="#ebooks">các ebook trả phí</a>.</li>
+</ul>
+</li>
+</ul>
+
+</div>
+
+<!-- index ends (don't remove) -->
+
+</div>

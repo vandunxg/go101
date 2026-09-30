@@ -1,0 +1,54 @@
+
+##### vòng lặp 4
+
+@@@ #question
+{
+Chương trình sau in ra nội dung gì?
+
+@@@ .line-numbers
+''' go
+package main
+
+func main() {
+	i, s := 9, []int{}
+	
+	for i = range s {}
+	print(i)
+	
+	for i = 0; i < len(s); i++ {}
+	print(i)
+
+	s = append(s, 1, 2, 3, 4, 5)
+	
+	for i = range s {}
+	print(i)
+	
+	for i = 0; i < len(s); i++ {}
+	println(i)
+}
+'''
+}
+
+Các lựa chọn:
+
+""" go101-quiz
+0055
+9055
+9045
+0045
+"""
+
+
+@@@ #answer
+{
+Đáp án: 9045
+
+Chạy chương trình trên __ Go play`` https://go.dev/play/p/muRnQApAInP __.
+
+Điểm chính:
+*
+   Một vòng lặp `for-range` không bao giờ đặt biến vòng lặp thứ nhất thành một index không hợp lệ.
+
+
+}
+
