@@ -1,13 +1,13 @@
 
 ################################## GoTV
 
-**// GoTV //** là một công cụ được dùng để quản lý và sử dụng một cách hài hòa, thuận tiện nhiều bản cài đặt cùng tồn tại của các phiên bản Go toolchain chính thức.
+**// GoTV //** là một công cụ dùng để quản lý và sử dụng một cách hài hòa và thuận tiện nhiều bản cài đặt cùng tồn tại của các phiên bản Go toolchain chính thức.
 Tên này là dạng viết tắt của **Go** **T**oolchain **V**ersion.
 
 Trang dự án: __https://github.com/go101/gotv__
 
 Hãy theo dõi __@zigo_101__ để nhận tin tức mới nhất về GoTV
-(và đủ loại chi tiết/sự thật/mẹo về Go/...).
+(và đủ loại chi tiết/sự thật/mẹo/... về Go).
 
     === @zigo_101 `` https://x.com/zigo_101
 
@@ -110,13 +110,13 @@ Tất cả các lệnh dành riêng cho `gotv`:
 # đồng bộ local Go git repository với remote
 gotv fetch-versions
 
-# liệt kê tất cả version được thấy ở local
+# liệt kê tất cả version đã biết ở local
 gotv list-versions
 
 # build và cache một số phiên bản toolchain
 gotv cache-version ToolchainVersion [ToolchainVersion ...]
 
-# bỏ cache một số phiên bản toolchain để tiết kiệm disk space
+# xóa cache một số phiên bản toolchain để tiết kiệm dung lượng đĩa
 gotv uncache-version ToolchainVersion [ToolchainVersion ...]
 
 # pin một phiên bản toolchain được chỉ định vào một path ổn định
@@ -148,13 +148,13 @@ Ví dụ sau đây cho thấy cách pin phiên bản Go toolchain 1.17.13:
 $ gotv pin-version 1.17.
 [Run]: cp -r $HOME/.cache/gotv/tag_go1.17.13 $HOME/.cache/gotv/pinned-toolchain
 
-Please put the following shown pinned toolchain path in
-your PATH environment variable to use go commands directly:
+Vui lòng thêm đường dẫn toolchain đã pin được hiển thị dưới đây vào
+biến môi trường PATH của bạn để sử dụng trực tiếp các lệnh go:
 
 	/home/username/.cache/gotv/pinned-toolchain/bin
 '''
 
-Sau khi path được nhắc thêm vào biến môi trường `PATH`,
+Sau khi thêm đường dẫn được yêu cầu vào biến môi trường `PATH`,
 hãy mở một cửa sổ terminal mới:
 
 '''
@@ -162,17 +162,17 @@ $ go version
 go version go1.17.13 linux/amd64
 '''
 
-Lệnh `gotv pin-version .!` sẽ upgrade pinned toolchain lên release version mới nhất
+Lệnh `gotv pin-version .!` sẽ upgrade toolchain đã pin lên release version mới nhất
 (có thể là một beta hoặc rc version).
 
 ###================================= Đặt một phiên bản toolchain bootstrap
 
-Để build một phiên bản toolchain, cần dùng một phiên bản toolchain khác đã được build trong quá trình build.
+Để build một phiên bản toolchain, cần sử dụng một phiên bản toolchain khác đã được build trong quá trình này.
 Phiên bản toolchain khác đó được gọi là phiên bản bootstrap.
 
 Một số thông tin:
 
-*  Các phiên bản toolchain <= 1.12.17 không thể được build bằng các phiên bản toochain >= 1.16;
+*  Các phiên bản toolchain <= 1.12.17 không thể được build bằng các phiên bản toolchain >= 1.16;
 *  Các phiên bản toolchain <= 1.5.4 không thể được build bằng các phiên bản toolchain >= 1.6;
 *  __Cần một phiên bản toolchain 1.17.13+ để build các phiên bản toolchain 1.20+__;
 *  __Cần một phiên bản toolchain 1.20.14+ để build các phiên bản toolchain 1.22+__.

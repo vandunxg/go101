@@ -1,19 +1,19 @@
 
-### Không có cách an toàn và hiệu quả nào để thực hiện so sánh chuỗi ba chiều trong Go
+### Không có cách an toàn và hiệu quả nào để thực hiện so sánh string ba chiều trong Go
 
-So sánh chuỗi ba chiều được sử dụng rộng rãi trong lập trình (__proof 1__ và __proof 2__).
+So sánh string ba chiều được sử dụng rộng rãi trong lập trình (__bằng chứng 1__ và __bằng chứng 2__).
 Nhưng cho đến hiện tại (Go 1.19), function __strings.Compare__ trong standard library
-được (__intentionally__) triển khai theo __a non-opitimized way__:
+được (__có chủ ý__) triển khai theo __một cách chưa được tối ưu hóa__:
 
-    === proof 1 `` https://sourcegraph.com/search?q=context:global+switch+strings.Compare+lang:Go+&patternType=literal
-    === proof 2 `` https://sourcegraph.com/search?q=context:global+strings.Compare+lang:Go&patternType=standard
-    === intentionally `` https://news.ycombinator.com/item?id=33353106
-    === a non-opitimized way `` https://go-review.googlesource.com/c/go/+/3012
+    === bằng chứng 1 `` https://sourcegraph.com/search?q=context:global+switch+strings.Compare+lang:Go+&patternType=literal
+    === bằng chứng 2 `` https://sourcegraph.com/search?q=context:global+strings.Compare+lang:Go&patternType=standard
+    === có chủ ý `` https://news.ycombinator.com/item?id=33353106
+    === một cách chưa được tối ưu hóa `` https://go-review.googlesource.com/c/go/+/3012
 
 ''' Go
 func Compare(a, b string) int {
 	// NOTE(rsc): Hàm này KHÔNG gọi hàm runtime cmpstring,
-	// vì chúng tôi không muốn đưa ra bất kỳ lý do hiệu năng nào cho
+	// vì chúng tôi không muốn đưa ra bất kỳ lý do biện minh nào về hiệu năng cho
 	// việc sử dụng strings.Compare. Về cơ bản, không ai nên sử dụng strings.Compare.
 	// Như chú thích ở trên đã nói, nó chỉ ở đây để đối xứng với package bytes.
 	// Nếu hiệu năng quan trọng, compiler nên được thay đổi để nhận diện
@@ -32,7 +32,7 @@ func Compare(a, b string) int {
 Khi so sánh hai string không bằng nhau, implementation sẽ thực hiện hai phép so sánh.
 Trong khi đó, một implementation hoàn hảo chỉ cần một phép so sánh,
 giống như implementation của __bytes.Compare__ được hiển thị bên dưới,
-trong đó __bytealg.Compare__ được triển khai bằng assembly code trên hầu hết architecture.
+trong đó __bytealg.Compare__ được triển khai bằng mã assembly trên hầu hết các kiến trúc.
 
 ''' Go
 func Compare(a, b []byte) int {
@@ -41,30 +41,30 @@ func Compare(a, b []byte) int {
 '''
 
 Implementation của `strings.Compare` tương đối kém hiệu quả.
-Cụ thể, nó kém hiệu quả hơn khi hai operand string không bằng nhau nhưng có cùng length.
+Cụ thể, nó kém hiệu quả hơn khi hai operand là string không bằng nhau nhưng có cùng độ dài.
 
     === strings.Compare `` https://github.com/golang/go/blob/go1.19/src/strings/compare.go#L7-L28
     === bytes.Compare `` https://github.com/golang/go/blob/go1.19/src/bytes/bytes.go#L23-L28
     === bytealg.Compare `` https://github.com/golang/go/blob/go1.19/src/internal/bytealg/compare_native.go#L12
 
 Code benchmark liên tục cho thấy `strings.Compare` sử dụng lượng thời gian CPU gấp 2 lần `bytes.Compare`
-khi so sánh các byte sequence không bằng nhau nhưng có cùng length (ở đây, cả string và byte slice
-được xem là các byte sequence).
+khi so sánh các dãy byte không bằng nhau nhưng có cùng độ dài (ở đây, cả string và byte slice
+đều được xem là các dãy byte).
 
 Chú thích nội bộ cho implementation `strings.Compare` hiện tại khá thú vị. Chú thích này gợi ý rằng
 hoàn toàn không nên sử dụng `strings.Compare` trong Go, nhưng hiện tại vẫn chưa có cách thay thế hiệu quả nào
-(trớ trêu thay, function này được sử dụng trong __Go toolchain code__ và được __a standard library function__ khuyến nghị).
-Nó đề cập rằng compiler nên thực hiện các optimization đặc biệt để tự động chuyển code sử dụng các toán tử
-so sánh thành các phép so sánh ba chiều nội bộ được tối ưu nếu có thể.
-Tuy nhiên, những optimization của compiler như vậy chưa từng được thực hiện,
+(trớ trêu thay, function này được sử dụng trong __code của Go toolchain__ và được __một function trong standard library__ khuyến nghị).
+Nó đề cập rằng compiler nên thực hiện các tối ưu hóa đặc biệt để tự động chuyển code sử dụng các toán tử
+so sánh thành các phép so sánh ba chiều nội bộ được tối ưu hóa nếu có thể.
+Tuy nhiên, những tối ưu hóa của compiler như vậy chưa từng được thực hiện,
 và theo tôi biết hiện vẫn chưa có kế hoạch thực hiện chúng.
-Cá nhân tôi nghi ngờ rằng có thể thực hiện những optimization như vậy cho mọi use case.
-Vì vậy, tôi cho rằng __the `strings.Compare` should be implemented efficiently__,
+Cá nhân tôi nghi ngờ rằng có thể thực hiện những tối ưu hóa như vậy cho mọi use case.
+Vì vậy, tôi cho rằng __`strings.Compare` nên được triển khai hiệu quả__,
 để tránh phá vỡ kỳ vọng của người dùng.
 
-    === Go toolchain code `` https://github.com/golang/go/blob/go1.19/src/cmd/go/internal/modindex/read.go#L822
-    === a standard library function `` https://github.com/golang/go/blob/go1.19/src/sort/search.go#L88-L99
-    === ...efficiently `` https://github.com/golang/go/issues/50167
+    === code của Go toolchain `` https://github.com/golang/go/blob/go1.19/src/cmd/go/internal/modindex/read.go#L822
+    === một function trong standard library `` https://github.com/golang/go/blob/go1.19/src/sort/search.go#L88-L99
+    === ...hiệu quả `` https://github.com/golang/go/issues/50167
 
 -----
 
@@ -77,6 +77,6 @@ Cập nhật: xem các cuộc thảo luận trên __reddit__ và __HN__.
     === reddit `` https://old.reddit.com/r/programming/comments/ycz0va/no_safe_efficient_ways_to_do_threeway_string/
     === HN `` https://news.ycombinator.com/item?id=33316402
 
-Cập nhật 2: cuối cùng, function `strings.Compare` đã __got optimizted in Go 1.23__.
+Cập nhật 2: cuối cùng, function `strings.Compare` đã __được tối ưu hóa trong Go 1.23__.
 
-    === got optimizted in Go 1.23 `` https://github.com/golang/go/commit/fd999fda5941f215ef082c6ef70e44e648db5485
+    === được tối ưu hóa trong Go 1.23 `` https://github.com/golang/go/commit/fd999fda5941f215ef082c6ef70e44e648db5485

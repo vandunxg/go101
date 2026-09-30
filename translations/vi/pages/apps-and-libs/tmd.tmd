@@ -10,4 +10,4 @@ __**tmd.go**__ là một thư viện Go cho ngôn ngữ markup TapirMD,
 
     === tmd.go:: https://github.com/go101/tmd.go
     === tài liệu:: https://pkg.go.dev/go101.org/tmd.go
-    === trang web chính thức của TapirMD...:: https://tmd.tapirgames.com
+    === TapirMD...:: https://tmd.tapirgames.com

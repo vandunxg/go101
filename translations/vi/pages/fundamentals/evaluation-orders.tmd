@@ -111,13 +111,13 @@ https://github.com/golang/go/issues/31292
 https://github.com/golang/go/commit/451cf3e2cd8950571f436896a3987343f8c2d7f6
 }
 
-Nhiều biến ở vế trái của khai báo biến được khởi tạo bằng một biểu thức nhiều giá trị
-duy nhất ở vế phải sẽ được khởi tạo cùng lúc. Ví dụ, với khai báo biến cấp package
+Nhiều biến ở vế trái của một variable specification, được khởi tạo bằng một biểu thức
+duy nhất có nhiều giá trị ở vế phải, sẽ được khởi tạo cùng lúc. Ví dụ, với khai báo biến cấp package
 `var x, y = f()`, các biến `x` và `y` được khởi tạo cùng lúc. Nói cách khác,
 không có biến nào khác được khởi tạo xen giữa chúng.
 
 Khai báo biến cấp package có nhiều biểu thức giá trị nguồn
-sẽ được tách thành nhiều khai báo chỉ có một giá trị nguồn
+sẽ được tách thành nhiều khai báo biến, mỗi khai báo có một biểu thức giá trị nguồn,
 trước khi khởi tạo tất cả biến cấp package. Ví dụ,
 
 @@@ .line-numbers
@@ -173,11 +173,11 @@ các quy tắc nêu trên. Ví dụ:
 
 ###========== Thứ tự đánh giá toán hạng trong các phép toán logic
 
-Trong biểu thức boolean `a && b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
+Trong biểu thức `bool` `a && b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
 nếu biểu thức toán hạng bên trái `a` được đánh giá là `true`.
 Vì vậy, nếu cần đánh giá `b`, việc đó diễn ra sau khi đánh giá `a`.
 
-Trong biểu thức boolean `a || b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
+Trong biểu thức `bool` `a || b`, biểu thức toán hạng bên phải `b` chỉ được đánh giá
 nếu biểu thức toán hạng bên trái `a` được đánh giá là `false`.
 Vì vậy, nếu cần đánh giá `b`, việc đó diễn ra sau khi đánh giá `a`.
 
@@ -219,7 +219,7 @@ trong đó
 *
    `f` là method của biểu thức `z`.
 
-Kết hợp với quy tắc ở mục trước, compiler phải đảm bảo các thứ tự đánh giá sau khi chạy.
+Kết hợp với quy tắc ở mục trước, compiler nên đảm bảo các thứ tự đánh giá sau khi chạy.
 *
    Các lời gọi hàm, lời gọi method và thao tác giao tiếp channel
    diễn ra theo thứ tự `z.f()`→`h()`→`i()`→`j()`→`<-c`→`g()`→`k()`.
@@ -239,7 +239,7 @@ Tuy nhiên, các thứ tự sau (và nhiều thứ tự khác) không được x
    Thứ tự đánh giá `y[]`, `x[]` và `<-c`.
 
 Theo thứ tự thông thường, ta biết các biến `x`, `m` và `n` được khai báo dưới đây
-(cũng được minh họa trong Go specification) sẽ được khởi tạo với các giá trị không xác định duy nhất.
+(cũng được minh họa trong Go specification) sẽ được khởi tạo với các giá trị không được xác định rõ.
 
 @@@ .line-numbers
 ''' go
@@ -268,8 +268,8 @@ và thứ tự thực hiện từng phép gán trong một câu lệnh gán:
 
 >
    Phép gán diễn ra qua hai giai đoạn.
-   Trước tiên, các toán hạng của biểu thức chỉ mục và phép gián tiếp con trỏ
-   (bao gồm phép gián tiếp con trỏ ngầm định trong selector) ở vế trái,
+   Trước tiên, các toán hạng của biểu thức chỉ mục và pointer indirection
+   (bao gồm pointer indirection ngầm định trong selector) ở vế trái,
    cùng các biểu thức ở vế phải, đều được đánh giá theo thứ tự thông thường.
    Sau đó, các phép gán được thực hiện theo thứ tự từ trái sang phải.
 
@@ -287,7 +287,7 @@ Trước hết, cần làm rõ rằng các phép gán trong giai đoạn thứ h
 không ảnh hưởng đến kết quả đánh giá biểu thức thu được ở cuối giai đoạn đầu.
 
 Để thuận tiện cho phần giải thích sau, ta giả định rằng
-giá trị container (slice hoặc map) của biểu thức chỉ mục đích gán luôn có thể lấy địa chỉ.
+giá trị container (slice hoặc map) của biểu thức đích dạng chỉ mục trong một phép gán luôn có thể lấy địa chỉ.
 Nếu không, có thể hình dung giá trị container đã được lưu vào
 và thay bằng một giá trị container tạm thời có thể lấy địa chỉ trước khi bắt đầu giai đoạn thứ hai.
 
@@ -297,11 +297,11 @@ mỗi biểu thức đích ở vế trái của phép gán
 *
    Nếu biểu thức đích là blank identifier, dạng cơ bản của nó vẫn là blank identifier.
 *
-   Nếu biểu thức đích là biểu thức chỉ mục container (array, slice hoặc map) `c[k]`,
-   dạng cơ bản là `(*cAddr)[k]`, trong đó `cAddr` là con trỏ trỏ đến `c`.
+   Nếu biểu thức đích là biểu thức chỉ mục của một container (array, slice hoặc map) `c[k]`,
+   dạng cơ bản là `(*cAddr)[k]`, trong đó `cAddr` là một pointer trỏ đến `c`.
 *
    Với trường hợp khác, biểu thức đích phải cho ra một giá trị có thể lấy địa chỉ;
-   dạng cơ bản của nó là phép giải tham chiếu địa chỉ của kết quả đánh giá biểu thức đích.
+   dạng cơ bản của nó là phép giải tham chiếu đến địa chỉ của kết quả đánh giá biểu thức đích.
 
 Giả sử `a` và `b` là hai biến cùng kiểu, có thể lấy địa chỉ. Phép gán sau
 
@@ -438,7 +438,7 @@ func main() {
 }
 '''
 
-Ví dụ sau cũng cho kết quả không xác định duy nhất.
+Ví dụ sau cũng cho kết quả không được xác định rõ.
 Tùy cách triển khai compiler, kết quả có thể là `1 7 2`, `1 8 2` hoặc `1 9 2`.
 
 @@@ .line-numbers
@@ -508,15 +508,15 @@ f(7) is called.
 ###========== Thứ tự đánh giá biểu thức trong khối mã `select-case`
 
 Khi thực thi khối mã `select-case`, trước khi đi vào khối mã của một nhánh,
-tất cả toán hạng channel của các phép nhận và các toán hạng của câu lệnh gửi
+tất cả toán hạng channel của các phép receive và các toán hạng của câu lệnh send
 trong khối mã `select-case` đều được đánh giá đúng một lần,
 theo thứ tự trong mã nguồn (từ trên xuống dưới, từ trái sang phải).
 
-Lưu ý, biểu thức đích được gán bởi một phép nhận trong `case`
-chỉ được đánh giá nếu phép nhận đó được chọn sau này.
+Lưu ý, biểu thức đích được gán bởi một phép receive trong `case`
+chỉ được đánh giá nếu phép receive đó được chọn sau này.
 
 Trong ví dụ sau, biểu thức `*fptr("aaa")` sẽ không bao giờ được đánh giá,
-vì phép nhận tương ứng `<-fchan("bbb", nil)` sẽ không được chọn.
+vì phép receive tương ứng `<-fchan("bbb", nil)` sẽ không được chọn.
 
 @@@ .line-numbers
 ''' go
@@ -537,10 +537,10 @@ func main() {
 	}
 
 	select {
-	case *fptr("aaa") = <-fchan("bbb", nil): // chờ
-	case *fptr("ccc") = <-fchan("ddd", c):   // không chờ
-	case fchan("eee", nil) <- *fptr("fff"):  // chờ
-	case fchan("ggg", nil) <- *fptr("hhh"):  // chờ
+	case *fptr("aaa") = <-fchan("bbb", nil): // blocking
+	case *fptr("ccc") = <-fchan("ddd", c):   // non-blocking
+	case fchan("eee", nil) <- *fptr("fff"):  // blocking
+	case fchan("ggg", nil) <- *fptr("hhh"):  // blocking
 	}
 }
 '''
@@ -558,7 +558,7 @@ ccc
 '''
 
 Lưu ý, biểu thức `*fptr("ccc")` là biểu thức cuối cùng được đánh giá trong ví dụ trên.
-Nó được đánh giá sau khi phép nhận tương ứng `<-fchan("ddd", c)` được chọn.
+Nó được đánh giá sau khi phép receive tương ứng `<-fchan("ddd", c)` được chọn.
 
 { %%
 

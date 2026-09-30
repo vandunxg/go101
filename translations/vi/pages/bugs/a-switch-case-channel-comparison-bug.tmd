@@ -1,9 +1,9 @@
 
-### Một lỗi so sánh channel khi channel được dùng làm biểu thức `case` của các block code `switch` (trong Go toolchain v1.20 - v1.23.x)
+### Một lỗi so sánh channel khi channel được dùng làm biểu thức `case` của các code block `switch` (trong Go toolchain v1.20 - v1.23.x)
 
 // (Issue liên quan: __https://github.com/golang/go/issues/67190__.)
 
-Trong Go toolchain v1.20 - v1.23.x, có một lỗi so sánh channel value,
+Trong Go toolchain v1.20 - v1.23.x, có một lỗi so sánh giá trị channel,
 được minh họa trong chương trình sau:
 
 ''' Go
@@ -61,6 +61,6 @@ Nếu bạn đang sử dụng phiên bản Go toolchain nằm trong khoảng t�
 
 { %%
 @@@ #gotv
-GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ được dùng để cài đặt và sử dụng đồng thời
-các bản Go toolchain một cách hài hòa.
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ dùng để cài đặt và sử dụng một cách hài hòa nhiều bản cài đặt
+cùng tồn tại của các phiên bản Go toolchain.
 }

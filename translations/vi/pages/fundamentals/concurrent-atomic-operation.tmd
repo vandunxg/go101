@@ -1,8 +1,8 @@
-### Các atomic operation trong package chuẩn `sync/atomic`
+### Các atomic operation được cung cấp trong package chuẩn `sync/atomic`
 
-Atomic operation là cơ chế nền tảng hơn các kỹ thuật đồng bộ khác.
+Các atomic operation có tính cơ bản hơn các kỹ thuật đồng bộ khác.
 Chúng không dùng lock và thường được triển khai trực tiếp ở mức phần cứng.
-Thực tế, atomic operation thường được dùng để xây dựng các kỹ thuật đồng bộ khác.
+Thực tế, các atomic operation thường được dùng để xây dựng các kỹ thuật đồng bộ khác.
 
 Lưu ý rằng nhiều ví dụ bên dưới không phải là chương trình concurrent.
 Chúng chỉ nhằm minh họa và giải thích cách sử dụng
@@ -35,10 +35,10 @@ func CompareAndSwapInt32(addr *int32,
 				old, new int32) (swapped bool)
 '''
 
-Bốn hàm atomic sau được cung cấp cho các kiểu con trỏ (an toàn).
+Bốn hàm atomic sau được cung cấp cho các kiểu pointer an toàn.
 Khi các hàm này được đưa vào thư viện chuẩn,
-Go chưa hỗ trợ generic do người dùng định nghĩa, vì vậy các hàm này được triển khai
-thông qua __kiểu con trỏ không an toàn__ `unsafe.Pointer`
+Go chưa hỗ trợ generics tùy chỉnh, vì vậy các hàm này được triển khai
+thông qua __kiểu unsafe pointer__ `unsafe.Pointer`
 (kiểu tương ứng với `void*` trong C).
 @@@ .line-numbers;must-line-numbers
 ''' go
@@ -50,11 +50,11 @@ func CompareAndSwapPointer(addr *unsafe.Pointer,
 				old, new unsafe.Pointer) (swapped bool)
 '''
 
-Không có hàm `AddPointer` dành cho con trỏ,
-vì con trỏ (an toàn) trong Go không hỗ trợ phép toán số học.
+Không có hàm `AddPointer` dành cho pointer,
+vì pointer an toàn trong Go không hỗ trợ phép toán số học.
 
 Package chuẩn `sync/atomic` còn cung cấp kiểu `Value`,
-và kiểu con trỏ tương ứng `*Value` có bốn method
+và kiểu pointer tương ứng `*Value` có bốn method
 (được liệt kê bên dưới; hai method sau được giới thiệu từ Go 1.17).
 Có thể dùng các method này để thực hiện atomic operation trên giá trị thuộc bất kỳ kiểu nào.
 
@@ -70,7 +70,7 @@ func (*Value) CompareAndSwap(old, new interface{}) (swapped bool)
 ###========== Tổng quan về các atomic operation mới được cung cấp từ Go 1.19
 
 Go 1.19 giới thiệu một số kiểu, mỗi kiểu có một nhóm method atomic,
-nhằm đạt được hiệu quả tương tự các hàm cấp package được liệt kê ở phần trước.
+nhằm đạt được tác dụng tương tự các hàm cấp package được liệt kê ở phần trước.
 
 Trong số các kiểu này, `Int32`, `Int64`, `Uint32`,
 `Uint64` và `Uintptr` dùng cho atomic operation trên số nguyên.
@@ -86,8 +86,8 @@ func (*Int32) Swap(new int32) (old int32)
 func (*Int32) CompareAndSwap(old, new int32) (swapped bool)
 '''
 
-Từ Go 1.18, Go đã hỗ trợ generic do người dùng định nghĩa.
-Một số package chuẩn bắt đầu dùng generic từ Go 1.19.
+Từ Go 1.18, Go đã hỗ trợ generics tùy chỉnh.
+Một số package chuẩn bắt đầu áp dụng generics tùy chỉnh từ Go 1.19.
 Package `sync/atomic` là một trong số đó.
 Kiểu `Pointer[T any]` được Go 1.19 đưa vào package này là một kiểu generic.
 Các method của kiểu này được liệt kê bên dưới.
@@ -111,7 +111,7 @@ Ví dụ sau minh họa cách thực hiện atomic operation `Add`
 trên giá trị `int32` bằng hàm `AddInt32`.
 Trong ví dụ này, goroutine chính tạo thêm 1000 goroutine chạy đồng thời.
 Mỗi goroutine mới tăng số nguyên `n` lên một đơn vị.
-Atomic operation bảo đảm các goroutine này không xảy ra data race.
+Atomic operation bảo đảm không có data race giữa các goroutine này.
 Kết quả in ra cuối cùng luôn là `1000`.
 
 @@@ .line-numbers
@@ -173,7 +173,7 @@ func main() {
 '''
 
 Các hàm/method atomic `StoreT` và `LoadT` thường được dùng
-để triển khai setter và getter cho (kiểu con trỏ tương ứng của)
+để triển khai các method setter và getter cho kiểu pointer tương ứng của
 một kiểu khi các giá trị của kiểu đó cần được truy cập đồng thời.
 Ví dụ, phiên bản dùng hàm:
 
@@ -192,7 +192,7 @@ func (page *Page) Views() uint32 {
 }
 '''
 
-Và phiên bản dùng kiểu cùng các method (từ Go 1.19):
+Và phiên bản dùng kiểu và các method (từ Go 1.19):
 
 @@@ .line-numbers
 ''' go
@@ -213,7 +213,7 @@ Với kiểu số nguyên có dấu `T` (`int32` hoặc `int64`),
 đối số thứ hai khi gọi hàm `AddT` có thể là số âm,
 để thực hiện atomic operation giảm giá trị.
 Còn với giá trị thuộc kiểu không dấu `T`,
-chẳng hạn `uint32`, `uint64` và `uintptr`, thì giảm giá trị một cách atomic như thế nào?
+chẳng hạn `uint32`, `uint64` và `uintptr`, thì thực hiện atomic operation giảm giá trị như thế nào?
 Có hai trường hợp đối với đối số thứ hai có kiểu không dấu.
 *.
    Với biến không dấu `v` có kiểu `T`,
@@ -228,7 +228,7 @@ Có hai trường hợp đối với đối số thứ hai có kiểu không d�
 Mẹo `^T(v-1)` cũng dùng được với biến không dấu `v`,
 nhưng `^T(v-1)` kém hiệu quả hơn `T(-v)`.
 
-Trong biểu thức `^T(c-1)`, nếu `c` là giá trị có kiểu
+Trong biểu thức `^T(c-1)`, nếu `c` là một giá trị có kiểu
 và kiểu của nó chính xác là `T`, có thể viết gọn thành `^(c-1)`.
 
 Ví dụ:
@@ -344,20 +344,20 @@ nhưng điều này không đúng với atomic operation dạng hàm trên kiế
     === memory layout :: memory-layout.tmd
 
 @@@ #pointer
-###========== Atomic operation trên con trỏ
+###========== Atomic operation trên pointer
 
 Ở trên đã đề cập package chuẩn `sync/atomic` cung cấp bốn hàm
-để thực hiện atomic operation trên con trỏ
-thông qua con trỏ không an toàn.
+để thực hiện atomic operation trên pointer
+thông qua unsafe pointer.
 
 Trong bài __con trỏ không an toàn về kiểu__, ta biết rằng
-trong Go, giá trị thuộc bất kỳ kiểu con trỏ nào cũng có thể được chuyển đổi tường minh sang `unsafe.Pointer` và ngược lại.
+trong Go, giá trị thuộc bất kỳ kiểu pointer nào cũng có thể được chuyển đổi tường minh sang `unsafe.Pointer` và ngược lại.
 Do đó, giá trị kiểu `*unsafe.Pointer` cũng có thể được chuyển đổi tường minh sang `unsafe.Pointer` và ngược lại.
 
     === type-unsafe pointers :: unsafe.tmd
 
 Ví dụ sau không phải là chương trình concurrent.
-Ví dụ chỉ minh họa cách thực hiện atomic operation trên con trỏ.
+Ví dụ chỉ minh họa cách thực hiện atomic operation trên pointer.
 Trong ví dụ này, `T` có thể là bất kỳ kiểu nào.
 @@@ .line-numbers;must-line-numbers
 ''' go
@@ -397,7 +397,7 @@ func main() {
 }
 '''
 
-Đúng là dùng các hàm atomic trên con trỏ khá dài dòng.
+Đúng là dùng các hàm atomic trên pointer khá dài dòng.
 Thực tế, cách dùng này không chỉ dài dòng mà còn không được bảo vệ bởi
 __hướng dẫn tương thích Go 1__,
 vì cách dùng này đòi hỏi phải import package chuẩn `unsafe`.
@@ -405,21 +405,21 @@ vì cách dùng này đòi hỏi phải import package chuẩn `unsafe`.
     === Go 1 compatibility guidelines :: https://golang.org/doc/go1compat
 
 { %%
-Theo ý kiến cá nhân, tôi cho rằng khả năng các atomic operation hợp lệ trên giá trị con trỏ
+Theo ý kiến cá nhân, tôi cho rằng khả năng các atomic operation hợp lệ trên giá trị pointer
 được dùng trong ví dụ trên trở nên không hợp lệ trong tương lai là thấp.
 Ngay cả khi chúng trở nên không hợp lệ, lệnh `go fix` trong
-Go Toolchain có thể sửa chúng sang một cách hợp lệ khác được bổ sung sau này.
-Tuy nhiên, đây chỉ là ý kiến cá nhân, không có giá trị khẳng định.
+Go Toolchain sẽ có thể sửa chúng bằng một cách hợp lệ mới khác được bổ sung sau này.
+Tuy nhiên, đây chỉ là ý kiến cá nhân, không phải là ý kiến có thẩm quyền.
 
-Nếu bạn lo ngại các atomic operation trên con trỏ được dùng
-trong ví dụ trên có thể không còn hợp lệ trong tương lai, bạn có thể dùng atomic operation trên con trỏ được giới thiệu ở
-phần tiếp theo, dù các operation sắp được giới thiệu kém
-hiệu quả hơn những operation trong phần này.
+Nếu bạn lo ngại các atomic operation trên pointer được dùng
+trong ví dụ trên có thể không còn hợp lệ trong tương lai, bạn có thể dùng atomic operation trên pointer được giới thiệu ở
+phần tiếp theo, dù các atomic operation sắp được giới thiệu kém
+hiệu quả hơn các atomic operation được giới thiệu trong phần này.
 }
 
 Ngược lại, code sẽ đơn giản và gọn hơn nhiều nếu
 ta dùng kiểu generic `Pointer` và các method được Go 1.19 giới thiệu
-để thực hiện atomic operation trên con trỏ, như đoạn code sau.
+để thực hiện atomic operation trên pointer, như đoạn code sau.
 
 @@@ .line-numbers;must-line-numbers
 ''' go
@@ -464,9 +464,9 @@ có thể dùng để load và store giá trị thuộc bất kỳ kiểu nào m
 
 Kiểu `*Value` có một số method: `Load`, `Store`,
 `Swap` và `CompareAndSwap` (hai method sau được giới thiệu từ Go 1.17).
-Kiểu tham số đầu vào của các method này đều là `interface{}`.
+Kiểu của các tham số đầu vào của các method này đều là `interface{}`.
 Vì vậy, có thể truyền mọi giá trị khi gọi các method này.
-Tuy nhiên, với giá trị `Value` có thể lấy địa chỉ `v`,
+Tuy nhiên, nếu `v` là một giá trị `Value` có thể lấy địa chỉ,
 một khi đã gọi `v.Store()` (cách viết tắt của `(&v).Store()`)
 ít nhất một lần,
 thì các lần gọi method tiếp theo trên `v` cũng phải nhận đối số
@@ -528,7 +528,7 @@ func main() {
 }
 '''
 
-Thực ra, ta cũng có thể dùng các hàm atomic trên con trỏ đã trình bày ở phần trước
+Thực ra, ta cũng có thể dùng các hàm atomic trên pointer đã trình bày ở phần trước
 để thực hiện atomic operation trên giá trị thuộc mọi kiểu, bằng cách thêm một cấp gián tiếp.
 Mỗi cách đều có ưu và nhược điểm riêng.
 Nên dùng cách nào tùy thuộc vào yêu cầu thực tế.
@@ -539,5 +539,4 @@ Nên dùng cách nào tùy thuộc vào yêu cầu thực tế.
 Đọc __mô hình bộ nhớ Go__ để biết chi tiết.
 
     === Go memory model :: memory-model.tmd#atomic
-
 

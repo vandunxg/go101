@@ -52,8 +52,8 @@ panic/recover__, cùng các kỹ thuật đồng bộ hóa đồng thời đư�
 __tổng quan về đồng bộ hóa đồng thời__
 cũng có thể được xem là câu lệnh điều khiển luồng theo nghĩa rộng.
 
-    === goroutines, ... :: control-flows-more.tmd
-    === concurrency synchronization overview :: concurrent-synchronization-overview.tmd
+    === goroutine, ... :: control-flows-more.tmd
+    === tổng quan về đồng bộ hóa đồng thời :: concurrent-synchronization-overview.tmd
 
 Bài viết này chủ yếu giải thích các khối mã điều khiển luồng cơ bản
 và các câu lệnh nhảy luồng thực thi. Bài viết cũng đề cập đến vòng lặp `for range anInteger {...}`
@@ -80,20 +80,20 @@ Phần `InitSimpleStatement` cũng là tùy chọn.
 Nếu có mặt, phần này phải là một __câu lệnh đơn giản__.
 Nếu không có, ta có thể xem nó là câu lệnh rỗng (một loại câu lệnh đơn giản).
 Trong thực tế, `InitSimpleStatement` thường là
-một khai báo biến ngắn hoặc một phép gán thuần túy.
-`Condition` phải là một __biểu thức__ cho kết quả kiểu boolean.
+một khai báo biến rút gọn hoặc một phép gán thuần túy.
+`Condition` phải là một __biểu thức__ cho kết quả là một giá trị boolean.
 Phần `Condition` có thể được đặt trong một cặp `()` hoặc không,
 nhưng không thể đặt chung với phần `InitSimpleStatement` trong cùng cặp ngoặc.
 
-    === simple statement :: expressions-and-statements.tmd#simple-statements
-    === expression :: expressions-and-statements.tmd#expressions
+    === câu lệnh đơn giản :: expressions-and-statements.tmd#simple-statements
+    === biểu thức :: expressions-and-statements.tmd#expressions
 
 Nếu phần `InitSimpleStatement` trong khối `if-else` có mặt,
 nó sẽ được thực thi trước các câu lệnh khác trong khối `if-else`.
 Nếu không có `InitSimpleStatement`,
 dấu chấm phẩy theo sau nó là tùy chọn.
 
-Mỗi cấu trúc điều khiển luồng `if-else` tạo thành
+Mỗi khối điều khiển luồng `if-else` tạo thành
 một khối mã ngầm định, một khối mã tường minh cho nhánh `if`
 và một khối mã tùy chọn cho nhánh `else`.
 Hai khối mã nhánh đều nằm bên trong khối mã ngầm định.
@@ -129,7 +129,7 @@ func main() {
 }
 '''
 
-Nếu `InitSimpleStatement` trong khối mã `if-else` là một khai báo biến ngắn,
+Nếu `InitSimpleStatement` trong khối mã `if-else` là một khai báo biến rút gọn,
 các biến được khai báo sẽ được xem như khai báo trong khối mã ngầm định ngoài cùng của khối `if-else`.
 
 Khối mã nhánh `else` có thể là ngầm định nếu `else`
@@ -175,14 +175,14 @@ for InitSimpleStatement; Condition; PostSimpleStatement {
 
 `for` là một keyword.
 Hai phần `InitSimpleStatement` và `PostSimpleStatement`
-đều phải là câu lệnh đơn giản; riêng `PostSimpleStatement` không được là khai báo biến ngắn.
-`Condition` phải là biểu thức có kết quả kiểu boolean.
+đều phải là câu lệnh đơn giản; riêng `PostSimpleStatement` không được là khai báo biến rút gọn.
+`Condition` phải là biểu thức có kết quả là một giá trị boolean.
 Cả ba phần đều là tùy chọn.
 
 Khác với nhiều ngôn ngữ lập trình khác, ba phần vừa nêu theo sau
 keyword `for` không thể được đặt trong một cặp `()`.
 
-Mỗi cấu trúc điều khiển luồng `for` tạo ra ít nhất hai khối mã,
+Mỗi khối điều khiển luồng `for` tạo ra ít nhất hai khối mã,
 một khối ngầm định và một khối tường minh.
 Khối tường minh nằm bên trong khối ngầm định.
 
@@ -247,7 +247,7 @@ for {
 '''
 
 Nếu phần `InitSimpleStatement` trong khối `for`
-là một câu lệnh khai báo biến ngắn,
+là một câu lệnh khai báo biến rút gọn,
 các biến vòng lặp được khai báo sẽ được xem như khai báo
 trong khối mã ngầm định ngoài cùng của khối `for`.
 Ví dụ, đoạn mã sau in `012` thay vì `0`.
@@ -279,14 +279,14 @@ Lưu ý: Go 1.22 đã thay đổi ngữ nghĩa của các khối vòng lặp `fo
 Trong phần lớn trường hợp, thay đổi ngữ nghĩa này không làm thay đổi hành vi của mã.
 Nhưng __đôi khi có thay đổi__.
 Vì vậy, thay đổi này phá vỡ khả năng tương thích ngược.
-Từ Go 1.22, __mỗi file nguồn Go cần chỉ định một phiên bản Go__ để
+Từ Go 1.22, __mỗi file nguồn Go nên chỉ định một phiên bản Go__ để
 hạn chế tối đa ảnh hưởng.
 
-    === sometimes, it does :: control-flows-more.tmd#argument-evaluation-moment
-    === every Go source ... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
+    === đôi khi có thay đổi :: control-flows-more.tmd#argument-evaluation-moment
+    === mọi file nguồn Go ... :: https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
 Có thể dùng câu lệnh `break` để chuyển luồng thực thi ra khỏi
-một khối điều khiển vòng lặp `for` sớm,
+một khối điều khiển luồng `for` sớm,
 nếu khối `for` đó là khối điều khiển luồng gần nhất có thể thoát bằng `break`
 chứa câu lệnh `break`.
 Ví dụ, đoạn mã sau cũng in các số từ `0` đến `9`.
@@ -323,13 +323,13 @@ for i := 0; i < 10; i++ {
 ###========== Dùng khối điều khiển `for-range` để duyệt số nguyên
 
 Có thể dùng khối vòng lặp `for-range` để duyệt số nguyên,
-mọi loại __container__, __channel__ và __một số hàm__.
+mọi loại __container__, mọi loại __channel__ và __một số hàm__.
 Bài viết này chỉ giải thích cách dùng khối vòng lặp `for-range`
 để duyệt số nguyên.
 
-    === containers :: container.tmd#iteration
-    === channels :: channel.tmd#range
-    === some functions :: function.tmd#range
+    === container :: container.tmd#iteration
+    === channel :: channel.tmd#range
+    === một số hàm :: function.tmd#range
 
 Lưu ý: chỉ từ Go 1.22 mới hỗ trợ dùng khối vòng lặp `for-range` để duyệt số nguyên.
 
@@ -388,7 +388,7 @@ for i := range 10 {
 ###========== Khối điều khiển luồng `switch-case`
 
 Khối điều khiển luồng `switch-case` là
-một loại khối điều khiển thực thi có điều kiện.
+một loại khối điều khiển luồng thực thi có điều kiện.
 
 Dạng đầy đủ của khối `switch-case` là:
 @@@ .line-numbers
@@ -424,7 +424,7 @@ default:
    Trong đặc tả Go, mỗi biểu thức này được gọi là biểu thức case.
    Nếu biểu thức case là một giá trị chưa định kiểu,
    nó phải có thể được chuyển đổi ngầm định sang kiểu của biểu thức switch
-   trong cùng cấu trúc điều khiển luồng `switch-case`.
+   trong cùng khối điều khiển luồng `switch-case`.
    Nếu không thể chuyển đổi, quá trình biên dịch sẽ thất bại.
 
 Mỗi `case CompareOperandListX:` hoặc `default:`
@@ -436,7 +436,7 @@ Từ đây về sau, ta gọi khối mã ngầm định trong nhánh đó là kh
 Trong một khối điều khiển luồng `switch-case` có nhiều nhất một nhánh `default`.
 
 Ngoài các khối mã nhánh,
-mỗi cấu trúc điều khiển luồng `switch-case` tạo thành hai khối mã:
+mỗi khối điều khiển luồng `switch-case` tạo thành hai khối mã:
 một khối ngầm định và một khối tường minh.
 Khối tường minh nằm bên trong khối ngầm định.
 Tất cả các khối mã nhánh đều nằm trong khối tường minh
@@ -447,7 +447,7 @@ do đó cũng có thể dùng câu lệnh `break` trong bất kỳ khối mã nh
 của khối `switch-case` để chuyển luồng thực thi ra khỏi
 khối `switch-case` sớm.
 
-Khi một cấu trúc điều khiển luồng `switch-case` được thực thi,
+Khi một khối điều khiển luồng `switch-case` được thực thi,
 `InitSimpleStatement` được thực thi trước tiên,
 và chỉ chạy một lần trong suốt quá trình thực thi cấu trúc đó.
 Sau khi `InitSimpleStatement` được thực thi,
@@ -463,7 +463,7 @@ với biểu thức đó được thực thi.
 Nếu không có biểu thức case nào bằng `CompareOperand0`,
 khối mã nhánh `default` (nếu có) sẽ được thực thi.
 
-Ví dụ về cấu trúc điều khiển luồng `switch-case`:
+Ví dụ về khối điều khiển luồng `switch-case`:
 @@@ .line-numbers
 ''' go
 package main
@@ -515,7 +515,7 @@ Trên thực tế, compiler Go tiêu chuẩn hiện tại (phiên bản 1.25.n)
 __cho phép các biểu thức case boolean trùng lặp__,
 còn gccgo (v8.2) cho phép cả biểu thức case boolean và string trùng lặp.
 
-    === allows duplicate ... :: https://github.com/golang/go/issues/28357
+    === cho phép các biểu thức case trùng lặp ... :: https://github.com/golang/go/issues/28357
 
 Như các comment trong ví dụ trên mô tả,
 khác với nhiều ngôn ngữ khác, trong Go,
@@ -575,10 +575,10 @@ default:
 '''
 
 Hai phần `InitSimpleStatement` và `CompareOperand0`
-trong cấu trúc điều khiển luồng `switch-case` đều là tùy chọn.
+trong khối điều khiển luồng `switch-case` đều là tùy chọn.
 Nếu không có phần `CompareOperand0`,
 nó sẽ được xem là `true`,
-một giá trị có kiểu thuộc kiểu dựng sẵn `bool`.
+một giá trị có kiểu `bool`, một kiểu dựng sẵn.
 Nếu không có phần `InitSimpleStatement`,
 có thể bỏ dấu chấm phẩy theo sau phần đó.
 
@@ -602,8 +602,7 @@ switch {
 
 Với hai khối điều khiển luồng `switch-case` cuối trong ví dụ trên,
 như đã đề cập, mỗi phần `CompareOperand0` bị lược bỏ
-đều được xem là giá trị có kiểu `true`
-thuộc kiểu dựng sẵn `bool`.
+đều được xem là giá trị `true` có kiểu `bool`, một kiểu dựng sẵn.
 Do đó, đoạn mã sau sẽ in `hello`.
 
 @@@ .line-numbers
@@ -647,7 +646,7 @@ Giống nhiều ngôn ngữ khác, Go cũng hỗ trợ câu lệnh `goto`.
 Để tạo thành câu lệnh, keyword `goto` phải được theo sau bởi một nhãn.
 Nhãn được khai báo theo dạng `LabelName:`,
 trong đó `LabelName` phải là một identifier.
-Nhãn có tên khác identifier trắng phải được sử dụng ít nhất một lần.
+Nhãn có tên không phải là blank identifier phải được sử dụng ít nhất một lần.
 
 Câu lệnh `goto` khiến luồng thực thi nhảy đến câu lệnh kế tiếp
 sau vị trí khai báo nhãn được dùng trong câu lệnh `goto`.
@@ -703,7 +702,7 @@ thì chỗ dùng nhãn không được nằm trước khai báo biến đó.
 Phạm vi của identifier sẽ được giải thích sau trong bài viết
 __khối và phạm vi trong Go__.
 
-    === blocks and scopes in Go :: blocks-and-scopes.tmd
+    === khối và phạm vi trong Go :: blocks-and-scopes.tmd
 
 Ví dụ sau cũng không biên dịch được.
 @@@ .line-numbers
@@ -736,7 +735,7 @@ Hiện tại, để đoạn mã trên biên dịch được,
 ta cần điều chỉnh phạm vi của biến `k`.
 Có hai cách sửa vấn đề trong ví dụ trước.
 
-    === may change later :: https://github.com/golang/go/issues/26058
+    === có thể thay đổi sau này :: https://github.com/golang/go/issues/26058
 
 Một cách là thu hẹp phạm vi của biến `k`.
 @@@ .line-numbers

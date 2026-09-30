@@ -19,7 +19,7 @@ Hầu hết giá trị chưa định kiểu đều có một kiểu mặc địn
 không có kiểu mặc định.
 Ta sẽ tìm hiểu thêm về `nil` trong các bài Go 101 khác.
 
-Mọi hằng số literal (hằng số không tên) đều là giá trị chưa định kiểu. Trên thực tế, trong Go, phần lớn giá trị chưa định kiểu là hằng số literal và hằng số có tên (sẽ được giới thiệu bên dưới trong bài này). Các giá trị chưa định kiểu khác gồm `nil` vừa đề cập và một số kết quả boolean do các phép toán sẽ được giới thiệu trong những bài khác trả về.
+Mọi hằng số literal (hằng số không tên) đều là giá trị chưa định kiểu. Trên thực tế, trong Go, phần lớn giá trị chưa định kiểu là hằng số literal và hằng số có tên (sẽ được giới thiệu bên dưới trong bài này). Các giá trị chưa định kiểu khác gồm `nil` vừa đề cập và một số kết quả boolean do một số phép toán trả về; các phép toán này sẽ được giới thiệu trong những bài khác.
 
 Kiểu mặc định của một hằng số literal được xác định dựa trên dạng literal của nó.
 *
@@ -206,7 +206,7 @@ __các toán tử thông dụng__.
 
 Ký hiệu `=` có nghĩa là “liên kết” (bind), không phải “gán” (assign).
 Ta nên hiểu mỗi constant specification
-là một identifier được khai báo và liên kết với literal giá trị cơ bản tương ứng.
+là một identifier đã khai báo được liên kết với literal giá trị cơ bản tương ứng.
 Hãy đọc phần cuối của bài này để biết thêm giải thích.
 
 Trong ví dụ trên, hai hằng số có tên `π` và `Pi`
@@ -336,7 +336,7 @@ const Is64bitOS = ^uint(0) >> 63 != 0
 const Is32bitOS = ^uint(0) >> 32 == 0
 '''
 
-Ở đây, `!=` và `==` lần lượt là toán tử khác và toán tử bằng.
+Ở đây, `!=` và `==` lần lượt là toán tử không bằng và toán tử bằng.
 
 ###----------- Tự động hoàn tất trong khai báo hằng số
 
@@ -488,7 +488,7 @@ Mỗi khai báo chuẩn bắt đầu bằng từ khóa `var`,
 sau đó là tên biến được khai báo.
 Tên biến phải là __identifier__.
 
-    === identifier :: keywords-and-identifiers.tmd#identifier
+    === identifiers :: keywords-and-identifiers.tmd#identifier
 
 Dưới đây là một số dạng khai báo chuẩn đầy đủ.
 Trong các khai báo này,
@@ -572,14 +572,14 @@ Nhìn chung, khai báo các biến liên quan cùng nhau
 sẽ giúp code dễ đọc hơn.
 
 @@@ #assignment
-###----------- Phép gán giá trị thuần
+###----------- Phép gán thuần
 
 Trong các khai báo biến ở trên, ký hiệu `=` có nghĩa là phép gán.
-Sau khi khai báo biến, ta có thể thay đổi giá trị của nó bằng phép gán giá trị thuần.
+Sau khi khai báo biến, ta có thể thay đổi giá trị của nó bằng phép gán thuần.
 Tương tự khai báo biến, một phép gán thuần có thể gán nhiều giá trị.
 
 Các biểu thức ở bên trái ký hiệu `=` trong phép gán thuần
-gọi là giá trị đích (destination hoặc target).
+được gọi là các giá trị đích (destination hoặc target).
 Chúng phải là giá trị có thể lấy địa chỉ, biểu thức chỉ mục map hoặc blank identifier.
 Địa chỉ giá trị và map sẽ được giới thiệu trong các bài sau.
 
@@ -588,7 +588,7 @@ với vai trò giá trị đích; nó chỉ có thể xuất hiện bên phải 
 Biến có thể dùng làm cả giá trị nguồn lẫn giá trị đích,
 nên có thể xuất hiện ở cả hai vế của phép gán thuần.
 
-Blank identifier cũng có thể xuất hiện bên trái phép gán giá trị thuần làm
+Blank identifier cũng có thể xuất hiện bên trái phép gán thuần làm
 giá trị đích; khi đó, ta bỏ qua giá trị đích ấy.
 Không thể dùng blank identifier làm giá trị nguồn trong phép gán.
 
@@ -620,7 +620,7 @@ Dòng code cuối trong ví dụ trên dùng phép chuyển đổi tường minh
 làm cho các giá trị đích và nguồn tương ứng khớp kiểu.
 Các quy tắc chuyển đổi tường minh cho giá trị số không phải hằng số
 được giới thiệu bên dưới.
-Go không hỗ trợ phép gán nối chuỗi. Ví dụ, code sau không hợp lệ.
+Go không hỗ trợ phép gán liên hoàn. Ví dụ, code sau không hợp lệ.
 @@@ .line-numbers
 ''' go
 var a, b int
@@ -688,14 +688,14 @@ __truyền đối số cho hàm__, được giới thiệu trong bài tiếp the
 
     === truyền đối số cho hàm :: function-declarations-and-calls.tmd#call
 
-Ta nói **// `x` có thể gán cho `y` //**
+Ta nói **// `x` có thể được gán cho `y` //**
 nếu `y = x` là câu lệnh hợp lệ (biên dịch được).
 Giả sử kiểu của `y` là `Ty`,
 đôi khi để tiện mô tả, ta cũng có thể nói
-**// `x` có thể gán cho kiểu `Ty` //**.
+**// `x` có thể được gán cho kiểu `Ty` //**.
 
-Nhìn chung, nếu `x` có thể gán cho `y`,
-thì `y` phải có thể thay đổi; kiểu của `x` và `y`
+Nhìn chung, nếu `x` có thể được gán cho `y`,
+thì `y` nên là giá trị có thể thay đổi; kiểu của `x` và `y`
 phải giống nhau hoặc `x` có thể được chuyển đổi ngầm định sang
 kiểu của `y`.
 Dĩ nhiên, `y` cũng có thể là blank identifier `_`.
@@ -751,7 +751,7 @@ func main() {
 }
 '''
 
-Nhìn chung, không nên dùng cách sửa trên trong code production.
+Nhìn chung, không nên dùng cách sửa trên trong production code.
 Chỉ nên dùng trong giai đoạn phát triển/debug.
 Để lại biến cục bộ không dùng là thói quen không tốt,
 vì chúng ảnh hưởng tiêu cực đến khả năng đọc hiểu code và hiệu năng thực thi chương trình.
@@ -810,7 +810,7 @@ không phải hằng số.
    Có thể chuyển đổi tường minh giá trị complex không phải hằng số
    sang bất kỳ kiểu complex nào khác.
 
-Khác với phép chuyển đổi số hằng, phép chuyển đổi số không phải hằng số cho phép tràn.
+Khác với phép chuyển đổi các giá trị số là hằng số, phép chuyển đổi các giá trị số không phải hằng số cho phép tràn.
 Khi chuyển giá trị floating-point không phải hằng số sang integer, việc làm tròn cũng được cho phép.
 Nếu giá trị floating-point không phải hằng số không gây tràn kiểu integer,
 phần thập phân của giá trị sẽ bị loại bỏ
@@ -833,7 +833,7 @@ var b = a
 var x = int32(a)
 // lỗi: không thể gán float64 cho int32.
 var y int32 = b
-	// hợp lệ: z == -1 và z có kiểu int32.
+// hợp lệ: z == -1 và z có kiểu int32.
 //       Phần thập phân của b bị loại bỏ.
 var z = int32(b)
 
@@ -844,7 +844,7 @@ var n = k
 var f = uint8(k + 1)
 // lỗi: không thể gán int16 cho uint8.
 var g uint8 = n + 1
-	// hợp lệ: h == 0 và h có kiểu uint8.
+// hợp lệ: h == 0 và h có kiểu uint8.
 //       n+1 tràn kiểu uint8 và bị cắt cụt.
 var h = uint8(n + 1)
 
@@ -900,7 +900,7 @@ Phạm vi (vùng có thể nhìn thấy trong code) của biến cấp package
 (hoặc hằng số có tên) là toàn bộ package nơi biến
 (hoặc hằng số có tên) đó được khai báo.
 Phạm vi của biến cục bộ (hoặc hằng số có tên) bắt đầu từ cuối
-khai báo và kết thúc ở cuối code block trong cùng chứa nó.
+khai báo và kết thúc ở cuối code block chứa nó ở mức lồng trong cùng.
 Đó là lý do dòng cuối trong hàm `main`
 của ví dụ trên không biên dịch được.
 
@@ -943,7 +943,7 @@ const r rune = 'a' + 0x7FFFFFFF // tràn kiểu rune
 const x float64 = 2e+308        // tràn kiểu float64
 '''
 
-###----------- Mỗi identifier hằng số có tên được thay bằng literal đã liên kết khi biên dịch
+###----------- Mỗi identifier của hằng số có tên được thay bằng literal mà nó liên kết khi biên dịch
 
 Có thể xem khai báo hằng số là macro `#define` nâng cao trong C.
 Khai báo hằng số định nghĩa một hằng số có tên biểu thị một literal.

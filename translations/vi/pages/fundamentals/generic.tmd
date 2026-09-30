@@ -4,15 +4,15 @@ Trước Go 1.18, Go chỉ hỗ trợ generics dựng sẵn.
 Kể từ Go 1.18, Go cũng hỗ trợ generics tùy chỉnh.
 Bài viết này chỉ giới thiệu các generics dựng sẵn.
 
-Các kiểu generic dựng sẵn của Go được hỗ trợ thông qua các kiểu tổ hợp hạng nhất.
+Các kiểu generic dựng sẵn của Go được hỗ trợ thông qua các kiểu tổ hợp là first-class citizen.
 Ta có thể dùng các kiểu tổ hợp để tạo ra vô số kiểu tùy chỉnh bằng cách kết hợp chúng.
 Bài viết này sẽ đưa ra một số ví dụ về tổ hợp kiểu
-và giải thích cách đọc các kiểu được tổ hợp đó.
+và giải thích cách đọc các kiểu được tạo bằng cách tổ hợp.
 
 ###========== Các ví dụ về tổ hợp kiểu
 
 Các tổ hợp kiểu trong Go được thiết kế trực quan và dễ hiểu.
-Rất khó nhầm lẫn khi tìm hiểu các kiểu tổ hợp của Go,
+Rất khó bị rối khi tìm hiểu các kiểu tổ hợp của Go,
 kể cả với những kiểu rất phức tạp.
 Dưới đây là một số ví dụ về tổ hợp kiểu,
 từ đơn giản đến phức tạp hơn.
@@ -25,15 +25,15 @@ Hãy xem một literal kiểu tổ hợp đơn giản.
 '''
 
 Khi phân tích một kiểu tổ hợp, ta nên đọc từ trái sang phải.
-`[3]` ở bên trái trong literal kiểu trên cho biết
-đây là một kiểu mảng.
-Toàn bộ phần bên phải, `[4]int`, là một kiểu mảng khác,
-đóng vai trò kiểu phần tử của kiểu mảng thứ nhất.
-Kiểu phần tử của kiểu phần tử (một kiểu mảng) của mảng thứ nhất
+`[3]` ở bên trái của literal kiểu trên cho biết
+đây là một kiểu array.
+Toàn bộ phần bên phải, `[4]int`, là một kiểu array khác,
+đóng vai trò kiểu element của kiểu array thứ nhất.
+Kiểu element của kiểu element (một kiểu array) của kiểu array thứ nhất
 là kiểu dựng sẵn `int`.
-Kiểu mảng thứ nhất có thể được xem là một kiểu mảng hai chiều.
+Kiểu array thứ nhất có thể được xem là một kiểu array hai chiều.
 
-Ví dụ sử dụng kiểu mảng hai chiều này.
+Ví dụ sử dụng kiểu array hai chiều này.
 @@@ .line-numbers
 ''' go
 package main
@@ -57,21 +57,21 @@ func main() {
 
 Tương tự,
 *
-   `[][]string` là một kiểu slice có kiểu phần tử
+   `[][]string` là một kiểu slice có kiểu element
    là một kiểu slice khác `[]string`.
 *
-   `**bool` là một kiểu con trỏ có kiểu cơ sở
-   là một kiểu con trỏ khác `*bool`.
+   `**bool` là một kiểu pointer có kiểu cơ sở
+   là một kiểu pointer khác `*bool`.
 *
-   `chan chan int` là một kiểu channel có kiểu phần tử
+   `chan chan int` là một kiểu channel có kiểu element
    là một kiểu channel khác `chan int`.
 *
-   `map[int]map[int]string` là một kiểu map có kiểu phần tử
+   `map[int]map[int]string` là một kiểu map có kiểu element
    là một kiểu map khác `map[int]string`.
-   Kiểu khóa của cả hai kiểu map đều là `int`.
+   Kiểu key của cả hai kiểu map đều là `int`.
 *
    `func(int32) func(int32)` là một kiểu function chỉ có
-   kiểu kết quả trả về duy nhất là một kiểu function khác `func(int32)`.
+   một kiểu kết quả trả về là một kiểu function khác `func(int32)`.
    Cả hai kiểu function đều chỉ có một tham số đầu vào
    với kiểu `int32`.
 
@@ -83,10 +83,10 @@ chan *[16]byte
 '''
 
 Từ khóa `chan` ở ngoài cùng bên trái cho biết đây là một kiểu channel.
-Toàn bộ phần bên phải `*[16]byte`, tức một kiểu con trỏ,
-biểu thị kiểu phần tử của kiểu channel này.
-Kiểu cơ sở của kiểu con trỏ là `[16]byte`, một kiểu mảng.
-Kiểu phần tử của kiểu mảng là `byte`.
+Toàn bộ phần bên phải `*[16]byte`, tức một kiểu pointer,
+biểu thị kiểu element của kiểu channel này.
+Kiểu cơ sở của kiểu pointer là `[16]byte`, một kiểu array.
+Kiểu element của kiểu array là `byte`.
 
 Ví dụ sử dụng kiểu channel này.
 @@@ .line-numbers
@@ -103,7 +103,7 @@ func main() {
 	c := make(chan *[16]byte)
 
 	go func() {
-		// Dùng hai mảng để tránh data race.
+		// Dùng hai array để tránh data race.
 		var dataA, dataB = new([16]byte), new([16]byte)
 		for {
 			_, err := rand.Read(dataA[:])
@@ -124,11 +124,11 @@ func main() {
 '''
 
 Tương tự, kiểu `map[string][]func(int) int` là một kiểu map.
-Kiểu khóa của kiểu map này là `string`.
+Kiểu key của kiểu map này là `string`.
 Phần còn lại ở bên phải, `[]func(int) int`, biểu thị
-kiểu phần tử của kiểu map.
-`[]` cho biết kiểu phần tử là một kiểu slice,
-có kiểu phần tử là kiểu function `func(int) int`.
+kiểu element của kiểu map.
+`[]` cho biết kiểu element là một kiểu slice,
+có kiểu element là kiểu function `func(int) int`.
 
 Ví dụ sử dụng kiểu map vừa giải thích.
 
@@ -162,7 +162,7 @@ func main() {
 }
 '''
 
-Dưới đây là một kiểu trông khá phức tạp.
+Dưới đây là một kiểu có vẻ khá phức tạp.
 
 @@@ .line-numbers
 ''' go
@@ -181,11 +181,11 @@ Dưới đây là một kiểu trông khá phức tạp.
 
 Hãy đọc kiểu này từ trái sang phải.
 `[]` ở ngoài cùng bên trái cho biết đây là một kiểu slice.
-Từ khóa `map` tiếp theo cho biết kiểu phần tử của slice là một kiểu map.
+Từ khóa `map` tiếp theo cho biết kiểu element của slice là một kiểu map.
 Kiểu struct được biểu thị bằng literal struct nằm trong dấu `[]` theo sau
-từ khóa `map` là kiểu khóa của kiểu map.
-Kiểu phần tử của map là một kiểu interface khai báo ba method.
-Kiểu khóa, vốn là một kiểu struct, có hai field:
+từ khóa `map` là kiểu key của kiểu map.
+Kiểu element của map là một kiểu interface khai báo ba method.
+Kiểu key, vốn là một kiểu struct, có hai field:
 một field `a` có kiểu `int`,
 field còn lại `b` có một kiểu struct khác
 là `struct {x string; y bool}`.
@@ -195,8 +195,8 @@ của một method được khai báo trong kiểu interface vừa nêu.
 
 Để dễ đọc hơn, ta thường tách một kiểu như vậy
 thành nhiều khai báo kiểu.
-Type alias `T` được khai báo trong đoạn code sau
-biểu thị cùng kiểu với kiểu vừa giải thích ở trên.
+Type alias `T` được khai báo trong đoạn code sau và kiểu vừa giải thích ở trên
+biểu thị cùng một kiểu.
 
 @@@ .line-numbers
 ''' go
@@ -224,7 +224,7 @@ type T = []map[K]E
 Ngoài các generics dựng sẵn dành cho kiểu tổ hợp,
 còn có một số hàm dựng sẵn cũng hỗ trợ generics.
 Ví dụ, hàm dựng sẵn `len` có thể được dùng để
-lấy độ dài của các giá trị kiểu mảng, slice, map, string và channel.
+lấy độ dài của các giá trị thuộc kiểu array, slice, map, string và channel.
 Nhìn chung, các hàm trong package chuẩn `unsafe`
 cũng được xem là các hàm dựng sẵn.
 Các hàm generic dựng sẵn đã được giới thiệu trong những bài viết trước,

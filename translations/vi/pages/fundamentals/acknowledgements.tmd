@@ -7,11 +7,11 @@ cuốn sách này đã không thể hoàn thành.
 
 Tôi xin gửi lời cảm ơn đặc biệt đến Ian Lance Taylor.
 Ian đã nhiệt tình trả lời vô số câu hỏi nhàm chán của tôi
-trên nhóm go-nuts và trình theo dõi issue của dự án Go.
-Những câu trả lời của Ian giúp tôi tháo gỡ nhiều điều từng chưa hiểu rõ khi sử dụng Go.
+trên nhóm go-nuts và issue tracker của dự án Go.
+Những câu trả lời của Ian giúp tôi giải tỏa nhiều vướng mắc trước đây khi sử dụng Go.
 
 Tôi xin cảm ơn những người đã tham gia
-vào các chủ đề hỏi đáp của tôi trên nhóm go-nuts và go-dev:
+vào các thread câu hỏi của tôi trên các nhóm go-nuts và go-dev:
 Axel Wagner,
 Keith Randall,
 Russ Cox,
@@ -34,9 +34,9 @@ Oleg Sidorov,
 và Rob 'Commander' Pike,
 cùng nhiều người khác.
 
-Tôi cũng học hỏi được rất nhiều từ trình theo dõi issue của dự án Go.
+Tôi cũng học hỏi được rất nhiều từ issue tracker của dự án Go.
 Xin cảm ơn những người thường xuyên hoạt động
-trên trình theo dõi issue của dự án Go, trong đó có:
+trên issue tracker của dự án Go, trong đó có:
 Ian Lance Taylor,
 Robert Griesemer,
 Brad Fitzpatrick,
@@ -221,7 +221,7 @@ cùng nhiều người khác.
 
 Tôi xin lỗi nếu đã quên nhắc đến ai đó trong các danh sách trên.
 Cộng đồng Go có rất nhiều gopher tốt bụng và sáng tạo,
-nên hẳn tôi đã bỏ sót một vài người.
+nên hẳn tôi đã bỏ sót ai đó.
 
 Xin cảm ơn các tác giả của những gói JavaScript
 __Bootstrap framework`` https://getbootstrap.com/docs/3.3/__,
@@ -234,14 +234,13 @@ __go-epub`` https://github.com/bmaupin/go-epub__ và
 __calibre`` https://calibre-ebook.com/__
 đã tạo các ebook Go 101.
 
-Xin cảm ơn Adam Chalkley vì một gợi ý hữu ích về việc tạo ebook.
+Xin cảm ơn Adam Chalkley vì một gợi ý hữu ích về việc tạo các ebook.
 
 Xin gửi lời cảm ơn đặc biệt đến
 __Renee French`` https://reneefrench.blogspot.com__
 và Rob Pike.
 Hình minh họa sống động trên bìa các phiên bản điện tử và bản in
-của cuốn sách này được lấy từ
+của cuốn sách này được sao chép từ
 __một slide của Rob`` https://talks.golang.org/2012/waza.slide#19__.
-Renee là tác giả của các linh vật gopher đáng yêu xuất hiện trong hình.
-
+Renee là tác giả của các linh vật gopher đáng yêu mang tính biểu tượng được dùng trong hình.
 

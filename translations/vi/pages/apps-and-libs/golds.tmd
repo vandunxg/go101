@@ -1,12 +1,12 @@
 ######################### Golds
 
-**// Golds //** là một server tài liệu cục bộ thử nghiệm cho Go,
-một trình tạo tài liệu Go và một trình đọc code Go.
+**// Golds //** là một server docs local thử nghiệm cho Go,
+một trình tạo docs Go và một trình đọc code Go.
 
 -  Bản demo: __docs và source code của các package standard__
    (được generate bằng `GOEXPERIMENT=arenas,jsonv2 golds -gen -nouses -only-list-exporteds -render-doclinks -theme=dark std`).
 -  Code được __host trên GitHub__. Mọi feedback, bao gồm PR và bug report, đều được hoan nghênh.
--  Hãy follow __@zigo_101__ để nhận tin mới nhất về **// Golds //**
+-  Hãy theo dõi __@zigo_101__ để nhận tin mới nhất về **// Golds //**
    (và đủ loại details/facts/tips/etc. về Go).
 
     === docs và ... `` https://docs.go101.org/index.html
@@ -22,12 +22,12 @@ Hãy đọc __trang chủ của dự án__ để biết chi tiết.
 ###================================= Cài đặt
 
 Chạy `go install go101.org/golds@latest` để cài đặt Golds.
-Nếu tên chương trình tool `golds` xung đột với một tool khác mà bạn đang dùng,
+Nếu tên chương trình `golds` xung đột với một tool khác cùng tên mà bạn đang dùng,
 bạn có thể chạy một trong các lệnh sau để cài **// Golds //** dưới dạng chương trình có tên khác:
 
 -  Trình tạo docs Go: chạy `go install go101.org/golds/godoge@latest`
 -  Trình đọc code Go: chạy `go install go101.org/golds/gocore@latest`
--  Docs Go cục bộ (chủ yếu dành cho legacy. `gold` là tên chương trình mặc định cũ của **// Golds //**):
+-  Docs Go local (chủ yếu dành cho legacy. `gold` là tên chương trình mặc định cũ của **// Golds //**):
    chạy `go install go101.org/golds/gold@latest`
 
 Bạn cũng có thể clone project này trước, sau đó chạy lệnh `go install`
@@ -44,16 +44,16 @@ Hãy chỉ định đường dẫn cài đặt binary Go trong biến môi trư�
 
 ###================================= Cách sử dụng
 
-Cách sử dụng chính của **// Golds //** là khởi động một server docs cục bộ cho một project,
+Cách sử dụng chính của **// Golds //** là khởi động một server docs local cho một project,
 để đọc docs của package hoặc nghiên cứu source code của project. Có thể:
 
 -  chạy `golds .` để hiển thị docs của package trong thư mục hiện tại
    (và tất cả các package phụ thuộc của package đó).
--  chạy `golds ./...` để hiển thị docs của tất cả package bên dưới thư mục hiện tại
+-  chạy `golds ./...` để hiển thị docs của tất cả các package bên dưới thư mục hiện tại
    (và tất cả các package phụ thuộc của chúng).
 -  chạy `golds toolchain` (hoặc `golds cmd`) để hiển thị docs của các package thuộc Go toolchain chính thức.
 -  chạy `golds std` để hiển thị docs của các package standard.
-   `std` có thể được dùng cùng với bất kỳ một trong ba argument ở trên.
+   `std` có thể được dùng cùng với bất kỳ một argument nào trong ba argument ở trên.
 -  chạy `golds aPackage[/...][@aVersion]` để hiển thị docs của các package được chỉ định
    (và tất cả các package phụ thuộc của chúng).
 -  chạy `golds foo.go bar.go baz.go` để hiển thị docs của các file được chỉ định
@@ -76,8 +76,8 @@ Option `-source-code-reading` được dùng để kiểm soát cách generate c
 Các giá trị khả dụng:
 
 -  `plain`: generate các trang source code đơn giản hơn
-   (không highlight và không có navigation trong code để giảm tổng kích thước trang đi 1/6 kích thước docs đầy đủ).
--  `highlight`: chỉ highlight keyword và literal cơ bản (không có navigation trong code).
+   (không highlight và không có code navigation để giảm tổng kích thước trang đi 1/6 kích thước docs đầy đủ).
+-  `highlight`: chỉ highlight keyword và literal cơ bản (không có code navigation).
 -  `rich`: trải nghiệm đọc code phong phú.
 -  `external`: liên kết tới các website host code bên ngoài (cố gắng hết sức; dùng `highlight` khi thất bại).
 
@@ -106,12 +106,12 @@ Các giá trị khả dụng gồm:
 
 Option `-render-doclinks` được dùng để kiểm soát việc có render các link trong docs hay không.
 
-Option `-theme` được dùng để kiểm soát styling của trang.
+Option `-theme` được dùng để kiểm soát style của trang.
 Các giá trị được hỗ trợ gồm `auto` (mặc định), `light` và `dark`.
-Giá trị `auto` tương đương với `light` cộng với styling tùy chỉnh được thiết lập
+Giá trị `auto` tương đương với `light` cộng với style tùy chỉnh được thiết lập
 trong file `UserConfigDir/golds/custom.css` (nếu file này tồn tại).
 
-Cách sử dụng thứ ba của **// Golds //** là serve các file bên trong một thư mục
+Cách sử dụng thứ ba của **// Golds //** là serve các file trong một thư mục
 ("Golds" cũng có nghĩa là Go local directory server).
 Ví dụ, có thể chạy `golds -dir=.` (hoặc đơn giản là `golds`) từ thư mục HTML docsgeneration để xem docs được generate trong browser.
 Các option `-s` và `-silent` cũng hoạt động trong mode này.
@@ -132,7 +132,7 @@ Lệnh `golds` nhận biết các biến môi trường `GOOS` và `GOARCH`.
 
    Tôi không tìm thấy một Go tool hiển thị các quan hệ implementation của type,
    vì vậy tôi quyết định viết một tool như vậy. Trong quá trình thực hiện,
-   tôi nảy ra nhiều ý tưởng mới, những ý tưởng này đã định hình tool thành thiết kế **// Golds //** cuối cùng.
+   tôi nảy ra nhiều ý tưởng mới, những ý tưởng này đã định hình thiết kế **// Golds //** cuối cùng.
 
    Tôi cũng có một số quan điểm thiết kế khác với các developer của chương trình `godoc` chính thức,
    chẳng hạn như __cách liệt kê các factory function__.
@@ -148,7 +148,7 @@ Lệnh `golds` nhận biết các biến môi trường `GOOS` và `GOARCH`.
 ?  ### Có nên chạy **// Golds //** trên máy local không?
    {
 
-   Có. Nhưng nếu bạn thực sự muốn serve docs package của mình trên Internet,
+   Có. Nhưng nếu bạn thực sự muốn serve docs của package của mình trên Internet,
    tốt nhất là serve các trang docs HTML static đã được generate để giảm chi phí server.
    }
 

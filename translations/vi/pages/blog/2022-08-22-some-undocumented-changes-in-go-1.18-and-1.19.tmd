@@ -3,9 +3,9 @@
 
 Khi một phiên bản Go mới được phát hành, các thay đổi trong phiên bản này thường
 được liệt kê trong release notes của phiên bản đó.
-Tuy nhiên, đôi khi một số thay đổi bị thiếu trong release notes.
+Tuy nhiên, đôi khi một số thay đổi bị bỏ sót trong release notes.
 
-Bài viết này liệt kê một số thay đổi bị thiếu trong release notes của Go __1.18__ và __1.19__.
+Bài viết này liệt kê một số thay đổi bị bỏ sót trong release notes của Go __1.18__ và __1.19__.
 
     === 1.18 `` https://go.dev/doc/go1.18
     === 1.19 `` https://go.dev/doc/go1.19
@@ -23,8 +23,8 @@ Nếu chưa cài, bạn có thể cài GoTV bằng cách chạy
 go install go101.org/gotv@latest
 '''
 
-sau đó chạy các command sau để cài các bản phát hành mới nhất của Go 1.17,
-Go 1.18 và Go 1.19 toolchain.
+sau đó chạy các command sau để cài các bản phát hành mới nhất của các toolchain
+Go 1.17, Go 1.18 và Go 1.19.
 
 '''
 gotv 1.17. version
@@ -35,11 +35,11 @@ gotv 1.19. version
 Lần thực thi đầu tiên của command `gotv` cần pull project ngôn ngữ Go,
 vì vậy có thể mất vài phút mới hoàn tất.
 
-###======================= Định nghĩa của thuật ngữ ||slice của byte|| được làm rõ
+###======================= Định nghĩa của thuật ngữ ||slice byte|| được làm rõ
 
-Đặc tả Go phát biểu rằng ||một value không phải constant `x` có thể được convert sang type `T` nếu `x` là một string và `T` là một slice của byte, và ngược lại||.
+Đặc tả Go phát biểu rằng ||một value không phải constant `x` có thể được convert sang type `T` nếu `x` là một string và `T` là một slice byte, và ngược lại||.
 
-Nhưng ||slice của byte|| là gì? Có hai cách hiểu:
+Nhưng ||slice byte|| là gì? Có hai cách hiểu:
 
 *. bất kỳ type nào có underlying type là `[]byte`.
 *. bất kỳ slice type nào có element type có underlying type là `byte`.
@@ -88,12 +88,12 @@ $ gotv 1.18. run main.go
 [Run]: $HOME/.cache/gotv/tag_go1.18.7/bin/go main main.go
 '''
 
-Go compiler chuẩn chính thức 1.17 đôi khi xem `[]T` là một ||slice của byte||
+Go compiler chuẩn chính thức 1.17 đôi khi xem `[]T` là một ||slice byte||
 (trong function `f`), đôi khi không (trong function `g`).
 Nếu type definition `type T byte` được đổi thành type alias declaration `type T = byte`,
 thì function `g` cũng được Go compiler chuẩn chính thức 1.17 xem là hợp lệ.
 
-Tình huống tương tự cũng xảy ra với ||slice của rune|| (hay ||rune slice||).
+Tình huống tương tự cũng xảy ra với ||slice rune|| (hay ||rune slice||).
 
 Lưu ý, cho đến hiện tại (Go 1.19), package chuẩn `reflect` vẫn chưa được cập nhật tương ứng.
 Ví dụ, program sau in ra hai `false`, nhưng đáng ra phải in ra hai `true`.
@@ -137,7 +137,7 @@ func main() {
 }
 '''
 
-Một số gopher nghĩ nó nên in ra `1`, đây thực sự là đáp án của Go compiler chuẩn chính thức 1.17.13-.
+Một số gopher nghĩ chương trình nên in ra `1`, và đó thực sự là đáp án của Go compiler chuẩn chính thức 1.17.13-.
 Tuy nhiên, kể từ Go compiler chuẩn chính thức 1.18, đáp án là `0`.
 Sau đây là output với các phiên bản compiler khác nhau:
 
@@ -179,7 +179,7 @@ Ref: __https://github.com/golang/go/issues/49157
 
 ###======================= Một bug liên quan đến type alias tồn tại lâu năm đã được sửa
 
-Khi type alias được đưa vào Go 1.8, một bug về comparison cũng được đưa vào.
+Khi type alias được đưa vào Go 1.8, một bug liên quan đến comparison cũng xuất hiện.
 
 Program sau đáng ra phải in ra `false`, nhưng in ra `true`
 khi sử dụng Go compiler chuẩn chính thức từ phiên bản 1.8 đến 1.17.13.
@@ -266,7 +266,7 @@ func main() {
 
 Trước Go 1.19, chưa có câu trả lời rõ ràng.
 Một số gopher nghĩ nó phải crash, vì panic `"bye"` không bao giờ được recover.
-Nhưng trong implementation của Go runtime chuẩn chính thức,
+Nhưng trong implementation của runtime Go chính thức,
 một Goexit signal sẽ hủy các panic (có thể recover) đã xảy ra trong goroutine hiện tại.
 Vì vậy, với compiler chuẩn chính thức, program ở trên sẽ thoát bình thường.
 __Hành vi này được quyết định là đúng trong Go 1.19__.

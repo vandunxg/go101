@@ -1,16 +1,16 @@
 
-###### Một số điểm tinh tế (thực tế) của Go
+###### Một số điểm tinh tế (thực sự) của Go
 
-Tôi vừa đọc một bài viết: __15 điểm tinh tế của Go mà có thể bạn chưa biết__.
+Tôi vừa đọc một bài viết: __15 điểm tinh tế của Go mà có thể bạn vẫn chưa biết__.
 Sau khi đọc bài viết đó, tôi cảm thấy tiêu đề này hơi kỳ lạ/không phù hợp.
-Vì tất cả những điểm tinh tế được gọi là như vậy trong bài viết đó
-đều là những điều mà một Go programmer đủ năng lực nên biết.
+Vì tất cả những điều được bài viết đó gọi là điểm tinh tế
+đều là những điều mà một lập trình viên Go đủ năng lực nên biết.
 
     === 15 điểm tinh tế của Go ... :: https://harrisoncramer.me/15-go-sublteties-you-may-not-already-know/
 
 Go thực sự có nhiều điểm tinh tế.
-Ngay cả nhiều Go programmer chuyên nghiệp cũng không biết một số điểm trong đó.
-Ở đây, bài viết này trình bày một số điểm trong đó
+Ngay cả nhiều lập trình viên Go chuyên nghiệp cũng không biết một số điểm trong đó.
+Bài viết này trình bày một số điểm trong đó
 (tất cả đều đến từ cuốn sách __Go Details & Tips 101__).
 
     === Go Details & Tips 101 :: https://go101.org/details-and-tips/101.html
@@ -21,7 +21,7 @@ Nội dung:
 @@@ #zero-size-pointers
 ###========== So sánh hai pointer tới các value có kích thước bằng không có thể cho kết quả true hoặc false, ngay cả trong cùng một lần thực thi chương trình
 
-Ví dụ. Chương trình sau in ra gì? Không gì cả hay true?
+Ví dụ: Chương trình sau in ra gì? Không in gì hay true?
 
 ''' Go
 package main
@@ -38,7 +38,7 @@ func main() {
 '''
 
 Nó in ra false (với Go toolchain chính thức).
-Ngạc nhiên không? Nhưng có vẻ hành vi này không vi phạm Go specification.
+Ngạc nhiên không? Nhưng có vẻ như hành vi này không vi phạm Go specification.
 
 Một ví dụ tương tự:
 
@@ -109,7 +109,7 @@ func main() {
 }
 '''
 
-Một số Go programmer có thể ngạc nhiên trước kết quả này.
+Một số lập trình viên Go có thể ngạc nhiên trước kết quả này.
 Để hiểu rõ kết quả, chúng ta cần biết về điểm tinh tế tiếp theo.
 
 @@@ #non-constant-bit-shift-expression
@@ -133,7 +133,7 @@ func main() {
 }
 '''
 
-Trong hai khai báo đầu tiên, type của `1` đều được assumed là `byte`.
+Trong hai khai báo đầu tiên, type của `1` trong cả hai trường hợp đều được assumed là `byte`.
 Vì vậy, hai khai báo này đều tương đương với dòng sau,
 trong đó biểu thức run-time `byte(1) << n` bị overflow
 (và bị truncate thành 0).

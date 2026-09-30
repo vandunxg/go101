@@ -1,11 +1,11 @@
-### Các kỹ thuật đồng bộ hóa trong package chuẩn `sync`
+### Các kỹ thuật đồng bộ hóa concurrency do package chuẩn `sync` cung cấp
 
 Bài viết __các trường hợp sử dụng channel__ giới thiệu
 nhiều trường hợp dùng channel để đồng bộ dữ liệu giữa các goroutine.
 Trên thực tế, channel không phải là kỹ thuật đồng bộ hóa duy nhất mà Go cung cấp.
 Go còn hỗ trợ một số kỹ thuật đồng bộ hóa khác.
 Trong một số tình huống cụ thể, dùng các kỹ thuật đồng bộ hóa
-khác channel sẽ hiệu quả và dễ đọc hơn.
+ngoài channel sẽ hiệu quả và dễ đọc hơn.
 Phần dưới đây giới thiệu những kỹ thuật đồng bộ hóa trong package chuẩn `sync`.
 
     === các trường hợp sử dụng channel :: channel-use-cases.tmd
@@ -14,7 +14,7 @@ Package chuẩn `sync` cung cấp một số kiểu
 có thể dùng để đồng bộ hóa trong các tình huống chuyên biệt
 và bảo đảm một số thứ tự bộ nhớ nhất định.
 Trong các tình huống đó, những kỹ thuật này hiệu quả hơn
-và có mã gọn gàng hơn cách dùng channel.
+và trông gọn gàng hơn cách dùng channel.
 
 //
 (Lưu ý: để tránh hành vi bất thường, tốt nhất không bao giờ sao chép
@@ -47,7 +47,7 @@ Với một giá trị `WaitGroup` có thể lấy địa chỉ `wg`,
       nếu bộ đếm mà `wg` duy trì đã bằng zero,
       ta có thể xem lời gọi `wg.Wait()` như một thao tác không làm gì.
    -
-      nếu không (bộ đếm đang dương), goroutine đó sẽ chuyển sang trạng thái chờ.
+      nếu không (bộ đếm đang dương), goroutine đó sẽ chuyển sang trạng thái blocking.
       Nó sẽ trở lại trạng thái chạy (tức là lời gọi `wg.Wait()` trả về)
       khi một goroutine khác đưa bộ đếm về zero,
       thường bằng cách gọi `wg.Done()`.
@@ -229,8 +229,8 @@ Do đó, cả hai đều có hai method `Lock` và `Unlock`
 Ngoài các method `Lock` và `Unlock`,
 kiểu `*RWMutex` còn có hai method khác là
 `RLock` và `RUnlock`,
-nhằm ngăn một số bên sử dụng dữ liệu (dù là bên ghi hay bên đọc) và một bên ghi dữ liệu
-cùng sử dụng một phần dữ liệu tại cùng thời điểm,
+nhằm ngăn một số bên sử dụng dữ liệu (dù là bên ghi hay bên đọc) sử dụng một phần dữ liệu
+cùng lúc với một bên ghi dữ liệu,
 đồng thời cho phép một số bên đọc truy cập phần dữ liệu đó cùng lúc.
 
 //
@@ -243,7 +243,7 @@ Giá trị `Mutex` zero là một mutex đang mở khóa.
 Chỉ có thể khóa một giá trị `Mutex` khi nó đang ở trạng thái mở khóa.
 Nói cách khác, khi một giá trị `Mutex` có thể lấy địa chỉ `m` đã được khóa thành công
 (tức là lời gọi method `m.Lock()` trả về),
-một goroutine khác thử khóa giá trị `Mutex` đó sẽ chuyển sang trạng thái chờ,
+một goroutine khác thử khóa giá trị `Mutex` đó sẽ chuyển sang trạng thái blocking,
 cho đến khi giá trị `Mutex` được mở khóa (qua một lời gọi `m.Unlock()` sau đó).
 
 Lưu ý rằng `m.Lock()` và `m.Unlock()`
@@ -303,8 +303,8 @@ Một giá trị `RWMutex` thường được gọi là khóa loại trừ lẫn
 Nó có hai khóa: khóa ghi và khóa đọc.
 Cả hai khóa của một giá trị `RWMutex` zero đều ở trạng thái mở khóa.
 Với một giá trị `RWMutex` có thể lấy địa chỉ `rwm`,
-bên ghi dữ liệu có thể khóa khóa ghi của `rwm` qua lời gọi method `rwm.Lock()`,
-còn bên đọc dữ liệu có thể khóa khóa đọc của `rwm` qua lời gọi method `rwm.RLock()`.
+bên ghi dữ liệu có thể lấy khóa ghi của `rwm` bằng các lời gọi method `rwm.Lock()`,
+còn bên đọc dữ liệu có thể lấy khóa đọc của `rwm` bằng các lời gọi method `rwm.RLock()`.
 Các lời gọi method `rwm.Unlock()` và `rwm.RUnlock()`
 dùng để mở khóa ghi và khóa đọc tương ứng.
 Khóa đọc của `rwm` duy trì một bộ đếm khóa: bộ đếm tăng thêm một
@@ -320,7 +320,7 @@ lần lượt là cách viết tắt của `(&m).Lock()`, `(&m).Unlock()`,
 
 Với một giá trị `RWMutex` có thể lấy địa chỉ `rwm`, có các quy tắc sau.
 *
-   Chỉ có thể khóa khóa ghi của `rwm` khi cả khóa đọc lẫn
+   Chỉ có thể lấy khóa ghi của `rwm` khi cả khóa đọc lẫn
    khóa ghi của `rwm` đều không ở trạng thái bị khóa.
    Nói cách khác, tại một thời điểm chỉ tối đa một bên ghi có thể giữ khóa ghi của `rwm`,
    và khóa đọc cùng khóa ghi không thể được giữ đồng thời.
@@ -430,7 +430,7 @@ func main() {
 '''
 
 Lưu ý rằng ví dụ trên chỉ nhằm mục đích giải thích.
-Nó dùng các lời gọi `time.Sleep` để đồng bộ hóa đồng thời,
+Nó dùng các lời gọi `time.Sleep` để đồng bộ hóa concurrency,
 đây là __thực hành không tốt đối với mã production__.
 
     === thực hành không tốt đối với mã production :: concurrent-common-mistakes.tmd#sleep
@@ -496,7 +496,7 @@ Với một giá trị `sync.Cond` có thể lấy địa chỉ `c`,
       sau đó gọi `c.L.Unlock()` để mở khóa, tức là nhả khóa `c.L`.
    *.
       {
-      rồi đưa goroutine gọi hiện tại sang trạng thái chờ.
+      rồi đưa goroutine gọi hiện tại sang trạng thái blocking.
       // <sup>(1)</sup>
 
       //
@@ -524,7 +524,7 @@ Lưu ý rằng `c.Wait()`, `c.Signal()` và `c.Broadcast()`
 lần lượt là cách viết tắt của `(&c).Wait()`, `(&c).Signal()`
 và `(&c).Broadcast()`.
 
-`c.Signal()` và `c.Broadcast()` thường được dùng để thông báo trạng thái của một điều kiện đã thay đổi.
+`c.Signal()` và `c.Broadcast()` thường được dùng để thông báo rằng trạng thái của một điều kiện đã thay đổi.
 Thông thường, nên gọi `c.Wait()` trong một vòng lặp kiểm tra điều kiện đã thỏa mãn hay chưa.
 
 { %%
@@ -534,10 +534,10 @@ trong khoảng thời gian ngắn giữa bước 2 và bước 3.
 
 *
    Nếu gọi `c.Signal()` trong khoảng thời gian ngắn giữa bước 2 và bước 3,
-   goroutine gọi `c.Wait()` có thể không chuyển sang trạng thái chờ.
+   goroutine gọi `c.Wait()` có thể không chuyển sang trạng thái blocking.
 *
    Nếu gọi `c.Broadcast()` trong khoảng thời gian ngắn giữa bước 2 và bước 3,
-   chắc chắn goroutine gọi `c.Wait()` sẽ không chuyển sang trạng thái chờ.
+   chắc chắn goroutine gọi `c.Wait()` sẽ không chuyển sang trạng thái blocking.
 
 }
 
@@ -575,12 +575,12 @@ func main() {
 			cond.L.Lock()
 			values[i] = string('a' + i)
 
-			// Gửi thông báo khi khóa cond.L đang bị khóa.
+			// Gửi thông báo khi khóa cond.L đang được giữ.
 			cond.Broadcast()
 			cond.L.Unlock()
 
 			// Có thể đặt "cond.Broadcast()"
-			// ở đây, khi khóa cond.L đã được mở.
+			// ở đây, khi khóa cond.L đã mở khóa.
 			//cond.Broadcast()
 		}(i)
 	}
@@ -627,13 +627,13 @@ không bắt buộc phải gọi `cond.Broadcast()` và `cond.Signal()`
 khi `cond.L` đang bị khóa.
 
 Để tránh data race,
-chỉ được sửa đổi từng phần trong mười phần của điều kiện do người dùng định nghĩa
+mỗi phần trong mười phần của điều kiện do người dùng định nghĩa chỉ nên được sửa đổi
 khi `cond.L` đang bị khóa.
-Cũng phải gọi hàm `checkCondition` và method `cond.Wait`
+Hàm `checkCondition` và method `cond.Wait` cũng nên được gọi
 khi `cond.L` đang bị khóa.
 
 Thực ra, trong ví dụ cụ thể ở trên, trường `cond.L` cũng có thể là một giá trị `*sync.RWMutex`,
-và có thể sửa từng phần trong mười phần của điều kiện do người dùng định nghĩa khi đang giữ khóa đọc của `cond.L`,
+và có thể sửa mỗi phần trong mười phần của điều kiện do người dùng định nghĩa khi đang giữ khóa đọc của `cond.L`,
 như đoạn mã sau:
 
 @@@ .line-numbers
@@ -659,8 +659,8 @@ Trong ví dụ trên, giá trị `sync.RWMutex` được dùng theo cách khác 
 Một số goroutine giữ khóa đọc để sửa các phần tử của mảng,
 còn goroutine main dùng khóa ghi để đọc các phần tử của mảng.
 
-Điều kiện do người dùng định nghĩa được một giá trị `Cond` theo dõi có thể là rỗng.
-Trong trường hợp đó, giá trị `Cond` chỉ được dùng để gửi thông báo.
+Điều kiện do người dùng định nghĩa mà một giá trị `Cond` theo dõi có thể là rỗng.
+Trong trường hợp đó, giá trị `Cond` chỉ dùng để gửi thông báo.
 Ví dụ, chương trình sau sẽ in `abc` hoặc `bac`.
 
 @@@ .line-numbers

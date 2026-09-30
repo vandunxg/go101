@@ -3,22 +3,22 @@
 
 <p>
 Go là một ngôn ngữ an toàn về bộ nhớ.
-Khi truy cập phần tử mảng/slice hoặc thực hiện thao tác tạo subslice,
-Go runtime sẽ kiểm tra các chỉ số liên quan có nằm ngoài phạm vi hay không.
-Nếu một chỉ số nằm ngoài phạm vi, chương trình sẽ panic để ngăn chỉ số không hợp lệ gây hại.
+Khi truy cập element của array/slice hoặc thực hiện thao tác tạo subslice,
+Go runtime sẽ kiểm tra các index liên quan có nằm ngoài phạm vi hay không.
+Nếu một index nằm ngoài phạm vi, sẽ xảy ra panic để ngăn index không hợp lệ gây hại.
 Việc này được gọi là kiểm tra giới hạn.
 Kiểm tra giới hạn giúp mã chạy an toàn, nhưng đồng thời cũng khiến mã chạy chậm hơn đôi chút.
 </p>
 
 <p>
-Kể từ Go Toolchain 1.7, Go compiler tiêu chuẩn sử dụng backend compiler mới,
+Kể từ Go Toolchain 1.7, Go compiler tiêu chuẩn sử dụng compiler backend mới,
 dựa trên SSA (static single-assignment form).
 SSA giúp Go compiler áp dụng hiệu quả các tối ưu hóa như
 <a href="https://en.wikipedia.org/wiki/Bounds-checking_elimination">BCE</a> (loại bỏ kiểm tra giới hạn)
-và <a href="https://en.wikipedia.org/wiki/Common_subexpression_elimination">CSE</a> (loại bỏ biểu thức con trùng lặp).
-BCE có thể bỏ qua một số lần kiểm tra giới hạn không cần thiết, còn CSE có thể tránh một số phép tính trùng lặp,
+và <a href="https://en.wikipedia.org/wiki/Common_subexpression_elimination">CSE</a> (loại bỏ biểu thức con chung).
+BCE có thể tránh một số kiểm tra giới hạn không cần thiết, còn CSE có thể tránh một số phép tính trùng lặp,
 nhờ đó Go compiler tiêu chuẩn tạo ra chương trình hiệu quả hơn.
-Đôi khi hiệu quả cải thiện của các tối ưu hóa này rất rõ rệt.
+Đôi khi, hiệu quả cải thiện do các tối ưu hóa này mang lại rất rõ rệt.
 </p>
 
 <p>
@@ -71,12 +71,12 @@ func main() {}
 <p>
 Ta thấy không cần kiểm tra giới hạn ở dòng <i>12</i>
 và dòng <i>13</i> trong hàm <code>f2</code>,
-vì kiểm tra giới hạn ở dòng <i>11</i> bảo đảm các chỉ số tại
+vì kiểm tra giới hạn ở dòng <i>11</i> bảo đảm các index tại
 dòng <i>12</i> và dòng <i>13</i> không nằm ngoài phạm vi.
 </p>
 
 <p>
-Trong hàm <code>f1</code>, cần thực hiện kiểm tra giới hạn ở cả ba dòng.
+Trong hàm <code>f1</code>, phải thực hiện kiểm tra giới hạn ở cả ba dòng.
 Kiểm tra giới hạn ở dòng <i>5</i> không thể bảo đảm dòng <i>6</i>
 và dòng <i>7</i> an toàn; kiểm tra giới hạn ở dòng <i>6</i> cũng không thể bảo đảm dòng <i>7</i> an toàn.
 </p>
@@ -94,7 +94,7 @@ trong hàm <code>f4</code> là an toàn.
 <p>
 Lưu ý: tính đến hiện tại (Go Toolchain 1.25.n), compiler tiêu chuẩn
 không kiểm tra BCE cho một thao tác trong generic function nếu thao tác đó
-liên quan đến type parameter và generic function chưa từng được khởi tạo với kiểu cụ thể.
+liên quan đến các type parameter và generic function chưa từng được instantiate.
 </p>
 
 Ví dụ minh họa:
@@ -245,7 +245,7 @@ Compiler vẫn chưa đủ thông minh sao?
 
 <p>
 Thực ra ở đây compiler làm đúng! Vì sao?
-Nguyên nhân là chỉ số bắt đầu trong biểu thức subslice có thể lớn hơn độ dài của slice cơ sở.
+Nguyên nhân là index bắt đầu trong biểu thức subslice có thể lớn hơn độ dài của slice cơ sở.
 Hãy xem một ví dụ đơn giản:
 </p>
 
@@ -263,7 +263,7 @@ func main() {
 	_ = s0[:index]
 	// Dòng trên an toàn không có nghĩa dòng sau
 	// cũng an toàn. Thực tế, dòng sau sẽ panic vì
-	// chỉ số bắt đầu lớn hơn chỉ số kết thúc.
+	// index bắt đầu lớn hơn index kết thúc.
 	_ = s0[index:] // panic
 }
 </code></pre>
@@ -351,7 +351,7 @@ func fd2(is []int, bs []byte) {
 	if len(is) >= 256 {
 		is = is[:256] // line 14: gợi ý
 		for _, n := range bs {
-			_ = is[n] // line 16: BCE đã loại bỏ kiểm tra!
+		_ = is[n] // line 16: kiểm tra đã được BCE loại bỏ!
 		}
 	}
 }
@@ -427,7 +427,7 @@ Dưới đây là một hàm so sánh slice do ta tự viết.
 </code></pre>
 
 Trong khối vòng lặp <code>for-range</code>, <code>b[i]</code> vẫn cần kiểm tra giới hạn
-để tránh chỉ số <code>i</code> nằm ngoài phạm vi.
+để tránh index <code>i</code> nằm ngoài phạm vi.
 Ta có thể sửa hàm một chút để bỏ bước kiểm tra này.
 
 <pre class="line-numbers"><code class="language-go">func CompareSlices_BCE(a, b []int) bool {
@@ -477,7 +477,7 @@ nên bài viết này không trình bày tất cả.
 Tính năng BCE trong Go compiler tiêu chuẩn chưa hoàn hảo,
 nhưng hoạt động rất tốt trong nhiều trường hợp phổ biến.
 Chắc chắn Go compiler tiêu chuẩn sẽ hoạt động tốt hơn ở các phiên bản sau,
-để những gợi ý trong ví dụ thứ 5 ở trên có thể không còn cần thiết.
+vì vậy có thể những gợi ý trong ví dụ thứ 5 ở trên sẽ không còn cần thiết.
 
 Cảm ơn đội ngũ Go đã bổ sung tính năng tuyệt vời này!
 </p>
@@ -487,7 +487,7 @@ Cảm ơn đội ngũ Go đã bổ sung tính năng tuyệt vời này!
 <ol>
 <li><a href="https://docs.google.com/document/d/1vdAEAjYdzjnPA9WDOQ1e4e05cYVMpqSxJYZT33Cqw2g">Loại bỏ kiểm tra giới hạn</a></li>
 <li>
-	<a href="https://talks.godoc.org/github.com/klauspost/talks/2016/go17-compiler.slide">Tận dụng Go 1.7 SSA Compiler</a>
+	<a href="https://talks.godoc.org/github.com/klauspost/talks/2016/go17-compiler.slide">Tận dụng SSA compiler của Go 1.7</a>
 	(và <a href="https://talks.godoc.org/github.com/klauspost/talks/2016/go17-compiler-2.slide">phần thứ hai</a>)
 </li>
 </ol>

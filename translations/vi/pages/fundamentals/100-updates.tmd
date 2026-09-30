@@ -2,25 +2,25 @@
 
 ###========== v1.23.a (2024/Oct/16)
 
-*  thêm mục __ Range Over Functions`` function.html#range__.
+*  thêm một mục __ Duyệt range trên hàm`` function.html#range__.
 
 ###========== v1.22.a (2024/Mar/18)
 
 *  Go 1.22 giới thiệu vòng lặp `for range Integer` và thay đổi ngữ nghĩa của các khối mã vòng lặp for. Các bài viết liên quan được chỉnh sửa tương ứng:
 *  __ Các luồng điều khiển cơ bản`` control-flows.html#for-semantic-change__
-*  __ Goroutine, lời gọi hàm trì hoãn và Panic/Recover`` control-flows-more.html#argument-evaluation-moment__
+*  __ Goroutine, lời gọi hàm trì hoãn và panic/recover`` control-flows-more.html#argument-evaluation-moment__
 *  __ Array, slice và map trong Go`` container.html#iteration__
 
 ###========== v1.21.a (2023/Oct/11)
 
-*  Go 1.21 __ bổ sung hàm builtin `clear` `` container.html#clear__.
-*  Kể từ Go 1.21, __ lời gọi `panic(nil)` sẽ tạo ra một runtime panic mới khác nil`` panic-and-recover-use-cases.html#avoid-verbose__.
+*  Go 1.21 __ bổ sung hàm dựng sẵn `clear` `` container.html#clear__.
+*  Kể từ Go 1.21, __ lời gọi `panic(nil)` sẽ tạo ra một runtime panic mới không phải nil`` panic-and-recover-use-cases.html#avoid-verbose__.
 
 ###========== v1.20.a (2023/Feb/01)
 
 *  Go 1.20 __ bắt đầu hỗ trợ chuyển đổi từ slice sang array`` container.html#slice-to-array__.
 *  Go 1.20 __ bổ sung ba hàm mới trong package "unsafe"`` unsafe.html__: `SliceData`, `String` và `StringData`.
-*  Kể từ Go 1.20, bộ sinh số ngẫu nhiên toàn cục trong package `math/rand` sẽ được tự động khởi tạo seed.
+*  Kể từ Go 1.20, bộ sinh số ngẫu nhiên toàn cục trong package `math/rand` sẽ được tự động seed.
 *  đề cập trong chương __ Loại bỏ kiểm tra biên`` bounds-check-elimination.html__ rằng `-gcflags="-d=ssa/check_bce"` không hoạt động với một số hàm generic.
 
 ###========== v1.19.a (2022/Aug/29)
@@ -48,17 +48,17 @@
 
 ###========== 1.15.b (2020/Oct/09)
 
-*  bổ sung thêm thông tin về __ các chi tiết liên quan đến reflect.DeepEqual`` details.html#reflect-deep-equal__.
+*  mô tả thêm __ các chi tiết liên quan đến reflect.DeepEqual`` details.html#reflect-deep-equal__.
 *  bổ sung __ một ngoại lệ cú pháp mới`` exceptions.html#code-block-following-else__.
 
 ###========== 1.15.a (2020/Aug/07)
 
-*  chỉ ra rằng, kể từ Go Toolchain 1.15, dùng make và copy để sao chép slice luôn hiệu quả hơn dùng append.
+*  chỉ ra rằng, kể từ Go Toolchain 1.15, dùng make+copy để clone slice luôn hiệu quả hơn dùng append để clone.
 
 ###========== 1.14.g (2020/Jun/12)
 
-*  loại bỏ chi tiết mới được thêm ở bản 1.14.e: Hành vi so sánh các giá trị struct có cả trường so sánh được và không so sánh được, hoặc các giá trị array có cả phần tử so sánh được và không so sánh được, là không xác định. Lý do là __ hành vi này sẽ được đặc tả`` https://github.com/golang/go/issues/8606__.
-*  bổ sung __ một chi tiết mới`` details.html#impossible-to-interface-assertion__: về các phép assertion sang interface bất khả thi mà trình biên dịch có thể phát hiện tại thời điểm biên dịch.
+*  loại bỏ chi tiết mới được thêm ở bản 1.14.e: Hành vi so sánh các giá trị struct có cả trường so sánh được và không so sánh được, hoặc các giá trị array có cả phần tử so sánh được và không so sánh được, là chưa được đặc tả. Lý do là __ hành vi này sẽ được đặc tả`` https://github.com/golang/go/issues/8606__.
+*  bổ sung __ một chi tiết mới`` details.html#impossible-to-interface-assertion__: Về các phép assertion sang interface bất khả thi có thể phát hiện tại compile time.
 
 
 ###========== 1.14.f (2020/Jun/02)
@@ -67,20 +67,20 @@
 
 ###========== 1.14.e (2020/May/06)
 
-*  bổ sung __ một chi tiết mới`` details.html#compare-values-with-both-comparable-and-incomparable-parts__: Hành vi so sánh các giá trị struct có cả trường so sánh được và không so sánh được, hoặc các giá trị array có cả phần tử so sánh được và không so sánh được, là không xác định.
-*  bổ sung __ một chi tiết mới`` details.html#blank-fields-are-ignored-in-comparisons__: Khi so sánh giá trị struct, các trường trống sẽ bị bỏ qua.
+*  bổ sung __ một chi tiết mới`` details.html#compare-values-with-both-comparable-and-incomparable-parts__: Hành vi so sánh các giá trị struct có cả trường so sánh được và không so sánh được, hoặc các giá trị array có cả phần tử so sánh được và không so sánh được, là chưa được đặc tả.
+*  bổ sung __ một chi tiết mới`` details.html#blank-fields-are-ignored-in-comparisons__: Khi so sánh giá trị struct, các blank field sẽ bị bỏ qua.
 
 ###========== 1.14.d (2020/Apr/25)
 
-*  các nội dung liên quan đến `runtime.KeepAlive` được gỡ khỏi bài viết __ Con trỏ unsafe`` unsafe.html__.
+*  các nội dung liên quan đến `runtime.KeepAlive` được gỡ khỏi bài viết __ Con trỏ không an toàn về kiểu`` unsafe.html__.
    Tôi xin lỗi vì trước đây đã truyền đạt một số thông tin sai trong bài viết này.
 
 ###========== 1.13.i (2019/Oct/31)
 
 *  sửa lỗi trong mã ví dụ ở mục __ Xóa một đoạn phần tử của slice`` container.html#delete-slice-elements__
-   trong bài viết "Array, slice và map trong Go".
-*  chỉnh lại phần giải thích trong mục __ Thời điểm đánh giá các giá trị hàm được defer`` function.html#function-evaluation-time__.
-*  bài viết "Những vị trí phù hợp để gọi hàm builtin `recover`" được __ đổi tên thành`` panic-and-recover-more.html__ "Giải thích chi tiết cơ chế Panic/Recover". Bài viết gần như được viết lại hoàn toàn.
+   trong bài viết "Array, Slice và Map trong Go".
+*  chỉnh lại phần giải thích trong mục __ Thời điểm đánh giá giá trị hàm được defer`` function.html#function-evaluation-time__.
+*  bài viết "Những vị trí phù hợp để gọi hàm dựng sẵn `recover`" được __ đổi tên thành`` panic-and-recover-more.html__ "Giải thích chi tiết cơ chế Panic/Recover". Bài viết gần như được viết lại hoàn toàn.
 
 ###========== 1.13.h (2019/Oct/18)
 
@@ -94,12 +94,12 @@
 
 ###========== 1.13.d (2019/Sep/30)
 
-*  bổ sung __ một sự thật mới`` unsafe.html#fact-value-address-might-change __ vào bài viết về "con trỏ kiểu unsafe"
+*  bổ sung __ một đặc điểm mới`` unsafe.html#fact-value-address-might-change __ vào bài viết về "con trỏ không an toàn về kiểu"
    và chỉ ra __ một sai lầm nghiêm trọng`` unsafe.html#pattern-convert-to-uintptr-and-back __ trong bài viết này.
 
 ###========== 1.13.c (2019/Sep/25)
 
-*  xóa mục có chứa lỗi mã ngớ ngẩn khỏi bài viết "Những vị trí phù hợp để gọi hàm recover".
+*  xóa mục chứa một lỗi ngớ ngẩn trong code khỏi bài viết "Những vị trí phù hợp để gọi hàm recover".
 
 ###========== 1.13.b (2019/Sep/19)
 
@@ -109,7 +109,7 @@
 
 *  sẵn sàng cho Go 1.13.
 *  bổ sung hai trường hợp vào bài viết __ Cách đóng channel một cách an toàn`` channel-closing.html__.
-*  các thuật ngữ __ "named type" và "unnamed type"`` type-system-overview.html#unnamed-type__ được dùng trở lại,
+*  các thuật ngữ __ "named type" và "unnamed type"`` type-system-overview.html#unnamed-type__ được đưa trở lại,
    nhưng hiện tương đương với "defined type" và "non-defined type".
 
 ###========== 1.12.d (2019/May/18)
@@ -131,7 +131,7 @@
 
 ###========== 1.11.f (2019/Jan/02)
 
-*  loại bỏ "Biến chưa sử dụng" khỏi __ Các ngoại lệ cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
+*  loại bỏ "Biến chưa sử dụng" khỏi __ Các ngoại lệ về cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
 
 ###========== 1.11.g (2018/Dec/27)
 
@@ -151,18 +151,18 @@
 
 ###========== 1.11.d (2018/Oct/18)
 
-*  loại bỏ "So sánh giá trị interface" khỏi __ Các ngoại lệ cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
-*  thêm "Các phép so sánh 2" vào __ Các ngoại lệ cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
+*  loại bỏ "So sánh giá trị interface" khỏi __ Các ngoại lệ về cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
+*  thêm "Các phép so sánh 2" vào __ Các ngoại lệ về cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
 *  chỉnh sửa một số mô tả về:
 *  __ quy tắc so sánh`` value-conversions-assignments-and-comparisons.html#comparison-rules__
 *  __ hệ phân cấp package`` packages-and-imports.html#package__
 
 ###========== 1.11.c (2018/Sep/22)
 
-*  thêm mẹo mới __ Cách khiến một kiểu struct không thể so sánh?`` tips.html#make-struct-type-uncomparable__.
+*  thêm mẹo mới __ Làm thế nào khiến một kiểu struct không thể so sánh?`` tips.html#make-struct-type-uncomparable__.
 *  thêm mẹo mới __ Thử đặt lại pointer trong các phần tử slice đã được giải phóng`` tips.html#reset-pointers-for-dead-elements__.
 *  thêm mẹo mới __ Tối ưu hóa bằng cách sử dụng BCE`` tips.html#make-using-of-bce__.
-*  loại bỏ "Thứ tự ưu tiên của các toán tử một ngôi" khỏi __ Các ngoại lệ cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
+*  loại bỏ "Thứ tự ưu tiên của các toán tử một ngôi" khỏi __ Các ngoại lệ về cú pháp/ngữ nghĩa trong Go`` exceptions.html__.
 
 ###========== 1.11.b (2018/Sep/09)
 
@@ -170,12 +170,12 @@
 
 ###========== 1.11.a (2018/Sep/01)
 
-*  đề cập GOARCH `wasm` mới của Go 1.11 trong __ Các kiến thức Go khác`` more.html#cross-platform-compiling__.
+*  đề cập GOARCH `wasm` mới của Go 1.11 trong __ Các chủ đề Go khác`` more.html#cross-platform-compiling__.
 *  đề cập lệnh `go mod` mới của Go 1.11 trong __ Go Toolchain`` go-toolchain.html__.
 
 ###========== 1.10.g (2018/Jun/02)
 
-*  xuất bản __ Giới thiệu Go 101`` 101-about.html__.
+*  xuất bản __ Giới thiệu về Go 101`` 101-about.html__.
 *  xuất bản __ Lời cảm ơn`` acknowledgements.html__.
 
 
@@ -187,16 +187,16 @@
 
 ###========== 1.10.e (2018/Apr/28)
 
-*  bổ sung chi tiết mới: __ Thoát chương trình bằng lời gọi hàm `os.Exit` và thoát goroutine bằng lời gọi hàm `runtime.Goexit`.`` details.html#os-exit-runtime-goexit__.
+*  bổ sung chi tiết mới: __ Thoát chương trình bằng lời gọi function `os.Exit` và kết thúc goroutine bằng lời gọi function `runtime.Goexit`.`` details.html#os-exit-runtime-goexit__.
 
 ###========== 1.10.d (2018/Apr/18)
 
-*  bổ sung chi tiết mới: __ Tên method không export và tên trường struct thuộc các package khác nhau được xem là các tên khác nhau.`` details.html#non-exported-names-from-different-packages__.
+*  bổ sung chi tiết mới: __ Tên method không được export và tên struct field từ các package khác nhau được xem là những tên khác nhau.`` details.html#non-exported-names-from-different-packages__.
 *  bổ sung câu hỏi thường gặp: __ Thông báo lỗi trình biên dịch `declared and not used` có nghĩa là gì?`` unofficial-faq.html#error-declared-not-used__
 *  bổ sung câu hỏi thường gặp: __ Lời gọi hàm `time.Sleep(d)` khác thao tác nhận từ `<-time.After(d)` như thế nào?`` unofficial-faq.html#time-sleep-after__
 *  bổ sung câu hỏi thường gặp: __ Các số ngẫu nhiên do package chuẩn `math/rand` tạo ra khác với các số do package chuẩn `crypto/rand` tạo ra như thế nào?`` unofficial-faq.html#math-crypto-rand__
 *  bổ sung câu hỏi thường gặp: __ Các hàm `fmt.Print` và `fmt.Println` khác nhau như thế nào?`` unofficial-faq.html#fmt-print-println__
-*  bổ sung câu hỏi thường gặp: __ Các hàm builtin `print`/`println` khác với các hàm print tương ứng trong các package chuẩn `fmt` và `log` như thế nào?`` unofficial-faq.html#print-builtin-fmt-log__
+*  bổ sung câu hỏi thường gặp: __ Các hàm dựng sẵn `print`/`println` khác với các hàm print tương ứng trong các package chuẩn `fmt` và `log` như thế nào?`` unofficial-faq.html#print-builtin-fmt-log__
 *  bổ sung câu hỏi thường gặp: __ Vì sao không có hàm `math.Round`?`` unofficial-faq.html#math-round__
 *  bổ sung câu hỏi thường gặp: __ Từ **// gopher //** trong cộng đồng Go có nghĩa là gì?`` unofficial-faq.html#gopher__
 
@@ -208,12 +208,10 @@
 
 ###========== 1.10.b (2018/Apr/06)
 
-*  bổ sung __ một ví dụ embedding kiểu thú vị`` type-embedding.html#dead-loop-example__
+*  bổ sung __ một ví dụ thú vị về embedding kiểu`` type-embedding.html#dead-loop-example__
 *  đề cập __ channel chỉ nhận không thể bị đóng`` channel.html#assign-and-compare__
-*  đề cập __ các chỉ số trong literal khởi tạo array và slice phải là hằng số`` container.html#value-literals__
+*  đề cập __ các index trong composite literal của array và slice phải là hằng số`` container.html#value-literals__
 
 ###========== 1.10.a (2018/Mar/31)
 
 Phát hành lần đầu, dù một số bài viết vẫn chưa hoàn thiện.
-
-

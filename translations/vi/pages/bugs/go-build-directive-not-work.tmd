@@ -1,3 +1,4 @@
+
 ### Các chỉ thị chú thích `//go:build go1.mn` không hoạt động với các phiên bản Go toolchain v1.22.x
     khi không có tệp `go.mod`
 
@@ -6,7 +7,7 @@ Vì những thay đổi ngữ nghĩa này làm thay đổi hành vi của mã hi
 theo ngữ nghĩa trước đây, chúng phá vỡ tính tương thích ngược.
 
 Hành vi của các vòng lặp `for-range` cũ hầu như không bị ảnh hưởng,
-nhưng một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do thay đổi này__.
+nhưng một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do việc phá vỡ tính tương thích ngược đó__.
 
     === có hành vi bất ngờ ... `` https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
@@ -15,7 +16,7 @@ ta phải chỉ định phiên bản Go cho từng tệp mã nguồn Go.
 Một cách là thêm chỉ thị chú thích `//go:build go1.21`
 ở đầu tệp mã nguồn Go chứa mã cũ.
 
-Dù cách này được tài liệu chính thức ghi nhận, do __một lỗi đã biết__,
+Dù cách này được ghi lại trong tài liệu chính thức, do __một lỗi đã biết__,
 nó hiện không hoạt động với các phiên bản Go toolchain 1.22.x.
 
     === lỗi đã biết ... `` https://github.com/golang/go/issues/66092
@@ -94,5 +95,5 @@ __ Cách đó cũng không hoạt động với một số phiên bản Go toolc
 { %%
 @@@ #gotv
 GoTV (__https://go101.org/apps-and-libs/gotv.html__) là công cụ giúp cài đặt và sử dụng đồng thời
-nhiều bản Go toolchain một cách thuận tiện.
+nhiều bản Go toolchain một cách hài hòa.
 }

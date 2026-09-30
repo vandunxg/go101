@@ -1,4 +1,4 @@
-### Cách đóng channel một cách an toàn
+### Cách đóng channel một cách uyển chuyển
 
 Vài ngày trước, tôi đã viết bài giải thích
 __các quy tắc về channel trong Go__.
@@ -9,13 +9,13 @@ nhưng cũng có ý kiến chỉ trích một số chi tiết trong thiết kế
     === reddit :: https://www.reddit.com/r/golang/comments/5k489v/the_full_list_of_channel_rules_in_golang/
     === HN :: https://news.ycombinator.com/item?id=13252416
 
-Tôi đã tổng hợp một số ý kiến chỉ trích về các thiết kế và quy tắc sau của channel trong Go:
+Tôi đã tổng hợp một số ý kiến chỉ trích về các thiết kế và quy tắc sau đây của channel trong Go:
 *.
    Không có cách đơn giản và phổ quát để kiểm tra channel đã đóng hay chưa mà không thay đổi trạng thái của nó.
 *.
-   Đóng channel đã đóng sẽ gây panic, nên nguy hiểm nếu bên đóng không biết channel đã đóng hay chưa.
+   Đóng một channel đã đóng sẽ gây panic, nên việc đóng channel trở nên nguy hiểm nếu bên thực hiện việc đóng không biết channel đã đóng hay chưa.
 *.
-   Gửi giá trị vào channel đã đóng sẽ gây panic, nên nguy hiểm nếu bên gửi không biết channel đã đóng hay chưa.
+   Gửi giá trị vào một channel đã đóng sẽ gây panic, nên việc gửi giá trị vào channel trở nên nguy hiểm nếu các sender không biết channel đã đóng hay chưa.
 
 Những ý kiến chỉ trích này nghe có vẻ hợp lý, nhưng thực tế thì không.
 Đúng là không có hàm dựng sẵn để kiểm tra channel đã đóng hay chưa.
@@ -56,9 +56,9 @@ Như đã nói ở trên, đây không phải cách phổ quát để kiểm tra
 
 Thực tế, ngay cả khi có hàm dựng sẵn `closed` để kiểm tra channel đã đóng hay chưa,
 tính hữu dụng của nó cũng rất hạn chế, tương tự hàm dựng sẵn `len`
-dùng để kiểm tra số giá trị hiện có trong buffer của channel.
-Lý do là trạng thái channel có thể thay đổi ngay sau khi các hàm này trả về,
-khiến giá trị trả về không còn phản ánh trạng thái mới nhất.
+dùng để kiểm tra số giá trị hiện có trong buffer chứa các giá trị của channel.
+Lý do là trạng thái của channel được kiểm tra có thể thay đổi ngay sau khi lời gọi các hàm này trả về,
+khiến giá trị trả về không thể phản ánh trạng thái mới nhất của channel vừa được kiểm tra.
 Nếu `closed(ch)` trả về `true`, bạn có thể dừng gửi giá trị vào channel `ch`.
 Nhưng nếu `closed(ch)` trả về `false`, việc đóng channel hoặc tiếp tục gửi vào channel vẫn không an toàn.
 
@@ -74,7 +74,7 @@ nếu goroutine đó là sender duy nhất của channel.
 
 Dĩ nhiên đây không phải nguyên tắc phổ quát để đóng channel.
 Nguyên tắc phổ quát là **không đóng (hoặc gửi giá trị vào) channel đã đóng**.
-Nếu bảo đảm không goroutine nào còn đóng hay gửi giá trị vào channel khác nil chưa đóng,
+Nếu bảo đảm không còn goroutine nào đóng hay gửi giá trị vào một channel chưa đóng và khác nil,
 thì một goroutine có thể đóng channel an toàn.
 Tuy nhiên, để receiver hoặc một trong nhiều sender bảo đảm điều đó thường cần nhiều công sức
 và khiến code phức tạp. Ngược lại, tuân theo **nguyên tắc đóng channel** ở trên đơn giản hơn nhiều.
@@ -92,7 +92,7 @@ func SafeClose(ch chan T) (justClosed bool) {
 	defer func() {
 		if recover() != nil {
 			// Giá trị trả về có thể được thay đổi
-			// trong lời gọi hàm defer.
+			// trong lời gọi một hàm defer.
 			justClosed = false
 		}
 	}()
@@ -144,7 +144,7 @@ func (mc *MyChannel) SafeClose() {
 }
 '''
 
-Ta cũng có thể dùng `sync.Mutex` để tránh đóng channel nhiều lần:
+Dĩ nhiên, ta cũng có thể dùng `sync.Mutex` để tránh đóng channel nhiều lần:
 @@@ .line-numbers
 ''' go
 type MyChannel struct {
@@ -185,8 +185,8 @@ Một nhược điểm của hàm `SafeSend` ở trên là không thể dùng l�
 làm thao tác gửi theo sau từ khóa `case` trong khối `select`.
 Nhược điểm khác của `SafeSend` và `SafeClose` là nhiều người, trong đó có tôi,
 cho rằng giải pháp dùng `panic`/`recover` và package `sync` chưa uyển chuyển.
-Sau đây là một số giải pháp chỉ dùng channel, không dùng `panic`/`recover`
-hay package `sync`, dành cho nhiều tình huống.
+Sau đây sẽ giới thiệu một số giải pháp chỉ dùng channel, không dùng `panic`/`recover`
+hay package `sync`, cho mọi loại tình huống.
 
 //
 (Trong các ví dụ sau, `sync.WaitGroup` được dùng để hoàn thiện ví dụ.
@@ -238,9 +238,9 @@ func main() {
 		go func() {
 			defer wgReceivers.Done()
 
-			// Nhận giá trị cho đến khi dataCh được
-			// đóng và hàng đợi buffer giá trị của
-			// dataCh trở nên rỗng.
+			// Nhận các giá trị cho đến khi dataCh được
+			// đóng và hàng đợi các giá trị trong buffer
+			// của dataCh trở nên rỗng.
 			for value := range dataCh {
 				log.Println(value)
 			}
@@ -251,7 +251,7 @@ func main() {
 }
 '''
 
-###----------- 2. Một receiver, N sender; receiver duy nhất báo “hãy dừng gửi” bằng cách đóng signal channel bổ sung
+###----------- 2. Một receiver, N sender; receiver duy nhất báo “hãy dừng gửi thêm” bằng cách đóng signal channel bổ sung
 
 Tình huống này phức tạp hơn một chút so với trường hợp trên.
 Ta không thể để receiver đóng data channel để dừng truyền dữ liệu,
@@ -338,8 +338,8 @@ func main() {
 }
 '''
 
-Như các comment đã nêu, sender của signal channel bổ sung chính là receiver của data channel.
-Signal channel này được sender duy nhất đóng,
+Như các comment đã nêu, với signal channel bổ sung, sender của nó chính là receiver của data channel.
+Signal channel bổ sung được đóng bởi sender duy nhất của nó,
 nên vẫn tuân thủ **nguyên tắc đóng channel**.
 
 Trong ví dụ này, channel `dataCh` không bao giờ được đóng.
@@ -348,12 +348,12 @@ Channel cuối cùng sẽ được garbage collection nếu không còn goroutin
 dù nó có được đóng hay không.
 Vì vậy, ở đây đóng channel uyển chuyển có nghĩa là không đóng channel.
 
-###----------- 3. M receiver, N sender; bất kỳ ai cũng có thể nói “kết thúc thôi” bằng cách báo moderator đóng signal channel bổ sung
+###----------- 3. M receiver, N sender; bất kỳ receiver hoặc sender nào cũng có thể nói “kết thúc thôi” bằng cách báo moderator đóng signal channel bổ sung
 
 Đây là tình huống phức tạp nhất.
-Ta không thể để receiver hay sender nào đóng data channel.
-Ta cũng không thể để receiver đóng signal channel bổ sung
-để thông báo cho tất cả sender và receiver kết thúc.
+Ta không thể để bất kỳ receiver hoặc sender nào đóng data channel.
+Ta cũng không thể để bất kỳ receiver nào đóng signal channel bổ sung
+để thông báo cho tất cả sender và receiver thoát khỏi cuộc chơi.
 Cả hai cách đều vi phạm **nguyên tắc đóng channel**.
 Tuy nhiên, ta có thể thêm vai trò moderator để đóng signal channel bổ sung.
 Một mẹo trong ví dụ sau là dùng thao tác thử gửi
@@ -529,8 +529,8 @@ toStop := make(chan string, NumReceivers + NumSenders)
 
 ###----------- 4. Biến thể của tình huống “M receiver, một sender”: yêu cầu đóng được đưa ra bởi goroutine bên thứ ba
 
-Đôi khi cần để goroutine bên thứ ba đưa ra yêu cầu đóng.
-Trong trường hợp đó, ta có thể dùng signal channel bổ sung để báo sender
+Đôi khi cần tín hiệu đóng phải do một goroutine bên thứ ba phát ra.
+Trong trường hợp đó, ta có thể dùng một signal channel bổ sung để báo cho sender
 đóng data channel. Ví dụ:
 
 @@@ .line-numbers
@@ -618,12 +618,12 @@ func main() {
 
     === một comment :: https://groups.google.com/forum/#!msg/golang-nuts/lEKehHH7kZY/SRmCtXDZAAAJ
 
-###----------- 5. Biến thể tình huống “N sender”: cần đóng data channel để báo receiver việc gửi dữ liệu đã kết thúc
+###----------- 5. Một biến thể của tình huống “N sender”: phải đóng data channel để cho các receiver biết việc gửi dữ liệu đã kết thúc
 
-Trong các giải pháp cho tình huống N sender ở trên, để tuân thủ **nguyên tắc đóng channel**,
-ta tránh đóng data channel. Tuy nhiên, đôi khi cần đóng data channel khi kết thúc
+Trong các giải pháp cho các tình huống N sender ở trên, để tuân thủ **nguyên tắc đóng channel**,
+ta tránh đóng các data channel. Tuy nhiên, đôi khi cần đóng các data channel khi kết thúc
 để receiver biết việc gửi dữ liệu đã hoàn tất.
-Trong trường hợp đó, có thể chuyển tình huống N sender thành một sender bằng channel trung gian.
+Trong trường hợp đó, có thể chuyển một tình huống N sender thành tình huống một sender bằng cách sử dụng một channel trung gian.
 Channel trung gian chỉ có một sender, vì vậy có thể đóng nó thay cho data channel ban đầu.
 
 @@@ .line-numbers
@@ -756,6 +756,5 @@ tôi tin rằng luôn có thể tìm ra giải pháp tuân thủ **nguyên tắc
 Không có tình huống nào buộc bạn phải vi phạm **nguyên tắc đóng channel**.
 Nếu gặp tình huống như vậy, hãy xem xét lại thiết kế và viết lại code.
 
-Lập trình với channel trong Go giống như tạo ra nghệ thuật.
-
+Lập trình với channel trong Go giống như làm nghệ thuật.
 

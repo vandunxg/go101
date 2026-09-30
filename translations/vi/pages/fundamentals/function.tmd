@@ -11,7 +11,7 @@ Mặc dù Go là ngôn ngữ tĩnh, hàm Go rất linh hoạt.
 Cảm giác khi dùng hàm Go khá giống với việc dùng hàm trong nhiều ngôn ngữ động.
 
 Go có một số hàm dựng sẵn.
-Các hàm này được tài liệu hóa trong những package chuẩn mã __`builtin`__ và __`unsafe`__.
+Các hàm này được tài liệu hóa trong các package chuẩn __`builtin`__ và __`unsafe`__.
 Hàm dựng sẵn có một số điểm khác với hàm do người dùng định nghĩa.
 Những điểm khác biệt này sẽ được đề cập bên dưới.
 
@@ -44,14 +44,14 @@ func (a int, b, c string) (x, y int, z bool)
 '''
 
 Vì tên tham số và tên kết quả không quan trọng trong các literal
-(miễn là không có tên nào trùng lặp, ngoại trừ tên trắng),
+(miễn là không có tên nào trùng lặp, ngoại trừ blank identifier),
 các literal trên tương đương với literal sau.
 @@@ .disable-line-numbers111
 ''' go
 func (x int, y, z string) (a, b int, c bool)
 '''
 
-Tên biến (tham số và kết quả) có thể là định danh trắng `_`.
+Tên biến (tham số và kết quả) có thể là blank identifier `_`.
 Các literal trên tương đương với literal sau.
 @@@ .disable-line-numbers111
 ''' go
@@ -70,7 +70,7 @@ func (int, string, string) (x int, y int, z bool)
 func (int, string, string) (a int, b int, _ bool)
 '''
 
-Tất cả literal kiểu hàm trên đều biểu thị cùng một kiểu hàm (không định danh).
+Tất cả literal kiểu hàm trên đều biểu thị cùng một kiểu hàm không tên.
 
 Trong một literal, mỗi danh sách tham số phải được đặt trong `()`,
 kể cả khi danh sách đó rỗng.
@@ -125,17 +125,17 @@ chúng không thể được dùng làm kiểu khóa của kiểu map.
 @@@ #prototype
 ###===========+++ Prototype hàm
 
-Function prototype gồm tên hàm và một kiểu hàm (hoặc chữ ký hàm).
-Literal của nó gồm từ khóa `func`, tên hàm và literal của một chữ ký hàm.
+Prototype hàm gồm tên hàm và một kiểu hàm (hoặc chữ ký hàm).
+Literal của nó gồm từ khóa `func`, tên hàm và literal chữ ký hàm.
 
-Ví dụ về literal function prototype:
+Ví dụ về literal prototype hàm:
 @@@ .disable-line-numbers111
 ''' go
 func Double(n int) (result int)
 '''
 
-Nói cách khác, function prototype là một khai báo hàm không có phần thân.
-Khai báo hàm gồm function prototype và phần thân hàm.
+Nói cách khác, prototype hàm là một khai báo hàm không có phần thân.
+Khai báo hàm gồm prototype hàm và phần thân hàm.
 
 @@@ #variadic-function
 ###=========== Khai báo hàm variadic và lời gọi hàm variadic
@@ -291,13 +291,14 @@ func main() {
 
 ###------ Hàm có thể trùng tên
 
-Thông thường, tên các hàm được khai báo trong cùng một package mã
+Thông thường, tên các hàm được khai báo trong cùng một package
 không được trùng nhau. Tuy nhiên, có hai ngoại lệ.
-*. Một ngoại lệ là mỗi package mã có thể khai báo nhiều hàm
+*. Một ngoại lệ là mỗi package có thể khai báo nhiều hàm
    __cùng tên `init` và cùng kiểu `func ()`__.
-*. Ngoại lệ còn lại là có thể khai báo nhiều hàm với tên
-   là định danh trắng `_`; trong trường hợp này,
-   các hàm đã khai báo không thể được gọi.
+*.
+    Ngoại lệ còn lại là có thể khai báo nhiều hàm với tên
+    là blank identifier `_`; trong trường hợp này,
+    các hàm đã khai báo không thể được gọi.
 
     === cùng tên ... :: packages-and-imports.tmd#init
 
@@ -329,7 +330,7 @@ Khi một giá trị được sao chép, __chỉ phần trực tiếp của nó 
 Ta có thể cài đặt một hàm bằng __Go assembly__.
 Các tệp mã nguồn Go assembly được lưu trong các tệp `*.a`.
 Một hàm được cài đặt bằng Go assembly vẫn cần được khai báo trong tệp `*.go`,
-nhưng chỉ cần có function prototype của hàm đó.
+nhưng chỉ cần có prototype hàm của hàm đó.
 Phần thân của khai báo hàm phải được lược bỏ khỏi tệp `*.go`.
 
     === Go assembly :: https://golang.org/doc/asm
@@ -359,9 +360,9 @@ func fb() bool {
 Có thể bỏ toàn bộ các kết quả trả về của một lời gọi hàm tự định nghĩa.
 Tuy nhiên, không thể bỏ kết quả trả về của lời gọi hàm dựng sẵn,
 ngoại trừ `recover` và `copy`, dù có thể bỏ qua chúng bằng cách gán
-cho một số định danh trắng.
-Không thể dùng lời gọi hàm có kết quả không thể bị bỏ qua làm lời gọi hàm `defer`
-hoặc lời gọi goroutine.
+cho một số blank identifier.
+Không thể dùng lời gọi hàm có kết quả không thể bị bỏ qua làm lời gọi hàm được defer
+hoặc lời gọi hàm trong goroutine.
 
 @@@ #call-as-expression
 ###------ Dùng lời gọi hàm làm biểu thức
@@ -418,13 +419,13 @@ __một số hàm dựng sẵn phá vỡ tính phổ quát__ của các quy tắ
 
 Như đã đề cập ở trên, kiểu hàm là một trong các kiểu của Go.
 Giá trị có kiểu hàm được gọi là giá trị hàm.
-Giá trị zero của kiểu hàm được biểu diễn bằng định danh khai báo sẵn `nil`.
+Zero value của kiểu hàm được biểu diễn bằng predeclared identifier `nil`.
 
 Khi khai báo một hàm tự định nghĩa, thực tế ta cũng đồng thời khai báo
 một giá trị hàm bất biến.
 Giá trị hàm được nhận diện bằng tên hàm.
 Kiểu của giá trị hàm được biểu diễn bằng literal nhận được
-khi lược bỏ tên hàm khỏi literal function prototype.
+khi lược bỏ tên hàm khỏi literal prototype hàm.
 
 Lưu ý, không thể dùng hàm dựng sẵn làm giá trị.
 Cũng không thể dùng hàm `init` làm giá trị.
@@ -433,13 +434,13 @@ Bất kỳ giá trị hàm nào cũng có thể được gọi giống như mộ
 Gọi một hàm nil để bắt đầu một goroutine sẽ gây ra lỗi nghiêm trọng.
 Không thể recover lỗi nghiêm trọng này và nó sẽ làm toàn bộ chương trình bị crash.
 Trong các trường hợp khác, lời gọi giá trị hàm nil sẽ tạo ra panic có thể recover,
-kể cả lời gọi hàm `defer`.
+kể cả lời gọi hàm được defer.
 
 Từ bài __các phần của giá trị__, ta biết rằng giá trị hàm khác nil
 là giá trị gồm nhiều phần.
 Sau khi một giá trị hàm được gán cho giá trị hàm khác,
-hai hàm sẽ dùng chung các phần nền tảng (cơ bản) của chúng.
-Nói cách khác, hai hàm biểu diễn cùng một function object nội bộ.
+hai hàm sẽ dùng chung các phần nền tảng của chúng.
+Nói cách khác, hai hàm biểu diễn cùng một đối tượng hàm nội bộ.
 Tác động khi gọi hai hàm là như nhau.
 
     === các phần của giá trị :: value-part.tmd
@@ -515,8 +516,8 @@ vẫn linh hoạt như nhiều ngôn ngữ script động.
 @@@ #range
 ###=========== Duyệt range trên hàm (từ Go 1.23)
 
-Kể từ Go 1.23, có thể duyệt giá trị của các kiểu hàm có kiểu nền
-là một trong các kiểu sau bằng vòng lặp `for-range`.
+Kể từ Go 1.23, có thể dùng vòng lặp `for-range` để duyệt các giá trị thuộc
+những kiểu hàm có underlying type là một trong các kiểu sau.
 
 @@@ .disable-line-numbers111
 ''' go
@@ -535,7 +536,7 @@ Khi vòng lặp `for-range` duyệt một giá trị hàm iterator như vậy,
 giá trị hàm iterator sẽ được gọi (một lần)
 với một hàm callback `yield` được tạo ngầm.
 Hàm callback `yield` trả về kết quả `bool`.
-Khi nó trả về `false`, hàm iterator không được gọi hàm `yield` thêm nữa.
+Khi nó trả về `false`, hàm iterator không nên gọi hàm `yield` thêm nữa.
 
 Sau đây là một số ví dụ dùng các iterator như vậy.
 

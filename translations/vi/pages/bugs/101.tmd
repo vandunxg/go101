@@ -17,7 +17,7 @@ Mục lục:
        === ...`` go-version-in-mod-file-not-work.tmd
 *  __Các chỉ thị chú thích `//go:build go1.mn` không hoạt động với các phiên bản Go toolchain v1.22.x khi không có tệp `go.mod` nào liên quan
        === ...`` go-build-directive-not-work.tmd
-*  __Một lỗi so sánh channel khi các channel được dùng làm biểu thức case của các khối mã switch (trong Go toolchain v1.20 - v1.23.x)
+*  __Một lỗi so sánh channel khi các channel được dùng làm biểu thức `case` của các khối mã `switch` (trong Go toolchain v1.20 - v1.23.x)
        === ...`` a-switch-case-channel-comparison-bug.tmd
 *  __Một số lỗi đã biết về thứ tự khởi tạo biến cấp package trong một số phiên bản Go toolchain
        === ...`` package-level-variable-initialization-order-bugs.tmd

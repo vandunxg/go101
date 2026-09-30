@@ -2,18 +2,18 @@
 
 Go là ngôn ngữ hỗ trợ lập trình đồng thời tích hợp sẵn.
 Bằng cách dùng từ khóa `go` để tạo goroutine (các luồng nhẹ)
-và __sử dụng__ __channel__ cùng __các kỹ thuật đồng bộ hóa khác__
+và __sử dụng__ __các channel__ cùng __các kỹ thuật đồng thời khác__ và __các kỹ thuật đồng bộ hóa__
 do Go cung cấp, việc lập trình đồng thời trở nên dễ dàng, linh hoạt và thú vị.
 
     === sử dụng :: channel-use-cases.tmd
-    === channel :: channel.tmd
-    === các cơ chế đồng thời khác :: concurrent-atomic-operation.tmd
-    === kỹ thuật đồng bộ hóa :: concurrent-synchronization-more.tmd
+    === các channel :: channel.tmd
+    === các kỹ thuật đồng thời khác :: concurrent-atomic-operation.tmd
+    === các kỹ thuật đồng bộ hóa :: concurrent-synchronization-more.tmd
 
-Mặt khác, Go không ngăn lập trình viên mắc các lỗi khi lập trình đồng thời,
+Mặt khác, Go không ngăn các lập trình viên Go mắc một số lỗi khi lập trình đồng thời,
 do bất cẩn hoặc thiếu kinh nghiệm.
 Phần còn lại của bài viết này nêu một số lỗi thường gặp
-trong lập trình đồng thời bằng Go, giúp bạn tránh mắc phải.
+trong lập trình đồng thời bằng Go, giúp các lập trình viên Go tránh những lỗi như vậy.
 
 ###========== Không đồng bộ hóa khi cần thiết
 
@@ -64,10 +64,10 @@ func main() {
 }
 '''
 
-Chương trình trên có thể chạy bình thường trên máy tính này nhưng lại panic trên máy khác,
+Chương trình trên có thể chạy bình thường trên một máy tính nhưng lại panic trên máy khác,
 hoặc chạy bình thường khi được biên dịch bằng compiler này nhưng panic khi dùng compiler khác.
 
-Ta nên dùng channel hoặc các kỹ thuật đồng bộ hóa trong package chuẩn `sync`
+Ta nên dùng các channel hoặc các kỹ thuật đồng bộ hóa trong package chuẩn `sync`
 để đảm bảo thứ tự bộ nhớ.
 Ví dụ:
 
@@ -91,7 +91,7 @@ func main() {
 '''
 
 @@@ #sleep
-###========== Dùng `time.Sleep` để đồng bộ hóa
+###========== Dùng các lệnh gọi `time.Sleep` để đồng bộ hóa
 
 Hãy xem ví dụ đơn giản sau.
 
@@ -121,10 +121,10 @@ Thực tế, chương trình gần như luôn in ra `789` khi chạy.
 Nhưng đây có phải chương trình được đồng bộ hóa đúng cách không?
 Không! Lý do là Go runtime không đảm bảo chắc chắn rằng phép ghi `x`
 xảy ra trước phép đọc `x`.
-Trong một số điều kiện, chẳng hạn phần lớn tài nguyên CPU bị các chương trình khác
-đang chạy trên cùng hệ điều hành chiếm dụng,
+Trong một số điều kiện, chẳng hạn khi phần lớn tài nguyên CPU bị các chương trình khác
+đang chạy trên cùng hệ điều hành và đòi hỏi nhiều tính toán chiếm dụng,
 phép ghi `x` có thể xảy ra sau phép đọc `x`.
-Vì vậy, không nên dùng `time.Sleep` để đồng bộ hóa trong các dự án thực tế.
+Vì vậy, không bao giờ nên dùng `time.Sleep` để đồng bộ hóa trong các dự án chính thức.
 
 { %%
 https://groups.google.com/forum/#!topic/golang-nuts/J3kXXZivlHA
@@ -156,7 +156,7 @@ func main() {
 }
 '''
 
-Theo bạn, chương trình sẽ in ra `123` hay `789`?
+Chương trình sẽ in ra `123` hay `789`?
 Thực tế, kết quả phụ thuộc vào compiler.
 Với Go compiler chuẩn 1.25.n,
 chương trình rất có thể in ra `123`.
@@ -214,7 +214,7 @@ hay chỉ tạm thời ở trạng thái chặn, vì vậy Go runtime sẽ khôn
 tài nguyên mà goroutine bị treo đang sử dụng.
 
 Trong trường hợp sử dụng channel kiểu __first-response-wins__,
-nếu sức chứa của channel dùng làm future không đủ lớn,
+nếu capacity của channel dùng làm future không đủ lớn,
 một số goroutine phản hồi chậm hơn sẽ bị treo khi cố gửi kết quả
 vào channel future.
 Ví dụ, nếu gọi hàm sau,
@@ -235,14 +235,14 @@ func request() int {
 }
 '''
 
-Để bốn goroutine không bị treo, sức chứa của channel `c`
+Để bốn goroutine không bị treo, capacity của channel `c`
 phải ít nhất là `4`.
 
-Trong __cách thứ hai để triển khai__ trường hợp dùng channel kiểu first-response-wins,
+Trong __cách thứ hai để triển khai trường hợp sử dụng channel first-response-wins__,
 nếu channel dùng làm future/promise là channel không đệm,
 như đoạn mã sau, receiver có thể bỏ lỡ mọi phản hồi rồi bị treo.
 
-    === cách thứ hai :: channel-use-cases.tmd#first-response-wins-2
+    === cách thứ hai để ... :: channel-use-cases.tmd#first-response-wins-2
 
 @@@ .line-numbers
 ''' go
@@ -271,9 +271,9 @@ do đó goroutine gọi hàm sẽ không bị treo.
 
 ###========== Sao chép giá trị thuộc các kiểu trong package chuẩn `sync`
 
-Trong thực tế, không nên sao chép giá trị của các kiểu
+Trong thực tế, không bao giờ nên sao chép giá trị của các kiểu
 trong package chuẩn `sync` (ngoại trừ giá trị của interface `Locker`).
-Ta chỉ nên sao chép con trỏ đến các giá trị đó.
+Ta chỉ nên sao chép pointer của các giá trị đó.
 
 Ví dụ sau là cách lập trình đồng thời không tốt.
 Khi gọi method `Counter.Value`, giá trị receiver `Counter` sẽ được sao chép.
@@ -311,7 +311,7 @@ func (c Counter) Value() (r int64) {
 }
 '''
 
-Ta nên đổi kiểu receiver của method `Value` thành kiểu con trỏ `*Counter`
+Ta nên đổi kiểu receiver của method `Value` thành kiểu pointer `*Counter`
 để tránh sao chép giá trị `sync.Mutex`.
 
 Lệnh `go vet` trong Go Toolchain sẽ báo các trường hợp có khả năng
@@ -382,15 +382,15 @@ như đoạn mã sau.
 ...
 '''
 
-###========== Dùng channel làm future/promise không đúng cách
+###========== Dùng các channel làm future/promise không đúng cách
 
 Từ bài viết __các trường hợp sử dụng channel__,
-ta biết một số hàm trả về __channel làm future__.
+ta biết một số hàm trả về __các channel làm future__.
 Giả sử `fa` và `fb` là hai hàm như vậy,
 thì lời gọi sau dùng các đối số future không đúng cách.
 
     === các trường hợp sử dụng channel :: channel-use-cases.tmd
-    === channel làm future :: channel-use-cases.tmd#future-promise
+    === các channel làm future :: channel-use-cases.tmd#future-promise
 
 @@@ .line-numbers
 ''' go
@@ -407,7 +407,7 @@ ca, cb := fa(), fb()
 doSomethingWithFutureArguments(<-ca, <-cb)
 '''
 
-###========== Đóng channel không phải từ goroutine gửi cuối cùng còn hoạt động
+###========== Không đóng channel từ goroutine gửi không phải là goroutine gửi cuối cùng còn hoạt động
 
 Một lỗi thường gặp của lập trình viên Go là đóng channel
 trong khi vẫn còn goroutine khác có khả năng gửi giá trị vào channel sau đó.
@@ -426,19 +426,19 @@ Hãy đọc __bài viết này__ để biết cách đóng channel an toàn và 
 
 ###========== Thực hiện thao tác atomic 64-bit trên giá trị không được đảm bảo căn chỉnh 8 byte
 
-Địa chỉ của giá trị tham gia vào thao tác atomic 64-bit không phải method
+Địa chỉ của giá trị tham gia vào thao tác atomic 64-bit dạng không phải method
 phải được căn chỉnh theo ranh giới 8 byte.
 Nếu không đáp ứng điều kiện này, goroutine hiện tại có thể panic.
 Với Go compiler chuẩn, trường hợp này chỉ có thể
 __xảy ra trên kiến trúc 32-bit__.
 Từ Go 1.19, ta có thể dùng các thao tác atomic 64-bit dạng method để tránh hạn chế này.
-Hãy đọc __bố cục bộ nhớ__ để biết cách
+Hãy đọc __memory layout__ để biết cách
 đảm bảo địa chỉ của word 64-bit được căn chỉnh 8 byte trên hệ điều hành 32-bit.
 
     === xảy ra trên kiến trúc 32-bit :: https://golang.org/pkg/sync/atomic/#pkg-note-BUG
-    === bố cục bộ nhớ :: memory-layout.tmd
+    === memory layout :: memory-layout.tmd
 
-###========== Không chú ý đến việc gọi hàm `time.After` tiêu tốn quá nhiều tài nguyên
+###========== Không chú ý đến việc các lệnh gọi hàm `time.After` tiêu tốn quá nhiều tài nguyên
 
 Hàm `After` trong package chuẩn `time`
 trả về __channel thông báo sau một khoảng trễ__.
@@ -478,7 +478,7 @@ func longRunning(messages <-chan string) {
 '''
 
 Lưu ý: từ Go 1.23, vấn đề này đã được khắc phục.
-Từ Go 1.23, giá trị `Timer` có thể được garbage collection
+Từ Go 1.23, giá trị `Timer` có thể được garbage collector thu gom
 mà không cần đợi hết hạn hoặc gọi `Stop`.
 
 Trước Go 1.23, để tránh tạo quá nhiều giá trị `Timer`
@@ -573,7 +573,7 @@ Nếu có, ta nên rút thông báo đó ra trước khi dùng lại timer;
 nếu không, thông báo sẽ được phát ngay ở vòng lặp kế tiếp.
 
 Ví dụ, chương trình sau rất có thể thoát sau khoảng một giây,
-thay vì mười giây. Quan trọng hơn, chương trình không tránh được data race.
+thay vì mười giây. Quan trọng hơn, chương trình không đảm bảo không có data race.
 
 @@@ .line-numbers
 ''' go
@@ -590,7 +590,7 @@ func main() {
 	select {
 	case <-timer.C:
 	default:
-		// Phần lớn khả năng sẽ chạy vào đây.
+		// Nhiều khả năng sẽ đi vào đây.
 		time.Sleep(time.Second)
 	}
 	// Dòng tiếp theo có thể gây data race.
@@ -603,8 +603,8 @@ func main() {
 Có thể để giá trị `time.Timer` ở trạng thái chưa dừng
 khi không còn dùng đến, nhưng nên dừng nó khi kết thúc.
 
-Không nên dùng chung một giá trị `time.Timer` giữa nhiều goroutine
-vì dễ gây lỗi.
+Không nên dùng đồng thời một giá trị `time.Timer` giữa nhiều goroutine
+vì cách này dễ gây lỗi.
 
 Không nên dựa vào giá trị trả về của lệnh gọi method `Reset`.
 Kết quả trả về của method `Reset` chỉ tồn tại để đảm bảo tương thích.
@@ -617,4 +617,3 @@ Không trộn lẫn truy cập atomic và không atomic trên cùng một memory
 https://github.com/golang/go/issues/34889
 
 }
-

@@ -7,7 +7,7 @@ Vì những thay đổi ngữ nghĩa này làm thay đổi hành vi của mã hi
 ngữ nghĩa trước đây, chúng phá vỡ tính tương thích ngược.
 
 Mặc dù hành vi của các vòng lặp `for-range` cũ hầu như không bị ảnh hưởng,
-một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do việc phá vỡ tương thích này__.
+một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ do thay đổi này__.
 
     === có hành vi bất ngờ ... `` https://go101.org/blog/2024-03-01-for-loop-semantic-changes-in-go-1.22.html
 
@@ -15,7 +15,7 @@ một số vòng lặp `for;;` truyền thống cũ __có hành vi bất ngờ d
 mỗi tệp mã nguồn Go phải được chỉ định bằng một phiên bản Go.
 Có hai cách phổ biến để thực hiện việc này.
 
-Cách thứ nhất là thêm một chú thích `//go:build go1.mn` ở ngay đầu tệp mã nguồn Go.
+Cách thứ nhất là thêm một chỉ thị chú thích `//go:build go1.mn` ở ngay đầu tệp mã nguồn Go.
 Tuy nhiên, __một số phiên bản Go toolchain được biết là có lỗi khi xử lý chỉ thị này__.
 
     === một số phiên bản ... `` go-build-directive-not-work.tmd
@@ -26,7 +26,7 @@ Cách khác là thêm một chỉ thị `go 1.mn` vào tệp `go.mod` của modu
 Ví dụ, hãy xét một module có tệp `go.mod` chỉ định phiên bản 1.21.
 Nếu module đó được compile bằng Go toolchain 1.22.x hoặc 1.23.y,
 chương trình sẽ in ra `210` (hành vi mới) thay vì `333` (hành vi cũ) như mong đợi.
-Điều này cho thấy toolchain không tôn trọng phiên bản được chỉ định trong tệp go.mod.
+Điều này cho thấy toolchain không tôn trọng phiên bản được chỉ định trong tệp `go.mod`.
 
 .  ### go.mod
    '''

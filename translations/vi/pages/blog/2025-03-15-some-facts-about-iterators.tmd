@@ -9,8 +9,8 @@ Mục lục:
 
     === iterators :: https://go.dev/blog/range-functions
 
-Go 1.23 giới thiệu __iterator__,
-Iterator trong Go là các function có thể được dùng trong range.
+Go 1.23 giới thiệu __các iterator__,
+Các iterator trong Go là những function có thể được dùng trong range.
 Cụ thể, các function expression có type mà underlying type
 thuộc một trong các dạng sau có thể được dùng trong range.
 
@@ -22,8 +22,8 @@ func(func(K, V) bool)
 // K và V đều biểu thị các type.
 '''
 
-Tất cả các type này đều nhận một callback function parameter, theo quy ước được gọi là `yield`.
-Các callback function này có thể nhận không, một hoặc hai parameter và luôn trả về
+Tất cả các type này đều nhận một parameter là callback function, theo quy ước được gọi là `yield`.
+Các callback function này có thể nhận không parameter nào, một hoặc hai parameter và luôn trả về
 một kết quả bool.
 
 @@@ #example-1
@@ -57,7 +57,7 @@ và trả về một kết quả `bool`.
    các value của (các instance của) loop variable `v`.
 *  Về cơ bản, loop body có thể được xem là function body của function `yield`.
    Chỉ cần lưu ý rằng, nếu việc thực thi một loop step trong quá trình duyệt
-   một iterator function kết thúc toàn bộ loop (chẳng hạn `break` loop),
+   một iterator function kết thúc toàn bộ loop (chẳng hạn như `break` khỏi loop),
    thì `yield` call tương ứng trả về false (cho iterator function);
    nếu không, `yield` call tương ứng trả về true.
 
@@ -136,7 +136,7 @@ func abc(yield func(string) bool) {
 ###========== Việc gọi một callback function `yield` đồng thời cần synchronization cẩn thận
 
 __Các lệnh gọi song song đến một callback function `yield` không được synchronize__
-theo mặc định. Bạn phải tự thực hiện synchronization.
+theo mặc định. Bạn cần tự thực hiện synchronization.
 
     === Các lệnh gọi song song ... :: https://github.com/golang/go/issues/68897
 
@@ -172,7 +172,7 @@ func oneHundred(yield func(int) bool) {
 }
 '''
 
-Để chương trình hoạt động, cần synchronize nó, như sau:
+Để chương trình hoạt động, nó cần được synchronize, như sau:
 
 ''' Go
 func abc(yield func(int) bool) {
@@ -192,11 +192,11 @@ func abc(yield func(int) bool) {
 }
 '''
 
-Tuy nhiên, khuyến nghị mạnh mẽ là không sử dụng callback function `yield`
+Tuy nhiên, khuyến nghị mạnh mẽ rằng không nên sử dụng callback function `yield`
 trong các goroutine khác.
 
 @@@ #impact-on-goroutine-execution
-###========== Các function call ở trên cùng trong call stack của một goroutine
+###========== Các function call ở đầu call stack của một goroutine
     sẽ được thực thi đồng thời nhưng không bao giờ cùng một lúc
     khi dùng range với các iterator function
 
@@ -229,7 +229,7 @@ func abc(yield func(string) bool) {
 '''
 
 Sau đây là một ví dụ khác, trong đó việc thực thi của một goroutine sẽ
-nhảy qua lại giữa 2^$$22$$ iterator function call và loop body
+nhảy qua lại giữa 2^$$22$$ lần gọi iterator function và loop body
 trong function `main`.
 Cuối cùng, chương trình lần lượt in ra `4194304`, `4194305` và `4194306`.
 

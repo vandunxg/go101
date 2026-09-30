@@ -6,43 +6,43 @@ và liệt kê các kỹ thuật đồng bộ hóa được Go hỗ trợ.
 ###========== Đồng bộ hóa đồng thời là gì?
 
 
-Đồng bộ hóa đồng thời là cách kiểm soát các phép tính đồng thời (hay goroutine trong Go)
+Đồng bộ hóa đồng thời là cách kiểm soát các tính toán đồng thời (còn gọi là các goroutine trong Go)
 *
    để tránh data race giữa chúng,
 *
    để tránh việc chúng tiêu tốn tài nguyên CPU khi không có việc gì để làm.
 
 { %%
-Thông thường, khi chương trình đồng thời đang chạy,
+Thông thường, khi một chương trình đồng thời đang chạy,
 một giá trị sẽ được nhiều goroutine sử dụng.
-Trong trường hợp đó, ta phải kiểm soát goroutine nào
+Trong những trường hợp như vậy, phải kiểm soát những goroutine nào
 có thể giành quyền sở hữu giá trị tại một thời điểm nhất định.
 Nếu không, data race có thể xảy ra và tính toàn vẹn của giá trị sẽ không được bảo đảm.
 
-Ta dùng nhiều kỹ thuật đồng bộ hóa dữ liệu để chuyển giao hoặc bảo vệ
-quyền sở hữu giá trị giữa các goroutine nhằm tránh data race trong chương trình.
+Ta dùng mọi loại kỹ thuật đồng bộ hóa dữ liệu để chuyển giao hoặc bảo vệ
+quyền sở hữu giá trị giữa các goroutine nhằm tránh data race trong các chương trình hiện tại.
 
 Cụ thể hơn, xét quyền sở hữu một giá trị:
 *
    quyền ghi một giá trị là độc quyền.
-   Trong khoảng thời gian một goroutine có quyền ghi giá trị,
-   các goroutine khác không được sử dụng giá trị đó, dù là đọc hay ghi.
+   Trong khoảng thời gian một goroutine có quyền ghi một giá trị,
+   các goroutine khác không nên sử dụng giá trị đó, dù là đọc hay ghi.
 *
    quyền đọc một giá trị không mang tính độc quyền.
-   Trong khoảng thời gian một goroutine có quyền đọc giá trị,
+   Trong khoảng thời gian một goroutine có quyền đọc một giá trị,
    các goroutine khác cũng có thể đọc giá trị đó một cách an toàn,
-   nhưng không goroutine nào được ghi giá trị.
+   nhưng không goroutine nào nên ghi giá trị.
 
 được gọi là đồng bộ hóa đồng thời.
 
 //
 (Thực tế, nói chính xác hơn, để tránh data race,
 điều ta quan tâm là quyền sở hữu một số vùng bộ nhớ.
-Khi chạy, một giá trị có thể chiếm nhiều vùng bộ nhớ.
+Trong thời gian chạy, một giá trị có thể chiếm nhiều vùng bộ nhớ.
 Khi viết mã đồng thời, ta có thể không cần quan tâm đến quyền sở hữu mọi vùng bộ nhớ
 mà giá trị chiếm dụng.
-Tuy nhiên, để giải thích đơn giản, trong các phần mô tả xuyên suốt loạt bài Go 101,
-ta vẫn dùng cách diễn đạt "quyền sở hữu giá trị".)
+Tuy nhiên, để đơn giản hóa việc giải thích, trong các phần mô tả xuyên suốt các bài viết Go 101,
+ta vẫn dùng cách diễn đạt "quyền sở hữu các giá trị".)
 
 }
 
@@ -50,17 +50,17 @@ ta vẫn dùng cách diễn đạt "quyền sở hữu giá trị".)
 ###========== Go hỗ trợ những kỹ thuật đồng bộ hóa nào?
 
 Bài viết __channel trong Go__ đã cho thấy ta có thể dùng channel để đồng bộ hóa.
-Ngoài channel, Go còn hỗ trợ một số kỹ thuật đồng bộ hóa phổ biến khác,
-chẳng hạn như mutex và các thao tác atomic.
+Ngoài việc sử dụng channel, Go còn hỗ trợ một số kỹ thuật đồng bộ hóa phổ biến khác,
+chẳng hạn như mutex và các atomic operation.
 Hãy đọc các bài viết sau để tìm hiểu cách đồng bộ hóa
 bằng những kỹ thuật khác nhau trong Go:
 *  __Các trường hợp sử dụng channel__
 *  __Cách đóng channel một cách an toàn__
-*  __Các kỹ thuật đồng bộ hóa đồng thời trong package chuẩn `sync`__
-*  __Các thao tác atomic trong package chuẩn `sync/atomic`__
+*  __Các kỹ thuật đồng bộ hóa đồng thời được cung cấp trong package chuẩn `sync`__
+*  __Các atomic operation được cung cấp trong package chuẩn `sync/atomic`__
 
 Ta cũng có thể đồng bộ hóa bằng cách sử dụng network và file IO.
-Tuy nhiên, các kỹ thuật này rất kém hiệu quả trong phạm vi một tiến trình.
+Tuy nhiên, các kỹ thuật này rất kém hiệu quả trong phạm vi một tiến trình duy nhất.
 Nhìn chung, chúng được dùng để đồng bộ hóa liên tiến trình và phân tán.
 Go 101 sẽ không đề cập đến các kỹ thuật này.
 
@@ -68,14 +68,14 @@ Go 101 sẽ không đề cập đến các kỹ thuật này.
 bạn nên tìm hiểu __các bảo đảm về thứ tự bộ nhớ trong Go__.
 
 Các kỹ thuật đồng bộ hóa dữ liệu trong Go không ngăn lập trình viên viết
-__mã đồng thời không phù hợp__.
+__mã đồng thời viết không đúng cách__.
 Tuy nhiên, những kỹ thuật này có thể giúp lập trình viên dễ dàng viết mã đồng thời chính xác.
-Ngoài ra, các tính năng độc đáo liên quan đến channel giúp việc lập trình đồng thời linh hoạt và thú vị.
+Và các tính năng độc đáo liên quan đến channel khiến việc lập trình đồng thời trở nên linh hoạt và thú vị.
 
     === channel trong Go :: channel.tmd
     === Các trường hợp sử dụng channel :: channel-use-cases.tmd
     === Cách đóng channel một cách an toàn :: channel-closing.tmd
     === Các kỹ thuật đồng bộ hóa đồng thời ... :: concurrent-synchronization-more.tmd
-    === Các thao tác atomic ... :: concurrent-atomic-operation.tmd
+    === Các atomic operation ... :: concurrent-atomic-operation.tmd
     === Thứ tự bộ nhớ ... :: memory-model.tmd
-    === Mã đồng thời không phù hợp :: concurrent-common-mistakes.tmd
+    === Mã đồng thời viết không đúng cách :: concurrent-common-mistakes.tmd

@@ -59,18 +59,18 @@ func merge[S ~[]E, E any](ss ...S) S {
 
 Thông thường, một lời gọi `make` sẽ đặt các element được allocate trong quá trình thực thi về zero value,
 việc này không cần thiết cho use case cụ thể này.
-Implementation cố gắng hết sức để zero ít element nhất có thể trong lời gọi `make`;
+Implementation cố gắng hết sức để đặt ít element nhất có thể về zero value trong lời gọi `make`;
 nhờ sử dụng tối ưu hóa đã nêu, nó không zero các element trong `r[:len(ss[0])]`,
 nhưng vẫn không tránh được việc zero các element còn lại (những element trong `r[len(ss[0]):]`).
 
-Nếu function `merge` là built-in, nó có thể tránh toàn bộ các phép zero element không cần thiết.
+Nếu function `merge` là built-in, nó có thể tránh toàn bộ các thao tác đặt element về zero value không cần thiết.
 
 ###========= Thiếu cách gọn gàng để clip slice
 
 Như đã đề cập ở trên, một lời gọi function `append` sẽ sử dụng lại backing array
 của đối số slice đầu tiên (gọi nó là `base` ở đây) cho slice kết quả nếu capacity của `base`
 đủ lớn để chứa tất cả element được append.
-Trong một số scenario, chúng ta muốn ngăn một lời gọi `append` sửa đổi các element trong `base[len(base):]`
+Trong một số trường hợp, chúng ta muốn ngăn một lời gọi `append` sửa đổi các element trong `base[len(base):]`
 và đạt được điều đó bằng cách clip capacity của `base` về length của nó:
 
 ''' Go

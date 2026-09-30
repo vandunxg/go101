@@ -4,7 +4,7 @@ Mục lục:
 
 @@@ #details.html .summaries
 *
-   Chi tiết về package:
+   Chi tiết liên quan đến package:
    @@@ .index
    -
       __Có thể import cùng một package nhiều lần trong một source file.`` #import-package-multiple-times__
@@ -16,23 +16,23 @@ Mục lục:
    Chi tiết về luồng điều khiển:
    @@@ .index
    -
-      __Nhánh `default` trong `switch` và `select` có thể đặt trước, sau hoặc xen giữa các nhánh `case`.`` #default-branch-position__
+      __Nhánh `default` trong các khối `switch` và `select` có thể được đặt trước tất cả các nhánh `case`, sau tất cả các nhánh `case`, hoặc xen giữa các nhánh `case`.`` #default-branch-position__
    -
-      __Các biểu thức `case` là hằng số số học trong `switch` không được trùng lặp, nhưng hằng số boolean thì có thể.`` #constant-case-expressions__
+      __Các biểu thức case là hằng số số trong khối `switch` không được trùng lặp, nhưng các biểu thức boolean thì có thể.`` #constant-case-expressions__
    -
-      __Các biểu thức `switch` trong một khối `switch` luôn được đánh giá thành giá trị có kiểu.`` #switch-expressions-are-typed__
+      __Các biểu thức switch trong khối `switch` luôn được đánh giá thành giá trị có kiểu.`` #switch-expressions-are-typed__
    -
-      __Biểu thức `switch` mặc định của một khối `switch` là giá trị `true` có kiểu dựng sẵn `bool`.`` #default-switch-expression-value__
+      __Biểu thức switch mặc định của khối `switch` là giá trị `true` có kiểu dựng sẵn `bool`.`` #default-switch-expression-value__
    -
       __Đôi khi, dấu ngoặc nhọn mở `{` của một khối code tường minh có thể đặt ở dòng tiếp theo.`` #open-brace-on-the-next-line__
    -
       __Một số khối nhánh `case` bắt buộc phải được viết tường minh.`` #some-case-branch-blocks-must-be-explicit__
    -
-      __Các lời gọi function lồng nhau trong `defer` có thể thay đổi giá trị trả về của function bao ngoài.`` #defer-modify-results__
+      __Các lời gọi function lồng nhau trong defer có thể thay đổi giá trị trả về của function bao ngoài.`` #defer-modify-results__
    -
       __Một số lời gọi `recover` có thể không có tác dụng.`` #no-op-recover-calls__
    -
-      __Thoát chương trình bằng lời gọi function `os.Exit` và kết thúc goroutine bằng lời gọi function `runtime.Goexit``` #os-exit-runtime-goexit__.
+      __Thoát chương trình bằng một `os.Exit` function call và kết thúc một goroutine bằng một `runtime.Goexit` function call`` #os-exit-runtime-goexit__.
 
 *
    Chi tiết về toán tử:
@@ -74,15 +74,15 @@ Mục lục:
    -
       __Duyệt nil map hoặc nil slice là hợp lệ và không thực hiện thao tác nào.`` #range-over-nil-map-and-slice__
    -
-      __Có thể dùng `range` với nil pointer tới array nếu bỏ qua hoặc lược bỏ biến lặp thứ hai.`` #range-over-nil-array-pointer__
+      __Có thể dùng range với nil pointer tới array nếu bỏ qua hoặc lược bỏ biến lặp thứ hai.`` #range-over-nil-array-pointer__
    -
       __Có thể thay đổi riêng length và capacity của slice.`` #modify-slice-length-and-capacity-separately__
    -
-      __Index trong composite literal của slice và array phải là hằng số không âm.`` #indexes-in-composite-literals__
+      __Các index trong composite literal của slice và array phải là hằng số không âm.`` #indexes-in-composite-literals__
    -
       __Các index hoặc key hằng số trong composite literal của slice/array/map không được trùng lặp.`` #constant-keys-in-composite-literals__
    -
-      __Phần tử của array không thể lấy địa chỉ cũng không thể lấy địa chỉ, nhưng phần tử của slice không thể lấy địa chỉ thì luôn có thể lấy địa chỉ.`` #array-slice-element-addressability__
+      __Các phần tử của những array không thể lấy địa chỉ cũng không thể lấy địa chỉ, nhưng các phần tử của những slice không thể lấy địa chỉ thì luôn có thể lấy địa chỉ.`` #array-slice-element-addressability__
    -
       __Có thể tạo subslice từ slice không thể lấy địa chỉ, nhưng không thể làm vậy với array không thể lấy địa chỉ. Có thể lấy địa chỉ phần tử của slice không thể lấy địa chỉ, nhưng không thể lấy địa chỉ phần tử của array không thể lấy địa chỉ.`` #array-slice-derivable__
    -
@@ -116,7 +116,7 @@ Mục lục:
    -
       __Việc có nhận kết quả tùy chọn thứ hai khi type assertion thất bại hay không sẽ ảnh hưởng đến hành vi của type assertion.`` #failed-type-assertion-may-panic__
    -
-      __Về các phép assertion sang interface bất khả thi có thể phát hiện tại compile time.`` #impossible-to-interface-assertion__
+      __Về các phép type assertion sang interface chắc chắn không thể thành công, có thể được phát hiện tại compile time.`` #impossible-to-interface-assertion__
       { %%
       -
          __Với standard Go compiler, độ phức tạp thời gian khi so sánh hai interface value bằng nhau có thể là // `O(1)` // hoặc // `O(n)` //.`` #interface-comparison-complexity__
@@ -148,7 +148,7 @@ Mục lục:
       __Tên method không được export và tên struct field từ các package khác nhau được xem là những tên khác nhau.`` #non-exported-names-from-different-packages__
       { %%
       -
-         __Hành vi so sánh struct value có cả field so sánh được lẫn không so sánh được, hoặc array value có cả phần tử so sánh được lẫn không so sánh được, chưa được đặc tả.`` #compare-values-with-both-comparable-and-incomparable-parts__
+         __Hành vi so sánh struct value có cả field comparable lẫn incomparable, hoặc array value có cả element comparable lẫn incomparable, chưa được đặc tả.`` #compare-values-with-both-comparable-and-incomparable-parts__
       }
    -
       __Khi so sánh struct value, các blank field sẽ bị bỏ qua.`` #blank-fields-are-ignored-in-comparisons__
@@ -174,11 +174,11 @@ Mục lục:
    -
       __Kết quả của `reflect.DeepEqual(x, y)` và `x == y` có thể khác nhau.`` #reflect-deep-equal__
    -
-      __Method `reflect.Value.Bytes()` trả về giá trị `[]byte` có element type `byte`, có thể khác với slice Go được biểu diễn bởi receiver.`` #reflect-value-bytes__
+      __Method `reflect.Value.Bytes()` trả về giá trị `[]byte` có element type `byte`, có thể khác với slice Go được biểu diễn bởi receiver parameter.`` #reflect-value-bytes__
    -
       __Nên dùng `os.IsNotExist(err)` thay cho `err == os.ErrNotExist` để kiểm tra file có tồn tại hay không.`` #check-file-existent__
    -
-      __Standard package `flag` xử lý boolean command flag khác với flag kiểu số và string.`` #boolean-flag__
+      __Standard package `flag` xử lý boolean command flag khác với flag kiểu số nguyên và string.`` #boolean-flag__
    -
       __Các function `[Sp|Fp|P]rintf` hỗ trợ positional argument.`` #printf-positional-arguments__
 
@@ -227,7 +227,7 @@ Tuy nhiên, từ Go Toolchain 1.11, hạn chế này __không áp dụng với p
 }
 
 @@@ #default-branch-position
-###========== Nhánh `default` trong `switch` và `select` có thể đặt trước, sau hoặc xen giữa các nhánh `case`.
+###========== Nhánh `default` trong các khối `switch` và `select` có thể được đặt trước tất cả các nhánh `case`, sau tất cả các nhánh `case`, hoặc xen giữa các nhánh `case`.
 
 Ví dụ:
 
@@ -273,7 +273,7 @@ Ví dụ:
 '''
 
 @@@ #constant-case-expressions
-###========== Các biểu thức `case` là hằng số số học trong `switch` không được trùng lặp, nhưng hằng số boolean thì có thể.
+###========== Các biểu thức case là hằng số dạng số trong khối `switch` không được trùng lặp, nhưng các biểu thức boolean thì có thể.
 
 Ví dụ, chương trình sau không biên dịch được.
 
@@ -310,9 +310,9 @@ Trên thực tế, standard Go compiler cũng không cho phép biểu thức cas
     === issue này :: https://github.com/golang/go/issues/28357
 
 @@@ #switch-expressions-are-typed
-###========== Các biểu thức `switch` trong một khối `switch` luôn được đánh giá thành giá trị có kiểu.
+###========== Các biểu thức switch trong một khối `switch` luôn được đánh giá thành giá trị có kiểu.
 
-Ví dụ, biểu thức `switch` `123` trong khối `switch` sau
+Ví dụ, biểu thức switch `123` trong khối `switch` sau
 được xem là giá trị kiểu `int` thay vì integer chưa định kiểu.
 Vì vậy chương trình sau không biên dịch được.
 
@@ -329,7 +329,7 @@ func main() {
 '''
 
 @@@ #default-switch-expression-value
-###========== Biểu thức `switch` mặc định của một khối `switch` là giá trị `true` có kiểu dựng sẵn `bool`.
+###========== Biểu thức switch mặc định của một khối `switch` là giá trị `true` có kiểu dựng sẵn `bool`.
 
 Ví dụ, chương trình sau sẽ in `true`.
 
@@ -360,9 +360,9 @@ func main() {
 	var i = 0
 Outer:
 	for
-	{ %% okay on the next line
+	{ %% được phép ở dòng tiếp theo
 		switch
-		{ %% okay on the next line
+		{ %% được phép ở dòng tiếp theo
 		case i == 5:
 			break Outer
 		default:
@@ -464,7 +464,7 @@ func demo(n, m int) (r int) {
 Hãy đọc __quy tắc xuống dòng trong Go__ để biết lý do.
 
 @@@ #defer-modify-results
-###========== Lời gọi function lồng nhau trong `defer` có thể thay đổi giá trị trả về của function bao trong cùng.
+###========== Lời gọi function lồng nhau trong defer có thể thay đổi giá trị trả về của function bao trong cùng.
 
 Ví dụ:
 
@@ -499,7 +499,7 @@ Hãy đọc __những vị trí phù hợp để gọi built-in function `recove
 ###========== Thoát chương trình bằng lời gọi function `os.Exit` và kết thúc goroutine bằng lời gọi function `runtime.Goexit`.
 
 { %%
-https://github.com/golang/go/issues/29226 a bug of goexit
+https://github.com/golang/go/issues/29226 lỗi của goexit
 }
 
 Ta có thể thoát chương trình từ bất kỳ function nào bằng cách gọi function `os.Exit`.
@@ -603,11 +603,11 @@ func main() {
 }
 
 const M  = 2
-// Compiles okay. 1.0 is deduced as an int value.
+// Biên dịch được. 1.0 được suy luận là một giá trị int.
 var _ = 1.0 << M
 
 var N = 2
-// Fails to compile. 1.0 is deduced as a float64 value.
+// Không biên dịch được. 1.0 được suy luận là một giá trị float64.
 var _ = 1.0 << N
 '''
 
@@ -632,14 +632,14 @@ func main() {
 	var a Ta
 	var b Tb
 
-	// Direct conversion is not allowed.
+	// Chuyển đổi trực tiếp không được phép.
 	//a = Ta(b) // error
 
-	// But indirect conversion is possible.
+	// Nhưng chuyển đổi gián tiếp thì có thể.
 	y := (*MyInt)(b)
 	x := (*int64)(y)
-	a = x           // <=> the next line
-	a = (*int64)(y) // <=> the next line
+	a = x           // <=> dòng tiếp theo
+	a = (*int64)(y) // <=> dòng tiếp theo
 	a = (*int64)((*MyInt)(b))
 	_ = a
 }
@@ -672,9 +672,9 @@ func main() {
 
 	fmt.Println(&x, &y, &o, &p)
 
-	// For the standard Go compiler (1.25.n),
-	// x, y, o and p escape to heap, but
-	// a, b, m and n are allocated on stack.
+	// Với standard Go compiler (1.25.n),
+	// x, y, o và p escape lên heap, còn
+	// a, b, m và n được allocate trên stack.
 
 	fmt.Println(&a == &b) // false
 	fmt.Println(&x == &y) // true
@@ -713,7 +713,7 @@ Tương tự,
 *
    element type của channel type có thể chính là channel type đó,
 *
-   and the argument and result types of a function type can be the function type itself.
+   và argument type và result type của function type có thể chính là function type đó.
 
 @@@ .line-numbers
 ''' go
@@ -759,10 +759,10 @@ package main
 type T struct {
 	x int
 }
-func (T) m(){} // T has one method.
+func (T) m(){} // T có một method.
 
-type P *T  // a named one-level pointer type.
-type PP *P // a named two-level pointer type.
+type P *T  // pointer type một cấp có tên.
+type PP *P // pointer type hai cấp có tên.
 
 func main() {
 	var t T
@@ -770,12 +770,12 @@ func main() {
 	var tpp = &tp
 	var p P = tp
 	var pp PP = &p
-	tp.x = 12  // okay
-	p.x = 34   // okay
+	tp.x = 12  // được
+	p.x = 34   // được
 	pp.x = 56  // error: type PP has no field or method x
 	tpp.x = 78 // error: type **T has no field or method x
 
-	tp.m()  // okay. Type *T also has a "m" method.
+	tp.m()  // được. Type *T cũng có method "m".
 	p.m()   // error: type P has no field or method m
 	pp.m()  // error: type PP has no field or method m
 	tpp.m() // error: type **T has no field or method m
@@ -877,7 +877,7 @@ func main() {
 	a := x[:]
 	b := x[0:0]
 	c := x[:0:0]
-	// Print three "true".
+	// In ba giá trị "true".
 	fmt.Println(a == nil, b == nil, c == nil)
 }
 '''
@@ -905,7 +905,7 @@ func main() {
 '''
 
 @@@ #range-over-nil-array-pointer
-###========== Có thể dùng `range` với nil pointer tới array nếu bỏ qua hoặc lược bỏ biến lặp thứ hai.
+###========== Có thể dùng range với nil pointer tới array nếu bỏ qua hoặc lược bỏ biến lặp thứ hai.
 
 Ví dụ, chương trình sau sẽ in `01234`.
 
@@ -967,7 +967,7 @@ Có thể dùng tính năng này để __kiểm tra một số điều kiện t�
     === kiểm tra điều kiện tại compile time :: tips.tmd#assert-at-compile-time
 
 @@@ #array-slice-element-addressability
-###========== Phần tử của array không thể lấy địa chỉ cũng không thể lấy địa chỉ, nhưng phần tử của slice không thể lấy địa chỉ thì luôn có thể lấy địa chỉ.
+###========== Các phần tử của những array không thể lấy địa chỉ cũng không thể lấy địa chỉ, nhưng các phần tử của những slice không thể lấy địa chỉ thì luôn có thể lấy địa chỉ.
 
 Lý do là các phần tử của array value và bản thân array được lưu
 trong cùng một vùng nhớ khi array được lưu trong bộ nhớ.
@@ -982,16 +982,16 @@ Ví dụ:
 package main
 
 func main() {
-	// Container composite literals are unaddressable.
+	// Composite literal của container không thể lấy địa chỉ.
 
-	// It is ok to take slice literal element addresses.
+	// Có thể lấy địa chỉ phần tử của slice literal.
 	_ = &[]int{1}[0] // ok
-	// Cannot take addresses of array literal elements.
+	// Không thể lấy địa chỉ phần tử của array literal.
 	_ = &[5]int{}[0] // error
 
-	// It is ok to modify slice literal elements.
+	// Có thể sửa đổi phần tử của slice literal.
 	[]int{1,2,3}[1] = 9  // ok
-	// Cannot modify array literal elements.
+	// Không thể sửa đổi phần tử của array literal.
 	[3]int{1,2,3}[1] = 9 // error
 }
 '''
@@ -1008,16 +1008,16 @@ Ví dụ:
 package main
 
 func main() {
-	// Map elements are unaddressable in Go.
+	// Phần tử của map không thể lấy địa chỉ trong Go.
 
-	// The following lines compile okay. Deriving
-	// slices from unaddressable slices is allowed.
+	// Các dòng sau biên dịch được. Được phép tạo
+	// slice từ slice không thể lấy địa chỉ.
 	_ = []int{6, 7, 8, 9}[1:3]
 	var ms = map[string][]int{"abc": {0, 1, 2, 3}}
 	_ = ms["abc"][1:3]
 
-	// The following lines fail to compile. Deriving
-	// slices from unaddressable arrays is not allowed.
+	// Các dòng sau không biên dịch được. Không được tạo
+	// slice từ array không thể lấy địa chỉ.
 	/*
 	_ = [...]int{6, 7, 8, 9}[1:3] // error
 	var ma = map[string][4]int{"abc": {0, 1, 2, 3}}
@@ -1062,7 +1062,7 @@ func main() {
 	for k, v := range m {
 		fmt.Println(k, v)
 	}
-	// the above loop outputs:
+	// vòng lặp trên in ra:
 	// NaN 123
 	// NaN 789
 }
@@ -1252,14 +1252,14 @@ func (T) foo() {}
 
 func main() {
 	var x interface{} = T(123)
-	// The following two lines fails to compile, for the
-	// same reason: interface{} does not implement Foo.
+	// Hai dòng sau không biên dịch được vì cùng một
+	// lý do: interface{} không implement Foo.
 	/*
 	var _ Foo = x   // error
 	var _ = Foo(x)  // error
 	*/
-	// But the following line compiles and runs okay.
-	var _ = x.(Foo) // okay
+	// Nhưng dòng sau biên dịch và chạy được.
+	var _ = x.(Foo) // được
 }
 '''
 
@@ -1277,19 +1277,19 @@ package main
 func main() {
 	var x interface{} = true
 
-	// Assertion fails, but doesn't cause a panic.
+	// Type assertion thất bại nhưng không gây panic.
 	_, _ = x.(int)
 
-	// Assertion fails, which causes a panic.
+	// Type assertion thất bại nên gây panic.
 	_ = x.(int)
 }
 '''
 
 @@@ #impossible-to-interface-assertion
-###========== Về các phép assertion sang interface bất khả thi có thể phát hiện tại compile time.
+###========== Về các phép type assertion sang interface chắc chắn không thể thành công, có thể được phát hiện tại compile time.
 
-Tại compile time, có thể suy ra một số phép assertion sang interface chắc chắn thất bại.
-Ví dụ, phép assertion trong code sau:
+Tại compile time, có thể suy ra một số phép type assertion sang interface chắc chắn thất bại.
+Ví dụ, phép type assertion trong code sau:
 
 @@@ .line-numbers
 ''' go
@@ -1313,15 +1313,15 @@ func main() {
 }
 '''
 
-Các phép assertion như vậy không khiến code biên dịch thất bại (nhưng chương trình sẽ panic khi chạy).
-Từ Go Toolchain 1.15, command `go vet` cảnh báo về các phép assertion này.
+Các phép type assertion như vậy không khiến code biên dịch thất bại (nhưng chương trình sẽ panic khi chạy).
+Từ Go Toolchain 1.15, command `go vet` cảnh báo về các phép type assertion này.
 
 { %%
 @@@ #interface-comparison-complexity
 ###========== Với standard Go compiler, độ phức tạp thời gian khi so sánh hai interface value bằng nhau có thể là // `O(1)` // hoặc // `O(n)` //.
 
 Độ phức tạp thời gian phụ thuộc vào việc direct part
-của hai interface bằng nhau có cùng tham chiếu tới underlying value hay không.
+của cả hai interface bằng nhau có tham chiếu tới underlying value hay không.
 Hãy đọc bài viết __các phần value__ để biết chi tiết.
 
     === các phần value :: value-part.tmd#interface-structure
@@ -1338,12 +1338,12 @@ func main() {
 
 	type I interface{}
 
-	// i0, i1 and i2 are three equal interfaces.
-	var i0 I = bigarr // the dynamic value of i0 is a copy of bigarr.
-	var i1 I = bigarr // the dynamic value of i1 is also a copy of bigarr.
-	                  // Note, the dynamic values of i0 and i1 are
-	                  // two different copies of bigarr.
-	var i2 I = i1 // i2 shares the same dynamic value copy with i1.
+	// i0, i1 và i2 là ba interface bằng nhau.
+	var i0 I = bigarr // dynamic value của i0 là bản sao của bigarr.
+	var i1 I = bigarr // dynamic value của i1 cũng là bản sao của bigarr.
+	                  // Lưu ý, dynamic value của i0 và i1 là
+	                  // hai bản sao khác nhau của bigarr.
+	var i2 I = i1 // i2 dùng chung bản sao dynamic value với i1.
 
 	startTime := time.Now()
 	_ = i0 == i1
@@ -1357,18 +1357,18 @@ func main() {
 }
 '''
 
-Output:
+Kết quả:
 @@@ .output
 '''
 duration for (i0 == i1): 1.381337ms
 duration for (i1 == i2): 609ns
 '''
-1ms is 1000000ns!
+1ms là 1000000ns!
 
 @@@ #interface-copy-complexity
 ###========== Về độ phức tạp thời gian khi sao chép interface value khác nil.
 
-__FAQ Go chính thức__
+__href="https://golang.org/doc/faq#pass_by_value">FAQ Go chính thức__
 nói rằng **// sao chép interface value sẽ tạo bản sao của đối tượng được lưu trong interface value đó. //**.
 Bài viết __interface trong Go`` interface.tmd#boxing__ cho biết,
 với standard Go compiler, độ phức tạp thời gian khi sao chép interface value
@@ -1533,10 +1533,10 @@ func (s S) about() string {
 thì:
 *
    value thuộc hai type `S` tương ứng từ hai package
-   can't be converted to each other.
+   không thể chuyển đổi cho nhau.
 *
    hai interface type `S` tương ứng từ hai package
-   denote two distinct method sets.
+   biểu thị hai method set khác nhau.
 *
    type `foo.S` không implement interface type `bar.I`.
 *
@@ -1555,7 +1555,7 @@ func main() {
 	var _ foo.I = x
 	var _ bar.I = y
 
-	// The following lines fail to compile.
+	// Các dòng sau không biên dịch được.
 	x = foo.S(y)
 	y = bar.S(x)
 	var _ foo.I = y
@@ -1565,13 +1565,13 @@ func main() {
 
 { %%
 @@@ #compare-values-with-both-comparable-and-incomparable-parts
-###========== Hành vi so sánh struct value có cả field so sánh được lẫn không so sánh được, hoặc array value có cả phần tử so sánh được lẫn không so sánh được, chưa được đặc tả.
+###========== Hành vi so sánh struct value có cả field comparable lẫn incomparable, hoặc array value có cả element comparable lẫn incomparable, chưa được đặc tả.
 
-Các giá trị không thể so sánh được đề cập ở đây phải xuất hiện dưới dạng interface; nếu không, phép so sánh sẽ không biên dịch được.
+Các value incomparable được đề cập ở đây phải xuất hiện dưới dạng interface; nếu không, phép so sánh sẽ không biên dịch được.
 
 Dù có vẻ implementation của standard Go compiler so sánh struct value từng field,
 và so sánh array value từng phần tử đến khi phát hiện điểm khác nhau hoặc panic,
-nhưng hiện tại (Go 1.15) __hành vi này thực sự chưa được đặc tả__.
+nhưng __href="https://github.com/golang/go/issues/8606">hành vi này thực sự chưa được đặc tả__ hiện tại (Go 1.15).
 
 @@@ .line-numbers
 ''' go
@@ -1602,10 +1602,10 @@ type A [2]interface{}
 
 func main() {
 	var f func()
-	cmpS(S{1, f}, S{2, f}) // false (but panic is ok)
-	cmpS(S{f, 1}, S{f, 2}) // panic (but false is ok)
-	cmpA(A{1, f}, A{2, f}) // false (but panic is ok)
-	cmpA(A{f, 1}, A{f, 2}) // panic (but false is ok)
+	cmpS(S{1, f}, S{2, f}) // false (nhưng panic cũng được)
+	cmpS(S{f, 1}, S{f, 2}) // panic (nhưng false cũng được)
+	cmpA(A{1, f}, A{2, f}) // false (nhưng panic cũng được)
+	cmpA(A{f, 1}, A{f, 2}) // panic (nhưng false cũng được)
 }
 '''
 
@@ -1647,20 +1647,20 @@ package main
 type T struct{x, y int}
 
 func main() {
-	// Each of the following three lines makes code
-	// fail to compile. Some "{}"s confuse compilers.
+	// Mỗi dòng trong ba dòng sau khiến code
+	// không biên dịch được. Một số "{}" làm compiler nhầm lẫn.
 	/*
 	if T{} == T{123, 789} {}
 	if T{} == (T{123, 789}) {}
 	if (T{}) == T{123, 789} {}
-	var _ = func()(nil) // nil is viewed as a type
+	var _ = func()(nil) // nil được xem là một type
 	*/
 
-	// We must add parentheses like the following
-	// two lines to make code compile okay.
+	// Cần thêm dấu ngoặc đơn như trong
+	// hai dòng sau để code biên dịch được.
 	if (T{} == T{123, 789}) {}
 	if (T{}) == (T{123, 789}) {}
-	var _ = (func())(nil) // nil is viewed as a value
+	var _ = (func())(nil) // nil được xem là một value
 }
 '''
 
@@ -1668,7 +1668,7 @@ func main() {
 @@@ #main-entry-function-absence
 ###========== Chương trình không cần function entry `main` để chạy.
 
-Chương trình sau __biên dịch được trước Go 1.11__,
+Chương trình sau __href="https://github.com/golang/go/issues/21256">biên dịch được trước Go 1.11__,
 với standard Go compiler.
 Nhưng từ Go 1.11 trở đi, chương trình không biên dịch được.
 
@@ -1709,7 +1709,7 @@ func f() {
 
 func main() {
 	defer func() {
-		recover() // helpless to avoid program crashing
+		recover() // không thể ngăn chương trình crash
 	}()
 	f()
 }
@@ -1783,8 +1783,8 @@ func main() {
 
 	type Node struct{peer *Node}
 	var q, r, s Node
-	q.peer = &q // form a cyclic reference chain
-	r.peer = &s // form a cyclic reference chain
+	q.peer = &q // tạo thành một chuỗi tham chiếu vòng
+	r.peer = &s // tạo thành một chuỗi tham chiếu vòng
 	s.peer = &r
 	println(reflect.DeepEqual(&q, &r)) // true
 	fmt.Println(q == r)                // false
@@ -1827,16 +1827,16 @@ func main() {
 '''
 
 @@@ #reflect-value-bytes
-###========== Method `reflect.Value.Bytes()` trả về giá trị `[]byte` có element type `byte`, có thể khác với slice Go được biểu diễn bởi receiver.
+###========== Method `reflect.Value.Bytes()` trả về giá trị `[]byte` có element type `byte`, có thể khác với slice Go được biểu diễn bởi receiver parameter.
 
 Giả sử underlying type của defined type `MyByte` là
 predeclared type `byte`; ta biết Go type system không cho phép
 chuyển đổi giữa giá trị `[]MyByte` và `[]byte`.
-Tuy nhiên, có vẻ implementation method `Bytes` của
+Tuy nhiên, có vẻ việc triển khai method `Bytes` của
 type `reflect.Value` vô tình vi phạm một phần hạn chế này,
 khi cho phép chuyển giá trị `[]MyByte` thành `[]byte`.
 
-Example:
+Ví dụ:
 
 @@@ .line-numbers
 ''' go
@@ -1852,10 +1852,10 @@ func main() {
 	var mybs = []MyByte{'a', 'b', 'c'}
 	var bs []byte
 
-	// bs = []byte(mybs) // this line fails to compile
+	// bs = []byte(mybs) // dòng này không biên dịch được
 
 	v := reflect.ValueOf(mybs)
-	bs = v.Bytes() // okay. Violating Go type system.
+	bs = v.Bytes() // được. Vi phạm Go type system.
 	fmt.Println(bytes.HasPrefix(bs, []byte{'a', 'b'})) // true
 
 	bs[1], bs[2] = 'r', 't'
@@ -1919,11 +1919,11 @@ func main() {
 
 Có ba cách truyền tùy chọn flag:
 *.
-   `-flag`, for boolean flags only.
+   `-flag`, chỉ dành cho boolean flag.
 *.
-   `-flag=x`, for any flag.
+   `-flag=x`, dành cho mọi flag.
 *.
-   `-flag x`, for non-boolean flags only.
+   `-flag x`, chỉ dành cho flag không phải boolean.
 
 Lưu ý rằng boolean flag theo cách đầu tiên
 được xem là flag cuối cùng; mọi mục theo sau nó được xem là argument.
@@ -2016,11 +2016,11 @@ https://golang.org/doc/go1.6 : {{a -}} sss {{- b}}
 
 
 
-Field và method được export của field nhúng không được export
-vẫn được export trong struct type bao ngoài.
+Các field và method được export của những field nhúng không được export
+vẫn được export đối với struct type chứa chúng.
 
 
-json:"name: empty" // doesn't work
+json:"name: empty" // không hoạt động
 
 Tài liệu package syscall hiển thị giá trị O mặc định theo kiến trúc hiện tại
   https://golang.org/pkg/syscall/?GOOS=linux&GOARCH=mips64le
@@ -2037,7 +2037,7 @@ Type embedding được tạo bằng reflection sẽ không nhận được meth
 https://golang.org/pkg/reflect/#pkg-note-BUG
 
 https://golang.org/pkg/reflect/#Value.String
-Các function in không phải lúc nào cũng in kết quả từ method `String()` của một value.
+Các function in không phải lúc nào cũng in kết quả từ method String() của một value.
 
 
 
@@ -2050,13 +2050,13 @@ Một hằng số rune hoặc int chưa định kiểu có thể được gán v
 goroutine chiếm CPU liên tục https://github.com/golang/go/issues/10958
 * Có vẻ một số goroutine không bao giờ nhường quyền chạy, khiến các goroutine khác không có cơ hội chạy. Vì sao?
 https://stackoverflow.com/questions/13107958/what-exactly-does-runtime-gosched-do
-Vòng lặp bận cần có thể bị preempt.
+Vòng lặp bận nên có thể bị preempt.
 https://github.com/golang/go/issues/10958
 (đã loại bỏ từ Go Toolchain 1.15) https://x.com/zigo_101/status/1225258083745558528
 
-package internal
+internal package
 
-`go doc xyz` có thể hiển thị tài liệu của package đầu tiên có tên chứa `xyz`
+go doc xyz có thể hiển thị tài liệu của package đầu tiên có tên chứa xyz
 https://github.com/golang/go/issues/24462
 
 
@@ -2091,9 +2091,9 @@ func main() {
 	println(x * y) // NaN
 }
 
-Method `String` của giá trị `reflect.Value` tên `v` trả về dạng string của underlying value của `v`.
-Tuy nhiên, các function trong package `fmt` cố in dạng string của underlying value thuộc underlying value của `v`,
-nếu underlying value của `v` cũng là một giá trị `reflect.Value`.
+Method String của giá trị reflect.Value v trả về dạng string của underlying value của v.
+Tuy nhiên, các function trong package fmt cố in dạng string của underlying value thuộc underlying value của v,
+nếu underlying value của v cũng là một giá trị reflect.Value.
 
 	package main
 
@@ -2120,10 +2120,10 @@ nếu underlying value của `v` cũng là một giá trị `reflect.Value`.
 	}
 
 io/ioutil từ Go 1.11
-    Function `TempFile` hiện cho phép chỉ định vị trí đặt ký tự ngẫu nhiên trong tên file.
-    Nếu argument prefix có chứa `*`, chuỗi ngẫu nhiên sẽ thay thế dấu `*` đó.
-    Ví dụ, prefix argument `myname.*.bat` có thể tạo tên file ngẫu nhiên như `myname.123456.bat`.
-    Nếu không có `*`, hành vi cũ được giữ nguyên và các chữ số ngẫu nhiên được nối vào cuối tên.
+    Function TempFile hiện cho phép chỉ định vị trí đặt ký tự ngẫu nhiên trong tên file.
+    Nếu argument prefix có chứa "*", chuỗi ngẫu nhiên sẽ thay thế dấu "*" đó.
+    Ví dụ, prefix argument "myname.*.bat" có thể tạo tên file ngẫu nhiên như "myname.123456.bat".
+    Nếu không có "*", hành vi cũ được giữ nguyên và các chữ số ngẫu nhiên được nối vào cuối tên.
 io/ioutil bị deprecated từ Go 1.16
 
 
@@ -2137,7 +2137,7 @@ Go contests 101 / tóm tắt / đoạn code
 1.13 trở lên: thêm một ngoại lệ của DeepEqual: https://go-review.googlesource.com/c/go/+/168438/3/src/reflect/deepequal.go
 * (đã hủy)
 
-`bytes.TrimSpace` có thể trả về nil dù đầu vào không nil: https://github.com/golang/go/issues/31038
+bytes.TrimSpace có thể trả về nil dù đầu vào không nil: https://github.com/golang/go/issues/31038
 
 
 
@@ -2152,9 +2152,9 @@ https://github.com/golang/go/issues/18531
 
 https://github.com/golang/go/issues/23224
 
-Các lời gọi deferred vẫn được thực hiện sau `runtime.Goexit` 
-nhưng không được thực hiện sau `os.Exit`. Lưu ý, `log.Fatal` gọi `os.Exit` bên trong.
-Nếu chương trình dọn dẹp tài nguyên trong các lời gọi deferred, đừng dùng `os.Exit` để kết thúc chương trình.
+Các lời gọi deferred vẫn được thực hiện sau runtime.Goexit
+nhưng không được thực hiện sau os.Exit. Lưu ý, log.Fatal gọi os.Exit bên trong.
+Nếu chương trình dọn dẹp tài nguyên trong các lời gọi deferred, đừng dùng os.Exit để kết thúc chương trình.
 
 package main
 import "C" // chương trình crash nếu comment dòng này
@@ -2170,7 +2170,7 @@ Kết quả in nil slice và slice rỗng giống nhau (tương tự map).
 
 Phần source trong khai báo type alias không thể tham chiếu tới alias đang được khai báo.
 
-cgo không nên gọi Go trước khi mọi function `init` kết thúc:
+cgo không nên gọi Go trước khi mọi function init kết thúc:
 https://github.com/golang/go/issues/36530#issuecomment-574213023
 
 buộc chạy GC mỗi 2 phút: https://github.com/golang/go/blob/895b7c85addfffe19b66d8ca71c31799d6e55990/src/runtime/proc.go#L4481-L448
@@ -2193,13 +2193,13 @@ https://github.com/golang/go/issues/38980
 
 
 https://x.com/dgryski/status/1302984936870223874
-`http.ResponseWriter` sẽ đặt status thành `200 OK` nếu gọi `Write()` trước khi đặt status code tường minh bằng `WriteHeader()`.
-Nếu gọi `WriteHeader` sau đó, status code mới sẽ bị bỏ qua nhưng server sẽ ghi log ra stderr.
+Một http.ResponseWriter sẽ đặt status thành "200 Ok" nếu Write() được gọi trước khi status code được đặt tường minh bằng WriteHeader().
+Nếu gọi WriteHeader() sau đó, status code mới sẽ bị bỏ qua nhưng server sẽ ghi log ra stderr.
 Hãy kiểm tra log!
 
 
 ...
-`f` nhanh hơn `g` nhiều vì `f` không cấp phát bộ nhớ (được Go Toolchain tối ưu).
+f nhanh hơn g nhiều vì f không cấp phát bộ nhớ (được Go Toolchain tối ưu).
 	func f(x, y, z []byte){
 	  switch {
 	  case string(x) == string(y):
@@ -2222,8 +2222,8 @@ func foo(buf []byte) {
 }
 
 
-`// +build go1.16` chỉ định phiên bản Go Toolchain tối thiểu cần để biên dịch source file.
-Directive `go 1.N` trong file `go.mod` chỉ định các tính năng module đó có thể dùng (https://golang.org/ref/mod#go-mod-file-go). Nó tương tự tùy chọn biên dịch `-lang=go1.N`. Vì vậy:
+"// +build go1.16" chỉ định phiên bản Go Toolchain tối thiểu cần để biên dịch source file.
+Directive "go 1.N" trong file "go.mod" chỉ định các tính năng module đó có thể dùng (https://golang.org/ref/mod#go-mod-file-go). Nó tương tự tùy chọn biên dịch "-lang=go1.N". Vì vậy:
   directive này không chỉ định phiên bản Go Toolchain tối thiểu để biên dịch module. Có thể dùng Toolchain phiên bản cao hơn hoặc thấp hơn nếu chúng hỗ trợ các tính năng cần thiết.
   directive này không áp dụng cho các module khác trong chương trình. https://play.golang.org/p/hMNDpRPh7Em
 
@@ -2239,18 +2239,18 @@ https://groups.google.com/g/golang-nuts/c/90fYaXNRmVM
 https://groups.google.com/g/golang-nuts/c/90fYaXNRmVM/m/ZfKRE1vwFQAJ
 
 https://github.com/golang/go/issues/44830
-reflect: `TypeOf(unsafe.Pointer(nil)).PkgPath()` trả về `""`, không phải `"unsafe"`
+reflect: TypeOf(unsafe.Pointer(nil)).PkgPath() trả về "", không phải "unsafe"
 
 https://github.com/golang/go/issues/46789
-`runtime.NumCgoCall()` giảm khi một số goroutine kết thúc? Đây là lỗi hay hành vi dự kiến?
+runtime.NumCgoCall() giảm khi một số goroutine kết thúc? Đây là lỗi hay hành vi dự kiến?
 
 https://github.com/golang/go/issues/46827#issuecomment-864694337
 Object nhỏ có thể ngầm dùng chung block bộ nhớ với object khác.
 https://go-review.googlesource.com/c/go/+/337391/5/src/runtime/mfinal.go
 
-Max embed size is 2G: https://github.com/golang/go/issues/47627
+Kích thước embed tối đa là 2G: https://github.com/golang/go/issues/47627
 
-Thiếu directive `go` trong go.mod: language version mặc định là 1.16:
+Thiếu directive go trong go.mod: phiên bản ngôn ngữ mặc định là 1.16:
 https://groups.google.com/g/golang-nuts/c/lhedc8YaWlM
 https://github.com/golang/go/issues/44976
 

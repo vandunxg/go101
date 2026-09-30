@@ -3,7 +3,7 @@
 Bài viết này giải thích code block và phạm vi định danh trong Go.
 
 //
-(Lưu ý: cách định nghĩa thứ bậc code block trong bài viết này
+(Lưu ý: cách định nghĩa thứ bậc của code block trong bài viết này
 hơi khác với cách nhìn của các package chuẩn `go/*`.)
 
 { %%
@@ -11,19 +11,19 @@ https://github.com/golang/go/issues/7429#issuecomment-282480782
 }
 
 @@@ #block
-###========== Code Block
+###========== Code Blocks
 
 Trong một dự án Go có bốn loại code block (sau đây cũng gọi là block):
 *  **universe block** chứa toàn bộ mã nguồn của dự án.
 *  mỗi package có một **package block** chứa toàn bộ mã nguồn,
    ngoại trừ các khai báo import của package đó.
 *  mỗi file có một **file block** chứa toàn bộ mã nguồn,
-   bao gồm cả các khai báo import trong file đó.
+   bao gồm cả các khai báo import package trong file đó.
 *  thông thường, một cặp dấu ngoặc nhọn `{}` bao quanh một **local block**.
    Tuy nhiên, một số local block không được bao quanh bởi `{}`;
    chúng được gọi là implicit local block.
    Local block được bao quanh bởi `{}` được gọi là explicit local block.
-   Dấu `{}` trong composite literal và định nghĩa kiểu không tạo thành
+   Cặp `{}` trong composite literal và định nghĩa kiểu không tạo thành
    local block.
 
 Một số keyword trong mọi dạng luồng điều khiển được theo sau bởi các code block ngầm định.
@@ -50,7 +50,7 @@ Các local block không nằm bên trong local block nào khác được gọi l
 (hoặc package-level) local block. Mọi thân hàm đều là top-level local block.
 
 Lưu ý, các tham số đầu vào và kết quả đầu ra của hàm được xem như được
-khai báo trong code block tường minh ở thân hàm, dù các khai báo của chúng
+khai báo trong code block tường minh của thân hàm, dù các khai báo của chúng
 nằm bên ngoài cặp ngoặc nhọn bao quanh thân hàm.
 
 Thứ bậc code block:
@@ -81,7 +81,7 @@ Code block chủ yếu được dùng để giải thích vị trí khai báo h�
 
 Có sáu loại phần tử mã nguồn có thể được khai báo:
 *  import package.
-*  kiểu được định nghĩa và bí danh kiểu.
+*  defined type và type alias.
 *  hằng số có tên.
 *  biến.
 *  hàm.
@@ -89,9 +89,9 @@ Có sáu loại phần tử mã nguồn có thể được khai báo:
 
 Nhãn được dùng trong các câu lệnh `break`, `continue` và `goto`.
 
-Một khai báo liên kết một định danh không phải blank với một phần tử mã nguồn (hằng số, kiểu, biến, hàm, nhãn hoặc package).
-Nói cách khác, trong khai báo, phần tử mã nguồn được khai báo mang tên là định danh không phải blank đó.
-Sau khi khai báo, ta có thể dùng định danh không phải blank để tham chiếu đến phần tử mã nguồn đã khai báo.
+Một khai báo liên kết một non-blank identifier với một phần tử mã nguồn (hằng số, kiểu, biến, hàm, nhãn hoặc package).
+Nói cách khác, trong khai báo, phần tử mã nguồn được khai báo mang tên là non-blank identifier đó.
+Sau khi khai báo, ta có thể dùng non-blank identifier để tham chiếu đến phần tử mã nguồn đã khai báo.
 
 Bảng sau cho biết từng loại phần tử mã nguồn có thể được khai báo trực tiếp trong những code block nào:
 #  ###
@@ -101,7 +101,7 @@ Bảng sau cho biết từng loại phần tử mã nguồn có thể được k
    ### local block
    @@@ .active
    -----------------------
-   ### định danh khai báo sẵn (phần tử built-in) ^$$(1)$$
+   ### các phần tử khai báo sẵn (built-in) ^$$(1)$$
    ;;; Có
    ;;;
    ;;;
@@ -114,7 +114,7 @@ Bảng sau cho biết từng loại phần tử mã nguồn có thể được k
    ;;;
    @@@ .active
    -----------------------
-   ### kiểu được định nghĩa và bí danh kiểu (không phải built-in)
+   ### defined type và type alias (không phải built-in)
    ;;;
    ;;; Có
    ;;; Có
@@ -163,7 +163,7 @@ Do đó:
 
 Lưu ý:
 *
-   nếu hai khai báo phần tử mã nguồn có cùng block chứa gần nhất,
+   nếu block chứa gần nhất của hai khai báo phần tử mã nguồn là cùng một block,
    tên (định danh) của hai phần tử đó không được trùng nhau.
 *
    tên (định danh) của phần tử mã nguồn cấp package được khai báo trong một package không được
@@ -189,7 +189,7 @@ Lưu ý:
 (Nhân tiện, theo các package chuẩn `go/*`, file block chỉ có thể chứa các khai báo import package.)
 
 Các phần tử mã nguồn được khai báo trong package block nhưng nằm ngoài mọi local block được gọi là phần tử mã nguồn cấp package.
-Phần tử mã nguồn cấp package có thể là hằng số có tên, biến, hàm, kiểu được định nghĩa hoặc bí danh kiểu.
+Phần tử mã nguồn cấp package có thể là hằng số có tên, biến, hàm, defined type hoặc type alias.
 
 @@@ #scope
 ###========== Phạm vi của phần tử mã nguồn đã khai báo
@@ -198,13 +198,13 @@ Phần tử mã nguồn cấp package có thể là hằng số có tên, biến
 
 Scope của một định danh đã khai báo là vùng mà định danh đó có thể được nhận diện (hay vùng hiển thị).
 
-Nếu chưa xét đến hiện tượng shadowing định danh sẽ được giải thích ở phần cuối bài viết này,
+Nếu không xét đến hiện tượng shadowing định danh (sẽ được giải thích ở phần cuối bài viết này),
 __định nghĩa về scope__ của định danh
 cho mọi loại phần tử mã nguồn được liệt kê dưới đây.
 *
    Scope của định danh khai báo sẵn/built-in là universe block.
 *
-   Scope của định danh import package là file block chứa khai báo import đó.
+   Scope của identifier thuộc import package là file block chứa khai báo import đó.
 *
    Scope của định danh biểu thị hằng số, kiểu, biến hoặc hàm
    (không bao gồm method) được khai báo ở cấp package là package block.
@@ -217,7 +217,7 @@ cho mọi loại phần tử mã nguồn được liệt kê dưới đây.
    (hoặc cuối khai báo nếu đó là biến được khai báo bằng cú pháp rút gọn)
    và kết thúc ở cuối block chứa gần nhất.
 *
-   Scope của định danh kiểu hoặc bí danh kiểu được khai báo bên trong
+   Scope của identifier biểu thị type hoặc type alias được khai báo bên trong
    thân hàm bắt đầu ở cuối định danh trong đặc tả kiểu tương ứng
    và kết thúc ở cuối block chứa gần nhất.
 *
@@ -228,15 +228,15 @@ cho mọi loại phần tử mã nguồn được liệt kê dưới đây.
 
     === Go generics 101 :: https://go101.org/generics/555-type-constraints-and-parameters.html#type-parameter-scope
 
-Blank identifier không có scope.
+Các blank identifier không có scope.
 
 //
-(Lưu ý, `iota` khai báo sẵn chỉ hiển thị trong các khai báo hằng số.)
+(Lưu ý, `iota` khai báo sẵn chỉ có thể được tham chiếu trong các khai báo hằng số.)
 
 @@@ #scope-difference-detail
-Có thể bạn đã nhận thấy một khác biệt nhỏ trong định nghĩa scope của định danh
-giữa định nghĩa kiểu cục bộ với biến cục bộ, hằng số cục bộ và bí danh kiểu cục bộ.
-Khác biệt này cho phép một kiểu được định nghĩa có thể
+Có thể bạn đã nhận thấy một khác biệt nhỏ trong định nghĩa scope của identifier
+giữa defined type cục bộ với biến, hằng số và type alias cục bộ.
+Khác biệt này có nghĩa là một defined type có thể
 tham chiếu đến chính nó trong khai báo.
 Ví dụ sau minh họa khác biệt này.
 @@@ .line-numbers
@@ -283,7 +283,7 @@ func main() {
 
 Lưu ý, cả lời gọi `fmt.Print(s)` lẫn `fmt.Print(m)` đều panic (do tràn stack).
 
-Tiếp theo là khác biệt về scope giữa khai báo cấp package và khai báo cục bộ:
+Còn khác biệt về scope giữa khai báo cấp package và khai báo cục bộ:
 @@@ .line-numbers
 ''' go
 package main
@@ -405,7 +405,7 @@ func main() {
 Trong một số trường hợp, khi định danh bị shadow bởi các biến
 được khai báo bằng cú pháp khai báo biến rút gọn,
 một số người mới dùng Go có thể nhầm lẫn không biết một biến
-trong khai báo rút gọn được khai báo lại hay là biến mới.
+trong khai báo rút gọn được khai báo lại hay mới được khai báo.
 Ví dụ tiếp theo (có lỗi) minh họa cái bẫy nổi tiếng trong Go.
 Hầu như gopher nào cũng từng mắc phải cái bẫy này khi mới dùng Go.
 
@@ -423,19 +423,19 @@ func parseInt(s string) (int, error) {
 		// đã khai báo trong khai báo rút gọn tiếp theo.
 		// Nhưng thực tế cả
 		// b lẫn err đều là biến mới được khai báo tại đây.
-		// Biến err mới khai báo shadow
+		// Biến err mới được khai báo sẽ shadow
 		// biến err được khai báo phía trên.
 		b, err := strconv.ParseBool(s)
 		if err != nil {
 			return 0, err
 		}
 
-		// Nếu thực thi đến đây, người mới dùng Go có thể
+		// Nếu luồng thực thi đi đến đây, người mới dùng Go có thể
 		// nghĩ rằng hàm sẽ trả về lỗi nil.
-		// Nhưng thực tế lỗi khác nil ở scope bên ngoài sẽ
-		// được trả về, vì scope của biến err
-		// err bên trong kết thúc ở cuối
-		// nhánh if bên ngoài.
+		// Nhưng thực tế lỗi non-nil ở scope bên ngoài
+		// sẽ được trả về, vì scope của biến err
+		// bên trong kết thúc ở cuối nhánh if
+		// bên ngoài.
 		if b {
 			n = 1
 		}
@@ -487,15 +487,15 @@ func main() {
 	fmt.Println("a weird program")
 	var output = fmt.Println
 
-	// Shadow tên import package "fmt".
+	// Shadow package import "fmt".
 	var fmt = [len]nil{{}, {}, {}}
-	// Lưu ý: "len" là một hằng số.
+	// Rất tiếc, "len" là một hằng số.
 	// var n = len(fmt)
 	// Thay vào đó, hãy dùng hàm built-in cap. :(
 	var n = cap(fmt)
 
 	// Keyword "for" được theo sau bởi một
-	// local code block ngầm định và một local block
+	// local code block ngầm định và một local code block
 	// tường minh. Biến lặp
 	// "true" shadow biến cấp package
 	// "true" được khai báo phía trên.
@@ -505,7 +505,7 @@ func main() {
 		// Biến "true" mới khai báo
 		// shadow biến lặp "true".
 		var true = true+1
-		// Lưu ý: "fmt" là một array, không phải package.
+		// Rất tiếc, "fmt" là một array, không phải package.
 		// fmt.Println(true, false)
 		output(true, false)
 	}
@@ -522,6 +522,5 @@ a weird program
 '''
 
 Đúng là ví dụ này khá cực đoan.
-Nó có nhiều cách viết không tốt.
+Nó có nhiều cách làm không tốt.
 Shadowing định danh rất hữu ích, nhưng đừng lạm dụng nó.
-

@@ -4,15 +4,15 @@
 <p>
 <i>Go 101</i> là cuốn sách tập trung vào cú pháp/ngữ nghĩa của Go
 (ngoại trừ các nội dung liên quan đến <a href="../generics/101.html">generics tùy chỉnh</a>) và
-nhiều khía cạnh liên quan đến runtime.
-Cuốn sách giúp gophers hiểu Go một cách sâu sắc và toàn diện.
+mọi loại vấn đề liên quan đến runtime.
+Cuốn sách cố gắng giúp gophers hiểu Go một cách sâu sắc và toàn diện.
 Sách cũng tập hợp nhiều chi tiết về Go và lập trình Go.
-Nhiều chi tiết trong số này không có trong tài liệu Go chính thức.
+Nhiều chi tiết trong số này không thể tìm thấy trong các tài liệu chính thức về Go.
 Cuốn sách được kỳ vọng sẽ hữu ích cho cả người mới bắt đầu lẫn lập trình viên Go giàu kinh nghiệm.
 </p>
 
 <p>
-Hiện sách đã tương thích với Go 1.25 (<a href="100-updates.html">lịch sử cập nhật</a>).
+Hiện sách đã sẵn sàng cho Go 1.25 (<a href="100-updates.html">lịch sử cập nhật</a>).
 </p>
 
 <p style="font-size: smaller;"><i>
@@ -28,7 +28,7 @@ Hiện sách đã tương thích với Go 1.25 (<a href="100-updates.html">lịc
 	<div class="col-xs-12 col-sm-9" style="padding-top: 6px; font-size: smaller;">
 		
 		Bạn có thể <a href="#index">đọc sách trực tuyến</a> miễn phí.
-		Bạn cũng có thể mua ebook để ủng hộ Go 101:
+		Ebook cũng có sẵn như một cách để ủng hộ Go 101:
 
 		<ul>
 		<li>
@@ -50,11 +50,11 @@ Hiện sách đã tương thích với Go 1.25 (<a href="100-updates.html">lịc
 		</ul>
 		
 		<p>
-		Bạn cũng có thể tải ebook miễn phí <a href="https://github.com/go101/go101/releases">tại đây</a>.
+		Ebook cũng được cung cấp miễn phí <a href="https://github.com/go101/go101/releases">tại đây</a>.
 		</p>
 
 		<p>
-		Tapir, tác giả của Go 101, đã viết loạt sách Go 101 và duy trì website go101.org từ tháng 7 năm 2016.
+		Tapir, tác giả của Go 101, đã và đang viết loạt sách Go 101 và duy trì website go101.org từ tháng 7 năm 2016.
 		Nội dung mới vẫn đang và sẽ tiếp tục được bổ sung vào loạt sách và website theo thời gian.
 		</p>
 
@@ -63,7 +63,7 @@ Hiện sách đã tương thích với Go 1.25 (<a href="100-updates.html">lịc
 		Nếu muốn, bạn có thể ủng hộ cuốn sách và website bằng cách
 		chơi <a href="https://www.tapirgames.com">các trò chơi của Tapir</a>
 		(dành cho cả Android và iPhone/iPad).
-		Bạn cũng có thể quyên góp cá nhân <a href="https://paypal.me/tapirliu">qua PayPal</a>.
+		Các khoản quyên góp cá nhân cũng được chấp nhận <a href="https://paypal.me/tapirliu">qua PayPal</a>.
 		</p>
 
 		<p>
@@ -122,17 +122,17 @@ Hệ thống kiểu của Go
 
 	<ul class="index chapters">
 	<li><a class="index" href="type-system-overview.html">Tổng quan về hệ thống kiểu của Go</a> - nội dung nhất định phải đọc để thành thạo lập trình Go.</li>
-	<li><a class="index" href="pointer.html">Con trỏ</a></li>
+	<li><a class="index" href="pointer.html">Pointer</a></li>
 	<li><a class="index" href="struct.html">Struct</a></li>
 	<li><a class="index" href="value-part.html">Các phần của giá trị</a> - giúp hiểu sâu hơn về các giá trị trong Go.</li>
 	<li><a class="index" href="container.html">Array, slice và map</a> - các kiểu container hạng nhất.</li>
 	<li><a class="index" href="string.html">String</a></li>
 	<li><a class="index" href="function.html">Hàm</a> - các kiểu và giá trị hàm, bao gồm hàm variadic.</li>
-	<li><a class="index" href="channel.html">Channel</a> - cách Go đồng bộ hóa concurrency.</li>
+	<li><a class="index" href="channel.html">Channel</a> - cách Go thực hiện đồng bộ hóa concurrency.</li>
 	<li><a class="index" href="method.html">Method</a></li>
 	<li><a class="index" href="interface.html">Interface</a> - các hộp giá trị dùng cho reflection và tính đa hình.</li>
 	<li><a class="index" href="type-embedding.html">Embedding kiểu</a> - mở rộng kiểu theo cách của Go.</li>
-	<li><a class="index" href="unsafe.html">Con trỏ không an toàn về kiểu</a></li>
+	<li><a class="index" href="unsafe.html">Pointer không an toàn về type</a></li>
 	<li><a class="index" href="generic.html">Generics</a> - sử dụng và đọc các kiểu tổ hợp</li>
 	<li><a class="index" href="reflection.html">Reflection</a> - package chuẩn <code>reflect</code>.</li>
 	</ul>
@@ -151,8 +151,8 @@ Một số chủ đề đặc biệt
 	<li><a class="index" href="line-break-rules.html">Quy tắc xuống dòng</a></li>
 	<li><a class="index" href="defer-more.html">Tìm hiểu thêm về lời gọi hàm trì hoãn</a></li>
 	<li><a class="index" href="panic-and-recover-use-cases.html">Một số trường hợp sử dụng panic/recover</a></li>
-	<li><a class="index" href="panic-and-recover-more.html">Giải thích chi tiết cơ chế panic/recover</a> - đồng thời giải thích các giai đoạn kết thúc của lời gọi hàm.</li>
-	<li><a class="index" href="blocks-and-scopes.html">Block mã và scope của identifier</a></li>
+	<li><a class="index" href="panic-and-recover-more.html">Giải thích chi tiết cơ chế panic/recover</a> - đồng thời giải thích các giai đoạn thoát của lời gọi hàm.</li>
+	<li><a class="index" href="blocks-and-scopes.html">Các block mã và scope của identifier</a></li>
 	<li><a class="index" href="evaluation-orders.html">Thứ tự đánh giá biểu thức</a></li>
 	<li><a class="index" href="value-copy-cost.html">Chi phí sao chép giá trị trong Go</a></li>
 	<!-- (to remove) moved--> <li><a class="index" href="bounds-check-elimination.html">Loại bỏ kiểm tra giới hạn</a></li>
@@ -168,7 +168,7 @@ Lập trình đồng thời
 	<ul class="index chapters">
 	<li><a class="index" href="concurrent-synchronization-overview.html">Tổng quan về đồng bộ hóa concurrency</a></li>
 	<li><a class="index" href="channel-use-cases.html">Các trường hợp sử dụng channel</a></li>
-	<li><a class="index" href="channel-closing.html">Cách đóng channel an toàn</a></li>
+	<li><a class="index" href="channel-closing.html">Cách đóng channel đúng đắn</a></li>
 	<li><a class="index" href="concurrent-synchronization-more.html">Các kỹ thuật đồng bộ hóa concurrency khác</a> - package chuẩn <code>sync</code>.</li>
 	<li><a class="index" href="concurrent-atomic-operation.html">Các thao tác atomic</a> - package chuẩn <code>sync/atomic</code>.</li>
 	<li><a class="index" href="memory-model.html">Các bảo đảm về thứ tự bộ nhớ trong Go</a></li>
@@ -197,7 +197,7 @@ Các chủ đề liên quan đến bộ nhớ
 Một số phần tổng kết
 
 	<ul class="index chapters">
-	<li><a class="index" href="summaries.html">Một số phần tổng kết ngắn</a></li>
+	<li><a class="index" href="summaries.html">Một số phần tổng kết đơn giản</a></li>
 	<li><a class="index" href="nil.html"><code>nil</code> trong Go</a></li>
 	<li><a class="index" href="value-conversions-assignments-and-comparisons.html">Các quy tắc chuyển đổi, gán và so sánh giá trị</a></li>
 	<li><a class="index" href="exceptions.html">Các ngoại lệ về cú pháp/ngữ nghĩa</a></li>
@@ -228,4 +228,3 @@ Một số phần tổng kết
 <!-- index ends (don't remove) -->
 
 </div>
-"""

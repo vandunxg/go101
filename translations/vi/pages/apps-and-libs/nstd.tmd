@@ -1,7 +1,7 @@
 
 ################################## nstd (Thư viện Go không chuẩn)
 
-`nstd` là một Go module chỉ gồm một package, cung cấp
+`nstd` là một module Go chỉ gồm một package, cung cấp
 một số type và function còn thiếu trong standard library.
 
 Trang dự án: __https://github.com/go101/nstd__
@@ -62,7 +62,7 @@ func ExampleMutexAndWaitGroup() {
 	const N = 1000
 	var n = 0
 	defer func() {
-		nstd.Printfln("n = %d", n) // sẽ in thêm một dòng mới ở cuối
+		nstd.Printfln("n = %d", n) // sẽ in một dòng mới ở cuối
 		if expected := N*7; n != expected {
 			nstd.Panicf("n (%d) != %d", n, expected) // panic với format
 		}

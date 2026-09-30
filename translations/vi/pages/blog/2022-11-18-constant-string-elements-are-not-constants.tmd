@@ -15,7 +15,7 @@ func main() {}
 
 Nhiều gopher có thể nghĩ rằng nó sẽ compile được.
 Nhưng nó không compile được.
-Bởi vì các giá trị phần tử của một string luôn không phải là constant trong Go,
+Bởi vì trong Go, các giá trị của các phần tử trong một string luôn không phải là constant,
 ngay cả khi string đó là một constant.
 
 Thật đáng tiếc là Go 1.0 đã không quy định rằng các phần tử của string constant cũng là các constant.
@@ -61,7 +61,7 @@ nên nó luôn coi dòng trên không phải là một khai báo array type thô
 Nếu các phần tử của string constant là các constant, cú pháp khai báo type parameter rút gọn sẽ không thể thực hiện được.
 
 Có __một proposal__ cho phép Go hỗ trợ các array constant (và các composite value constant khác).
-Tuy nhiên, thiết kế custom generics của Go gần như đã khiến proposal đó không thể thành hiện thực.
+Tuy nhiên, thiết kế custom generics của Go gần như đã đặt dấu chấm hết cho proposal đó.
 Bởi vì, tương tự, đoạn code sau sẽ dẫn đến các ambiguity khi parsing
 nếu các value của array có thể được khai báo là constant.
 

@@ -1,7 +1,7 @@
 ### Tìm hiểu thêm về các lời gọi hàm được defer
 
 Các lời gọi hàm được defer đã được __giới thiệu trước đây__.
-Do kiến thức về Go của bạn đọc khi đó còn hạn chế,
+Do kiến thức về Go khi đó còn hạn chế,
 bài viết ấy chưa đề cập đến một số chi tiết và trường hợp sử dụng khác của lời gọi hàm được defer.
 Phần còn lại của bài viết này sẽ đề cập đến những chi tiết và trường hợp sử dụng đó.
 
@@ -9,7 +9,7 @@ Phần còn lại của bài viết này sẽ đề cập đến những chi ti�
 
 ###========== Không thể defer lời gọi đến nhiều hàm dựng sẵn có giá trị trả về
 
-Trong Go, bạn có thể bỏ qua toàn bộ giá trị trả về từ lời gọi hàm tự định nghĩa.
+Trong Go, toàn bộ giá trị trả về từ lời gọi hàm tự định nghĩa có thể bị bỏ qua.
 Tuy nhiên, với các hàm dựng sẵn có danh sách kết quả trả về không rỗng,
 __không được bỏ qua__ các giá trị trả về từ lời gọi của chúng,
 ngoại trừ lời gọi đến các hàm dựng sẵn `copy` và `recover`.
@@ -20,9 +20,10 @@ vì vậy không thể defer lời gọi đến nhiều hàm dựng sẵn.
 
 May mắn là trong thực tế, hiếm khi cần defer lời gọi đến hàm dựng sẵn
 (có danh sách kết quả trả về không rỗng).
-Theo những gì tôi biết, đôi khi chỉ cần defer lời gọi đến hàm dựng sẵn `append`.
+Theo những gì tôi biết, đôi khi chỉ có lời gọi đến hàm dựng sẵn `append`
+mới có thể cần được defer.
 Trong trường hợp này, ta có thể defer lời gọi đến một hàm vô danh
-bọc bên ngoài lời gọi `append`.
+bao bọc lời gọi `append`.
 @@@ .line-numbers
 ''' go
 package main
@@ -42,7 +43,7 @@ func main() {
 @@@ #function-evaluation-time
 ###========== Thời điểm đánh giá giá trị hàm được defer
 
-Hàm được gọi (giá trị hàm) trong một lời gọi hàm được defer sẽ được đánh giá
+Giá trị hàm được gọi trong một lời gọi hàm được defer sẽ được đánh giá
 khi lời gọi được đưa vào stack các lời gọi defer của goroutine hiện tại.
 Ví dụ, chương trình sau sẽ in ra `false`.
 
@@ -115,7 +116,7 @@ func main() {
 }
 '''
 
-###========== Lời gọi được defer giúp code rõ ràng hơn và giảm khả năng mắc lỗi
+###========== Các lời gọi được defer giúp code rõ ràng hơn và giảm khả năng mắc lỗi
 
 Ví dụ:
 
@@ -182,11 +183,11 @@ func withDefers(filepath string, head, body []byte) error {
 https://joeshaw.org/dont-defer-close-on-writable-files/
 }
 
-Bạn thấy cách nào rõ ràng hơn? Có lẽ là cách dùng lời gọi defer, dù chỉ nhỉnh hơn một chút.
+Bạn thấy cách nào rõ ràng hơn? Có vẻ là cách dùng các lời gọi được defer, dù chỉ nhỉnh hơn một chút.
 Đồng thời, cách này cũng giảm khả năng mắc lỗi: hàm không dùng defer có nhiều lời gọi `f.Close()`,
 nên dễ bỏ sót một lời gọi hơn.
 
-Ví dụ sau cho thấy lời gọi defer cũng có thể giúp giảm khả năng mắc lỗi.
+Ví dụ sau cho thấy các lời gọi được defer cũng có thể giúp giảm khả năng mắc lỗi.
 Nếu các lời gọi `doSomething` gây panic trong ví dụ dưới đây,
 hàm `f2` sẽ thoát mà không mở khóa giá trị `Mutex`.
 Vì vậy, hàm `f1` ít có khả năng mắc lỗi hơn.
@@ -214,7 +215,7 @@ Không phải lúc nào cũng nên dùng lời gọi hàm được defer.
 Với Go compiler chính thức, trước phiên bản 1.13,
 lời gọi hàm được defer gây ra một số tổn thất hiệu năng khi chạy.
 Từ Go Toolchain 1.13, một số trường hợp dùng defer phổ biến đã được tối ưu đáng kể,
-nên nhìn chung ta không cần bận tâm đến vấn đề hiệu năng do lời gọi defer gây ra.
+nên nhìn chung ta không cần bận tâm đến vấn đề hiệu năng do các lời gọi được defer gây ra.
 Cảm ơn Dan Scales đã thực hiện những tối ưu tuyệt vời này.
 
 { %%
@@ -257,7 +258,7 @@ func (t *T) IncreaseB() {
 }
 '''
 
-Trong các hàm phiên bản B, ta phải bảo đảm rằng đoạn code giữa lời gọi
+Trong các hàm phiên bản B, ta nên bảo đảm rằng đoạn code giữa lời gọi
 `Lock` và `Unlock` sẽ không bao giờ gây panic.
 Nhìn chung, nên dùng các hàm phiên bản A trong thực tế.
 Chỉ nên dùng phiên bản B khi thực sự cần quan tâm đến hiệu năng
@@ -265,12 +266,12 @@ của các hàm liên quan.
 }
 
 @@@ #kind-of-resource-leaking
-###========== Có thể gây rò rỉ tài nguyên khi defer lời gọi hàm
+###========== Hiện tượng giống rò rỉ tài nguyên khi defer lời gọi hàm
 
 Một stack các lời gọi defer quá lớn cũng có thể tiêu tốn nhiều bộ nhớ,
 và một số tài nguyên có thể không được giải phóng kịp thời nếu các lời gọi bị trì hoãn quá lâu.
 
-Ví dụ, nếu có nhiều file cần xử lý trong một lần gọi hàm sau,
+Ví dụ, nếu có nhiều file cần được xử lý trong một lần gọi đến hàm sau đây,
 thì một số lượng lớn file handler sẽ chưa được giải phóng trước khi hàm kết thúc.
 
 @@@ .line-numbers
@@ -298,9 +299,9 @@ func writeManyFiles(files []File) error {
 }
 '''
 
-Trong những trường hợp như vậy, ta có thể dùng một hàm vô danh để bao quanh các lời gọi defer,
-nhờ đó các hàm được defer sẽ được thực thi sớm hơn. Ví dụ,
-ta có thể viết lại hàm trên như sau để cải thiện nó:
+Trong những trường hợp như vậy, ta có thể dùng một hàm vô danh để bao quanh các lời gọi được defer,
+nhờ đó các lời gọi hàm được defer sẽ được thực thi sớm hơn. Ví dụ,
+ta có thể viết lại và cải thiện hàm trên như sau:
 
 @@@ .line-numbers
 ''' go
@@ -329,4 +330,3 @@ func writeManyFiles(files []File) error {
 	return nil
 }
 '''
-

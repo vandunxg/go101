@@ -2,7 +2,7 @@
 
 Bài viết này liệt kê các loại ngoại lệ về cú pháp/ngữ nghĩa trong Go.
 Một số ngoại lệ là cú pháp rút gọn giúp lập trình thuận tiện hơn,
-một số xuất phát từ các ưu đãi dành cho generic tích hợp sẵn,
+một số do các đặc quyền của generic tích hợp sẵn gây ra,
 một số tồn tại vì lý do lịch sử, còn một số có nguyên nhân logic khác.
 
 @@@ #nest-function-calls
@@ -29,7 +29,7 @@ Ngoại lệ (trước Go Toolchain 1.15):
 !
    Với trình biên dịch Go tiêu chuẩn (không áp dụng cho gccgo),
    quy tắc cơ bản không áp dụng khi lồng lời gọi hàm tích hợp sẵn `print` và `println`.
-   Không thể dùng lời gọi hàm trả về nhiều giá trị làm đối số lồng bên trong các hàm này.
+   Không thể dùng lời gọi hàm trả về nhiều giá trị làm đối số trong lời gọi tới các hàm này.
 }
 
 Ví dụ:
@@ -53,7 +53,7 @@ type T struct{}
 func (T) m()(float64, float64) {return 1, 2}
 
 func main() {
-	// These lines compile okay.
+	// Các dòng này biên dịch được.
 	f2(f0(), 123)
 	f2(f1())
 	fmt.Println(f1())
@@ -61,23 +61,24 @@ func main() {
 	_ = complex(T{}.m())
 	f2(I(T{}).m())
 
-	// These lines don't compile.
+	// Các dòng này không biên dịch được.
 	/*
 	f3(123, f1())
 	f3(f1(), 123)
 	*/
 
-	// This line compiles okay only since
+	// Dòng này chỉ biên dịch được kể từ
 	// Go Toolchain 1.15.
 	println(f1())
 
-	// The following 3 lines compile okay
-	// only since Go Toolchain 1.13.
+	// 3 dòng sau biên dịch được
+	// chỉ kể từ Go Toolchain 1.13.
 	copy(f4())
 	delete(f5())
 	_ = complex(I(T{}).m())
-}
-'''
+ }
+ '''
+
 
 { %%
 ###========== Biến không được sử dụng
@@ -85,7 +86,7 @@ func main() {
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Không được khai báo biến cục bộ rồi bỏ đó không sử dụng.
+   Không thể khai báo biến cục bộ mà không sử dụng.
 
 Ngoại lệ:
 @@@ .alert;alert-success
@@ -121,7 +122,7 @@ func main() {
 	var p = &t
 
 	p.x *= 2
-	// The above line is a sugar of the following line.
+	// Dòng trên là cú pháp rút gọn của dòng sau.
 	(*p).x *= 2
 }
 '''
@@ -137,7 +138,7 @@ Cú pháp rút gọn:
 @@@ .alert;alert-success
 !
    Mặc dù các method được khai báo tường minh cho kiểu `*T` không phải là method của kiểu `T`,
-   giá trị kiểu `T` có thể lấy địa chỉ vẫn được dùng làm receiver khi gọi các method này.
+   các giá trị addressable kiểu `T` có thể được dùng làm receiver khi gọi các method này.
 
 Ví dụ:
 @@@ .line-numbers
@@ -153,34 +154,34 @@ func (pt *T) Double() {
 }
 
 func main() {
-	// T{3}.Double() // This line fails to compile.
+	// T{3}.Double() // Dòng này không biên dịch được.
 
 	var t = T{3}
 
-	t.Double() // t.x == 6 now
-	// The above line is a sugar of the following line.
-	(&t).Double() // t.x == 12 now
+	t.Double() // lúc này, t.x == 6
+	// Dòng trên là cú pháp rút gọn của dòng sau.
+	(&t).Double() // lúc này, t.x == 12
 }
 '''
 
-###========== Lấy địa chỉ giá trị composite literal
+###========== Lấy địa chỉ của các giá trị composite literal
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Các giá trị literal không thể lấy địa chỉ, và không thể lấy địa chỉ của giá trị không thể lấy địa chỉ.
+   Các giá trị literal là unaddressable, và không thể lấy địa chỉ của các giá trị unaddressable.
 
 Cú pháp rút gọn:
 @@@ .alert;alert-success
 !
-   Dù giá trị composite literal không thể lấy địa chỉ, vẫn có thể lấy địa chỉ của chúng một cách tường minh.
+   Mặc dù các giá trị composite literal là unaddressable, vẫn có thể lấy địa chỉ của chúng một cách tường minh.
 
-Đọc thêm __structs__ và __containers__ để biết chi tiết.
+Đọc thêm __struct__ và __container__ để biết chi tiết.
 
-    === structs :: struct.tmd#take-composite-literal-address
-    === containers :: container.tmd#take-composite-literal-address
+    === struct :: struct.tmd#take-composite-literal-address
+    === container :: container.tmd#take-composite-literal-address
 
-###========== Selector trên named pointer một cấp
+###========== Selector trên pointer một cấp có tên
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
@@ -194,7 +195,7 @@ Cú pháp rút gọn:
    và selector `(*x).f` hợp lệ,
    thì `x.f` cũng là selector hợp lệ, có thể xem là cách viết tắt của `(*x).f`.
 
-    === named :: type-system-overview.tmd#underlying-type
+    === có tên :: type-system-overview.tmd#underlying-type
 
 Không thể dùng selector trên giá trị có kiểu pointer **nhiều cấp**,
 dù kiểu pointer nhiều cấp đó có được đặt tên hay không.
@@ -218,23 +219,23 @@ func (T) y() {
 }
 
 type P *T
-type PP **T // a multi-level pointer type
+type PP **T // một kiểu pointer nhiều cấp
 
 func main() {
 	var t T
 	var p P = &t
-	var pt = &t   // type of pt is *T
-	var ppt = &pt // type of ppt is **T
+	var pt = &t   // kiểu của pt là *T
+	var ppt = &pt // kiểu của ppt là **T
 	var pp PP = ppt
 	_ = pp
 
-	_ = (*p).x // legal
-	_ = p.x    // also legal (for x is a field)
+	_ = (*p).x // hợp lệ
+	_ = p.x    // cũng hợp lệ (vì x là một trường)
 
-	_ = (*p).y // legal
-	// _ = p.y // illegal (for y is a method)
+	_ = (*p).y // hợp lệ
+	// _ = p.y // không hợp lệ (vì y là một method)
 
-	// Following ones are all illegal.
+	// Các dòng sau đều không hợp lệ.
 	/*
 	_ = ppt.x
 	_ = ppt.y
@@ -260,7 +261,7 @@ Cú pháp rút gọn:
    độ ưu tiên cao hơn toán tử `++`. Nói cách khác, `*ptr++` tương đương với
    `(*ptr)++`, vì Go không hỗ trợ phép toán số học trên pointer.
 
-    === binary operator :: https://golang.org/ref/spec#Operators
+    === toán tử hai ngôi :: https://golang.org/ref/spec#Operators
 
 Ví dụ:
 @@@ .line-numbers
@@ -282,43 +283,43 @@ func main() {
 	var t = &T{}
 	var a = *t.M()
 	var b = *(t.M())
-	// The above two lines are equivalent.
+	// Hai dòng trên tương đương nhau.
 	var c = (*t).M()
 	fmt.Printf("%T %T %T\n", a, b, c) // int int *int
 
 	var s = [...]int{0, 1, 2}
 	var u = &s[0]
 	var v = &(s[0])
-	// The above two lines are equivalent.
+	// Hai dòng trên tương đương nhau.
 	var w = (&s)[0]
 	fmt.Printf("%T %T %T\n", u, v, w) // *int *int int
 
-	// sugar
+	// cú pháp rút gọn
 
 	var x = new(int)
-	*x++ // *x == 1 now
-	// The Above line is a sugar for
+	*x++ // lúc này, *x == 1
+	// Dòng trên là cú pháp rút gọn của
 	(*x)++
 }
 '''
 }
 
-###========== Khả năng lấy địa chỉ của container và phần tử
+###========== Tính addressable của container và các phần tử
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Nếu có thể lấy địa chỉ của một container thì cũng có thể lấy địa chỉ các phần tử của nó.
+   Nếu một container là addressable thì các phần tử của nó cũng là addressable.
 
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   Các phần tử của `map` luôn không thể lấy địa chỉ, ngay cả khi bản thân `map` có thể lấy địa chỉ.
+   Các phần tử của `map` luôn là unaddressable, ngay cả khi bản thân `map` là addressable.
 
 Cú pháp rút gọn:
 @@@ .alert;alert-success
 !
-   Các phần tử của `slice` luôn có thể lấy địa chỉ, ngay cả khi bản thân `slice` không thể lấy địa chỉ.
+   Các phần tử của `slice` luôn là addressable, ngay cả khi bản thân `slice` là unaddressable.
 
 Ví dụ:
 @@@ .line-numbers
@@ -327,33 +328,33 @@ package main
 
 func main() {
 	var m = map[string]int{"abc": 123}
-	_ = &m // okay
+	_ = &m // được
 
-	// The exception:
+	// Ngoại lệ:
 	// p = &m["abc"] // error: map elements are unaddressable
 
-	// The sugar:
-	f := func() []int { // return results are unaddressable
+	// Cú pháp rút gọn:
+	f := func() []int { // các giá trị trả về là unaddressable
 		return []int{0, 1, 2}
 	}
 	// _ = &f() // error: f() is unaddressable
-	_ = &f()[2] // okay
+	_ = &f()[2] // được
 }
 '''
 
-###========== Sửa đổi giá trị không thể lấy địa chỉ
+###========== Sửa đổi giá trị unaddressable
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Không thể sửa đổi các giá trị không thể lấy địa chỉ.
-   Nói cách khác, giá trị không thể lấy địa chỉ không nên xuất hiện ở vế trái phép gán.
+   Không thể sửa đổi các giá trị unaddressable.
+   Nói cách khác, các giá trị unaddressable không nên xuất hiện ở vị trí đích trong phép gán.
 
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   Mặc dù giá trị phần tử `map` không thể lấy địa chỉ, vẫn có thể sửa đổi chúng
-   và dùng chúng làm giá trị đích trong phép gán.
+   Mặc dù các giá trị phần tử `map` là unaddressable, chúng vẫn có thể được sửa đổi
+   và xuất hiện ở vị trí đích trong phép gán.
    (Tuy nhiên, không thể sửa một phần tử `map` theo từng phần,
    mà chỉ có thể ghi đè toàn bộ, tức là thay thế phần tử đó.)
 
@@ -368,11 +369,11 @@ func main() {
 	}
 
 	var mt = map[string]T{"abc": {123}}
-	// Map elements are unaddressable.
+	// Các phần tử map là unaddressable.
 	// _ = &mt["abc"] // error
-	// Partial modification is not allowed.
+	// Không cho phép sửa đổi một phần.
 	// mt["abc"].x = 456 // error
-	// It is ok to replace a map element as a whole.
+	// Có thể thay thế toàn bộ một phần tử map.
 	mt["abc"] = T{x: 789}
 }
 '''
@@ -387,7 +388,7 @@ Quy tắc cơ bản:
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   Đối số đầu tiên của các hàm tích hợp sẵn `make` và `new` là kiểu.
+   Tham số đầu tiên của các hàm tích hợp sẵn `make` và `new` là kiểu.
 
 
 ###========== Tên hàm trong cùng một package
@@ -451,11 +452,11 @@ import "unsafe"
 func init() {}
 
 func main() {
-	// These ones are okay.
+	// Các dòng này hợp lệ.
 	var _ = main
 	var _ = fmt.Println
 
-	// This one fails to compile.
+	// Dòng này không biên dịch được.
 	var _ = init
 }
 '''
@@ -507,16 +508,16 @@ Ngoại lệ trong ngoại lệ:
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Các biến đã khai báo luôn có thể lấy địa chỉ.
+   Các biến đã khai báo luôn là addressable.
 
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   Biến __`nil` được khai báo sẵn__ không thể lấy địa chỉ.
+   Biến __`nil` được khai báo sẵn__ là unaddressable.
 
 Vì vậy, `nil` là một biến bất biến.
 
-    === predeclared `nil` :: https://golang.org/pkg/builtin/#pkg-variables
+    === `nil` được khai báo sẵn :: https://golang.org/pkg/builtin/#pkg-variables
 
 ###========== Truyền đối số
 
@@ -544,13 +545,13 @@ func main() {
 	var s = "xyz"
 
 	copy(bs, s)
-	// The above line is a sugar (and an optimization)
-	// for the following line.
+	// Dòng trên là cú pháp rút gọn (và là một tối ưu hóa)
+	// của dòng sau.
 	copy(bs, []byte(s))
 
 	bs = append(bs, s...)
-	// The above line is a sugar (and an optimization)
-	// for the following line.
+	// Dòng trên là cú pháp rút gọn (và là một tối ưu hóa)
+	// của dòng sau.
 	bs = append(bs, []byte(s)...)
 }
 '''
@@ -576,8 +577,8 @@ func main() {
 	var s1 = []int{1, 2, 3}
 	var s2 = []int{7, 8, 9}
 	//_ = s1 == s2 // error: slice values can't be compared
-	_ = s1 == nil // ok
-	_ = s2 == nil // ok
+	_ = s1 == nil // được
+	_ = s2 == nil // được
 
 	var m1 = map[string]int{}
 	var m2 = m1
@@ -598,18 +599,18 @@ func main() {
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Nếu một giá trị có thể được chuyển đổi ngầm định sang kiểu so sánh được thì có thể so sánh giá trị đó với các giá trị thuộc kiểu ấy.
+   Nếu một giá trị có thể được chuyển đổi ngầm định sang kiểu comparable thì có thể so sánh giá trị đó với các giá trị thuộc kiểu ấy.
 
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   Không thể so sánh các giá trị thuộc kiểu không phải interface và không thể so sánh với giá trị thuộc kiểu interface,
-   ngay cả khi kiểu không phải interface và không thể so sánh đó triển khai kiểu interface
-   (do đó giá trị của kiểu không phải interface ấy có thể được chuyển đổi ngầm định sang kiểu interface).
+   Không thể so sánh các giá trị thuộc kiểu incomparable không phải interface với các giá trị thuộc kiểu interface,
+   ngay cả khi kiểu incomparable không phải interface đó triển khai kiểu interface
+   (do đó giá trị của kiểu incomparable không phải interface ấy có thể được chuyển đổi ngầm định sang kiểu interface).
 
-Xem __comparison rules__ để biết ví dụ.
+Xem __quy tắc so sánh__ để biết ví dụ.
 
-    === comparison rules :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
+    === quy tắc so sánh :: value-conversions-assignments-and-comparisons.tmd#comparison-rules
 
 { %%
 ###========== So sánh giá trị interface
@@ -617,14 +618,14 @@ Xem __comparison rules__ để biết ví dụ.
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   So sánh các giá trị interface có dynamic value không thể so sánh sẽ gây `panic`.
+   So sánh các giá trị interface có dynamic value incomparable sẽ gây `panic`.
 
 Ngoại lệ:
 @@@ .alert;alert-success
 !
    Nếu dynamic type của hai giá trị interface khác nhau,
    thì so sánh chúng sẽ không bao giờ gây `panic`,
-   kể cả khi một trong hai dynamic value không thể so sánh.
+   kể cả khi một trong hai dynamic value là incomparable.
 
 Ví dụ:
 @@@ .line-numbers
@@ -637,11 +638,11 @@ func main() {
 	var x interface{} = s
 	var y interface{} = m
 	var z interface{} = nil
-	// The dynamic values of x and y are both incomparable.
-	//_ = x == x // will panic
-	//_ = y == y // will panic
-	_ = x == z // false, will not panic
-	_ = x == y // false, will not panic
+	// Các dynamic value của x và y đều có kiểu incomparable.
+	//_ = x == x // sẽ panic
+	//_ = y == y // sẽ panic
+	_ = x == z // false, sẽ không panic
+	_ = x == y // false, sẽ không panic
 }
 '''
 }
@@ -667,7 +668,7 @@ package main
 import "fmt"
 
 func main() {
-	// new(T) returns the address of a zero value of type T.
+	// new(T) trả về địa chỉ của zero value kiểu T.
 
 	type T0 struct {
 		x int
@@ -720,7 +721,7 @@ Ngoại lệ:
    Kiểu tích hợp sẵn `error` có method `Error() string`.
 
 { %%
-###========== Phạm vi hiển thị của identifier
+###========== Tính hiển thị của identifier
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
@@ -744,7 +745,7 @@ Quy tắc cơ bản:
 Ngoại lệ:
 @@@ .alert;alert-success
 !
-   `nil` không định kiểu không có kiểu cũng như kiểu mặc định.
+   `nil` không định kiểu không có kiểu lẫn kiểu mặc định.
 
 
 ###========== Giá trị hằng
@@ -770,7 +771,7 @@ Ngoại lệ 2:
    Không thể gán `iota` cho biến trong khai báo biến.
 
 @@@ #behaviors-on-missing-optional-result
-###========== Thay đổi hành vi khi bỏ kết quả đánh giá tùy chọn của biểu thức
+###========== Thay đổi hành vi do bỏ qua các kết quả đánh giá tùy chọn của biểu thức
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
@@ -791,33 +792,33 @@ func main() {
 	var ok bool
 
 	var m = map[int]int{}
-	_, ok = m[123] // will not panic
-	_ = m[123]     // will not panic
+	_, ok = m[123] // sẽ không panic
+	_ = m[123]     // sẽ không panic
 
 	var c = make(chan int, 2)
 	c <- 123
 	close(c)
-	_, ok = <-c // will not panic
-	_ = <-c     // will not panic
+	_, ok = <-c // sẽ không panic
+	_ = <-c     // sẽ không panic
 
 	var v interface{} = "abc"
-	_, ok = v.(int) // will not panic
-	_ = v.(int)     // will panic!
+	_, ok = v.(int) // sẽ không panic
+	_ = v.(int)     // sẽ panic!
 }
 '''
 
 @@@ #code-block-following-else
-###========== Từ khóa `else` theo sau bởi khối mã
+###========== Từ khóa `else` theo sau là khối mã
 
 Quy tắc cơ bản:
 @@@ .alert;alert-info
 !
-   Từ khóa `else` phải theo sau bởi một khối mã tường minh `{...}`.
+   Từ khóa `else` phải được theo sau bởi một khối mã tường minh `{...}`.
 
 Cú pháp rút gọn:
 @@@ .alert;alert-success
 !
-   Từ khóa `else` có thể theo sau bởi khối mã `if` (là khối ngầm định).
+   Từ khóa `else` có thể theo sau là khối mã `if` (là khối ngầm định).
 
 Ví dụ, trong đoạn mã sau, hàm `foo` biên dịch được, còn hàm `bar` thì không.
 @@@ .line-numbers
@@ -858,7 +859,4 @@ func bar() {
 	}
 }
 '''
-
-
-
 

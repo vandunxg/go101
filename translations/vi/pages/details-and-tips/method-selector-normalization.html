@@ -71,7 +71,7 @@ func main() {
 }
 </code></pre>
 
-<p>Lưu ý rằng interface method value và method value lấy được qua reflection sẽ được mở rộng thành promoted method value với một độ trễ.
+<p>Lưu ý rằng các interface method value và các method value lấy được qua reflection sẽ được mở rộng thành các promoted method value sau một khoảng trễ.
 Ví dụ, trong chương trình sau, việc sửa đổi <code>s.T.X</code>
 ảnh hưởng đến kết quả trả về của các method value lấy được qua reflection và qua interface.</p>
 
@@ -107,7 +107,7 @@ func main() {
 
 <p>Nguồn: <a href="https://github.com/golang/go/issues/47863">https://github.com/golang/go/issues/47863</a></p>
 
-<p>Lưu ý, official standard Go compiler có một bug trước version 1.20.
+<p>Lưu ý rằng trước version 1.20, official standard Go compiler có một bug.
 Các compiler cũ de-virtualize một số interface method ở compile time, nhưng việc de-virtualize được thực hiện quá mức nên không đúng.
 Ví dụ, chương trình sau đáng lẽ phải in ra <code>2 2</code>,
 nhưng sẽ in ra <code>1 2</code> nếu được compile bằng official standard Go compiler v1.19.</p>
@@ -129,10 +129,10 @@ func main() {
 	var i I = t
 	
 	var f = i.M
-	defer f() // 2 (đúng)
+	defer f() // 2 (correct)
 
-	// i.M được de-virtualize thành (*t).M tại compile time (bug).
-	defer i.M() // 1 (sai)
+	// i.M is de-virtualized as (*t).M at compile time (bug).
+	defer i.M() // 1 (wrong)
 	
 	t.x = 2
 }

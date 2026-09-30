@@ -3,7 +3,7 @@
 
 ###====== Trường hợp 1
 
-Do __một bug inline function__ (lời gọi hàm `foo()` được inline ở đây),
+Do __một bug khi inline function__ (lời gọi hàm `foo()` được inline ở đây),
 với các phiên bản Go toolchain trước v1.23, chương trình sau in ra
 `1 0`, nhưng theo __các quy tắc__ được quy định trong Go specification,
 nó phải in ra `1 1`.
@@ -32,7 +32,7 @@ func main() {
 
 ###====== Trường hợp 2
 
-Do __một bug tối ưu hóa trong compiler__,
+Do __một bug trong quá trình tối ưu hóa của compiler__,
 với các phiên bản Go toolchain trước v1.22, chương trình sau in ra
 `true`, nhưng theo __các quy tắc__ được quy định trong Go specification,
 nó phải in ra `false`.

@@ -1,6 +1,6 @@
 
 #######################################################
-    Các thay đổi ngữ nghĩa của loop `for` trong Go 1.22: Hãy lưu ý tác động
+    Các thay đổi ngữ nghĩa của loop `for` trong Go 1.22: Hãy lưu ý đến tác động
 
 Go 1.22 đã thay đổi ngữ nghĩa của các loop `for`,
 bao gồm cả loop `for-range` và loop 3-clause truyền thống
@@ -22,7 +22,7 @@ Nội dung:
 Nói cụ thể, chỉ ngữ nghĩa của các loop `for`
 mà các loop variable được khai báo bên trong loop mới thay đổi
 (trong phần còn lại của nội dung, chúng ta gọi các loop variable như vậy là
-loop variable được khai báo mới).
+loop variable mới được khai báo).
 Ví dụ, trong đoạn code sau,
 ngữ nghĩa của hai loop đầu không thay đổi,
 nhưng ngữ nghĩa của hai loop sau thay đổi (từ Go 1.21 sang 1.22).
@@ -81,12 +81,12 @@ Sự khác biệt về hành vi là rõ ràng:
 *  từ Go 1.22, nó in `10` (luôn luôn, ngay cả khi không có sự tham gia của channel `c`).
 
 Lý do của sự khác biệt:
-*  trước Go 1.22, mọi loop variable được khai báo mới được dùng trong
+*  trước Go 1.22, mọi loop variable mới được khai báo được dùng trong
    một loop `for` đều được dùng chung bởi tất cả iteration trong lúc thực thi loop.
    Hai goroutine mới được tạo được thực thi sau khi thực thi loop `for` kết thúc,
    khi đó các value cuối cùng của loop variable `i` và `v` lần lượt là `3` và `4`.
    `(3+4) + (3+4)` cho kết quả `14`.
-*  từ Go 1.22, mọi loop variable được khai báo mới được dùng trong
+*  từ Go 1.22, mọi loop variable mới được khai báo được dùng trong
    một loop `for` sẽ được instantiate thành một instance riêng biệt
    ở đầu mỗi iteration. Nói cách khác,
    hiện tại nó có scope theo từng iteration. Vì vậy, các value của
@@ -150,13 +150,13 @@ Bài viết này tập trung vào các chi tiết của những thay đổi
 và tác động của các thay đổi, thay vì các lý do phía sau chúng.
 Để biết chi tiết về quá trình phê duyệt và các lý do phía sau những thay đổi,
 hãy xem
-*. Cuộc thảo luận đầu tiên: định nghĩa lại ngữ nghĩa của loop variable trong for:
+*. Cuộc thảo luận đầu tiên: định nghĩa lại ngữ nghĩa của loop variable trong loop `for`:
    __https://github.com/golang/go/discussions/56010__.
-*. Thread issue của proposal chính thức:
+*. Issue thread của proposal chính thức:
    __https://github.com/golang/go/issues/60078__.
    **Lưu ý rằng comment mở đầu của thread này hầu như không đề cập đến
    thay đổi ngữ nghĩa trên các loop `for;;`.
-*. Chính file proposal:
+*. Bản thân file proposal:
    __https://go.googlesource.com/proposal/+/master/design/60078-loopvar.md__.
    //(Nếu bạn chỉ quan tâm đến các lý do, bạn chỉ cần đọc file này.)//
 *. Trang wiki:    __https://go.dev/wiki/LoopvarExperiment__,
@@ -179,14 +179,14 @@ hãy xem
     Tác động của các thay đổi
 
 Cá nhân tôi cho rằng lý do của thay đổi đối với các loop `for-range` là hợp lý.
-Semantics mới của các loop `for-range` trở nên trực quan hơn.
+Ngữ nghĩa mới của các loop `for-range` trở nên trực quan hơn.
 Thay đổi này chỉ ảnh hưởng đến các loop `for k, v := range .. {...}`,
 trong đó ký hiệu `:=` gợi ý mạnh rằng các loop variable có scope theo từng iteration.
-Không có hệ quả nào được đưa vào. Tác động của thay đổi gần như là tích cực.
+Không phát sinh hệ quả nào. Tác động của thay đổi gần như là tích cực.
 
 Mặt khác, theo ý kiến thành thật của tôi, lý do của thay đổi đối với các loop `for;;`
 là chưa đủ thuyết phục. Lý do chính được những người tạo proposal đưa ra là để
-tạo sự nhất quán với các loop `for-range` (cả hai đều là loop `for`).
+tạo tính nhất quán với các loop `for-range` (cả hai đều là loop `for`).
 Tuy nhiên, hoàn toàn không trực quan khi nghĩ rằng các loop variable trong
 các loop tương tự sau đây có scope theo từng iteration.
 
@@ -198,15 +198,15 @@ for a, b, c := anExpression; aCondition; postStatement {
 
 Câu lệnh `a, b, c := anExpression` chỉ được thực thi một lần
 trong suốt quá trình thực thi loop, vì vậy thật trực quan khi cho rằng
-các loop variable chỉ được **//khởi tạo tường minh//** một lần
+các loop variable chỉ được **//instantiate một cách tường minh//** một lần
 trong quá trình thực thi loop.
-Semantics mới khiến các loop variable được khởi tạo
+Ngữ nghĩa mới khiến các loop variable được instantiate
 ở mỗi iteration, nghĩa là phải có một đoạn code **//ngầm định**//
 để thực hiện việc đó. Điều này là đúng. __Specification của Go 1.22+__ nói rằng:
 
->  Mỗi iteration có một variable (hoặc các variable) riêng biệt đã khai báo.
-   Variable được iteration đầu tiên sử dụng được khai báo bởi init statement.
-   Variable được mỗi iteration tiếp theo sử dụng được khai báo ngầm định
+>  Mỗi iteration có một variable (hoặc các variable) riêng biệt được khai báo cho iteration đó.
+   Variable được sử dụng trong iteration đầu tiên được khai báo bởi init statement.
+   Variable được sử dụng trong mỗi iteration tiếp theo được khai báo ngầm định
    trước khi thực thi post statement và được khởi tạo bằng value của variable
    thuộc iteration trước tại thời điểm đó.
 
@@ -247,7 +247,7 @@ Phần sau sẽ chỉ ra một số trường hợp có thể phá vỡ kỳ v�
 
 @@@ #defer-calls
 ###-------------------
-    Hành vi của các function call được defer có capture loop variable có thể thay đổi
+    Hành vi của các function call được defer và capture loop variable có thể thay đổi
 
 Một ví dụ đơn giản:
 
@@ -285,7 +285,7 @@ Bạn có thể thấy rằng, từ Go 1.22, value của `counter`
 không bao giờ thực sự được tăng. Tại sao? Tôi xin lỗi.
 Như đã đề cập ở trên, rất khó giải thích rõ ràng
 ngữ nghĩa mới và tôi không nghĩ mình có khả năng làm điều đó.
-Bạn có thể hiểu được từ code tương đương sau:
+Bạn có thể hiểu điều này từ code tương đương sau:
 
 ''' Go
 func main() {
@@ -324,7 +324,7 @@ func demoFilter(n int) bool {
 	return n & 1 == 0;
 }
 
-// Tìm các value và trả về chúng mà không đảo ngược thứ tự.
+// Tìm các value và trả về chúng mà không làm sai lệch thứ tự.
 func search(start, end int)(r []int) {
 	var count = 0
 	for i, index := start, 0; i <= end; i++ {
@@ -356,14 +356,14 @@ $ gotv 1.22. run search.go
 [0 0 0 0 0]
 '''
 
-Vì vậy, từ Go 1.22, hãy cẩn thận khi dùng các loop variable được khai báo mới
+Vì vậy, từ Go 1.22, hãy cẩn thận khi dùng các loop variable mới được khai báo
 trong các function call được defer.
 
-!  Ví dụ trên cho thấy một số loop variable được khai báo mới trong clause đầu tiên của
-   loop `for;;` có thể phù hợp với scope theo từng iteration,
+!  Ví dụ trên cho thấy một số loop variable mới được khai báo trong clause đầu tiên của
+   loop `for;;` có thể có scope theo từng iteration,
    nhưng một số khác được kỳ vọng mạnh mẽ là có scope trên toàn loop,
    chẳng hạn như các loop variable `index` và `counter` được cho thấy ở trên.
-   Tôi từng đề xuất __cho phép các statement khai báo lại làm `postStatement`
+   Tôi từng đề xuất __cho phép các statement khai báo lại được dùng làm `postStatement`
    của loop `for;;` để **//tường minh//** chỉ định variable nào có scope theo từng iteration__.
    Ví dụ, trong code loop sau, `n` có scope theo từng iteration nhưng `counter`
    có scope trên toàn loop.
@@ -413,9 +413,9 @@ $ gotv 1.22. run demo-closure-1.go
 0
 '''
 
-Trước Go 1.22, thứ mà closure `printN` capture là instance duy nhất
+Trước Go 1.22, closure `printN` capture instance duy nhất
 của loop variable, có value cuối cùng là `9`.
-Tuy nhiên, từ Go 1.22, thứ mà closure `printN` capture là instance đầu tiên
+Tuy nhiên, từ Go 1.22, closure `printN` capture instance đầu tiên
 của loop variable, có value cuối cùng là `0`.
 Đó là lý do của sự khác biệt về hành vi giữa hai version Go.
 
@@ -473,7 +473,7 @@ func main() {
 Từ Go 1.22, nó sẽ không bao giờ thoát (trước Go 1.22, nó in `012` rồi thoát ngay lập tức)
 
 !  Vì vậy, dù bạn thấy nó trực quan hay không, chỉ cần nhớ rằng,
-   từ Go 1.22, một loop variable được khai báo mới có thể có nhiều instance lúc chạy,
+   từ Go 1.22, một loop variable mới được khai báo có thể có nhiều instance lúc chạy,
    bất kể nó có được sửa đổi trong `postStatement` hay không.
    Mỗi instance được instantiate trong một bước iteration.
 
@@ -482,7 +482,7 @@ Từ Go 1.22, nó sẽ không bao giờ thoát (trước Go 1.22, nó in `012` r
     Hãy cẩn thận khi lấy address của loop variable
 
 Tương tự, từ Go 1.22, việc dùng
-address của một loop variable được khai báo mới qua các iteration của loop có thể nguy hiểm.
+address của một loop variable mới được khai báo qua các iteration của loop có thể nguy hiểm.
 
 Ví dụ, chương trình Go sau in ra gì?
 //(Một số người nói rằng ví dụ này kỳ quặc đến mức không nên duy trì backward-compatibility
@@ -513,7 +513,7 @@ false
 '''
 
 Go 1.21 và 1.22 cho các câu trả lời khác nhau.
-Tại sao? Từ code tương đương được cho thấy bên dưới, chúng ta có thể thấy rằng,
+Tại sao? Từ đoạn code tương đương bên dưới, có thể thấy rằng,
 trong phép so sánh `p == &i`, `p` trỏ tới instance đầu tiên của `i`,
 trong khi `&i` lấy address của instance thứ hai của `i`.
 Vì vậy, kết quả đánh giá phép so sánh là `false`.
@@ -556,7 +556,7 @@ func main() {
 }
 '''
 
-Từ Go 1.22, chương trình trên sẽ không bao giờ thoát (trước Go 1.22 thì có):
+Từ Go 1.22, chương trình trên sẽ không bao giờ thoát (trước Go 1.22, chương trình sẽ thoát):
 '''
 $ gotv 1.21. run demo-pointer2.go
 [Run]: $HOME/.cache/gotv/tag_go1.21.7/bin/go run demo-pointer2.go
@@ -589,7 +589,7 @@ for ...; ...; {
 }
 '''
 
-Ví dụ, nếu chúng ta chuyển các statement của clause thứ 3 của các loop
+Ví dụ, nếu chúng ta chuyển các statement trong clause thứ 3 của các loop
 trong section cuối vào trong thân loop, thì hành vi của chúng thay đổi (từ Go 1.22).
 
 ''' Go
@@ -636,7 +636,7 @@ true
     Hãy cẩn thận khi khai báo các value no-copy làm loop variable
 
 Như đã giải thích ở trên, từ Go 1.22, ở đầu mỗi iteration của loop,
-mỗi loop variable được khai báo mới sẽ được copy một lần, **//ngầm định//**.
+mỗi loop variable mới được khai báo sẽ được copy một lần, **//ngầm định//**.
 Hệ quả là, từ Go 1.22, nói chung không nên
 dùng các value no-copy làm loop variable.
 Các ví dụ bao gồm `sync.Mutex`, `sync/atomic.Int64`, `bytes.Buffer`, `strings.Builder`,
@@ -693,7 +693,7 @@ $ gotv 1.22. vet demo-nocopy1.go
 '''
 
 Lưu ý rằng command `go vet` trong các version Go toolchain trước 1.24 không thể phát hiện
-việc nhân bản ngầm định như vậy của các value no-copy, bất kể loop variable `wg`
+việc nhân bản ngầm định các value no-copy như vậy, bất kể loop variable `wg`
 có được capture trong thân loop hay không.
 
 Một số kiểm tra `no-copy` được thực hiện trong lúc chạy.
@@ -756,25 +756,25 @@ goroutine 1 [running]:
 Các output cho thấy rằng:
 *  trước Go 1.22, hành vi của hai function `a2z` nhất quán.
    Không xảy ra việc nhân bản loop variable, nên sẽ không có panic.
-*  từ Go 1.22, vì loop variable được khai báo mới được copy ngầm định
-   ở đầu mỗi iteration, function kiểm tra `no-copy` lúc chạy hoạt động.
+*  từ Go 1.22, vì loop variable mới được khai báo được copy ngầm định
+   ở đầu mỗi iteration, việc kiểm tra `no-copy` lúc chạy có hiệu lực.
    Nhưng việc kiểm tra chỉ hoạt động cho function `a2z_bar`,
    không hoạt động cho function `a2z_foo`.
 
 Nhưng tại sao việc kiểm tra `no-copy` lúc chạy không hoạt động cho function `a2z_foo`?
-Vì hai compiler optimization.
+Vì có hai compiler optimization.
 Trong một optimization, compiler bỏ qua dòng `foo(&b)` trong function `a2z_foo`.
 Optimization này thực sự hợp lệ.
-Optimization này có tính bảo thủ nên compiler không bỏ qua dòng `bar(&b)`
+Optimization này có tính bảo thủ, nên compiler không bỏ qua dòng `bar(&b)`
 trong function `a2z_bar`.
 Hệ quả là, trong optimization còn lại, compiler (nhầm lẫn) cho rằng
-loop variable `b` được khai báo mới trong function `a2z_foo` chỉ có thể được instantiate một lần
+loop variable `b` mới được khai báo trong function `a2z_foo` chỉ có thể được instantiate một lần
 cho toàn bộ loop, mặc dù ngữ nghĩa của nó cho thấy cần instantiate theo từng iteration.
 
 Tuy nhiên, compiler quá thông minh để __đưa ra một quyết định sai__ ở đây.
 Compiler đã triển khai ngữ nghĩa không đúng.
-Hành vi của hai function `a2z` trong chương trình trên vẫn phải nhất quán từ Go 1.22.
-Cả hai đều phải panic.
+Hành vi của hai function `a2z` trong chương trình trên vẫn nên nhất quán từ Go 1.22.
+Cả hai đều nên panic.
 
 Go core team __từ chối sửa bug này__, điều này gióng lên hồi chuông cảnh báo rằng
 hành vi không mong đợi có thể xảy ra trong các kịch bản tương tự khác.
@@ -800,7 +800,7 @@ bởi vì việc copy các value no-copy không phải lúc nào cũng gây hư 
 
 Đôi khi compiler quá thông minh; đôi khi nó không đủ thông minh.
 Ví dụ, đôi khi standard compiler chính thức được cung cấp trong Go toolchain 1.22
-không thể xác định rằng mỗi instance của một loop variable được khai báo mới
+không thể xác định rằng mỗi instance của một loop variable mới được khai báo
 chỉ được dùng trong lifetime tương ứng của iteration, khiến loop variable
 được instantiate theo từng iteration và mỗi instance của nó
 được allocate trên heap thay vì stack. Tệ hơn nữa, nếu size của loop variable lớn,
@@ -879,7 +879,7 @@ Các gợi ý để tránh vấn đề suy giảm performance này:
 
 @@@ #sharing-loop-vars
 ###-------------------
-    Cảnh báo: mọi thứ có thể trở nên tinh vi hơn trước khi loop variable được dùng đồng thời
+    Cảnh báo: mọi thứ có thể trở nên tinh vi hơn trước khi các loop variable được dùng đồng thời
 
 Trước hết, hãy xem một chương trình đơn giản.
 
@@ -905,7 +905,7 @@ func main() {
 }
 '''
 
-Chương trình trên được dự định để in các value của loop variable `i` ở mỗi iteration.
+Chương trình trên nhằm in các value của loop variable `i` ở mỗi iteration.
 Trước Go 1.22, trong chương trình có một data race rõ ràng,
 bởi vì loop variable `i` chỉ được instantiate một lần trong toàn bộ loop.
 Tất cả goroutine mới được tạo sẽ đọc cùng một instance nhưng goroutine chính sẽ sửa đổi nó.
@@ -967,7 +967,7 @@ Trông có vẻ ổn. Mỗi goroutine mới được tạo chỉ dùng một b�
 của loop variable `i`. Nhưng câu trả lời là "không", bởi vì
 có một assignment ngầm định ở đầu mỗi iteration
 và assignment ngầm định sử dụng một instance của loop variable làm source value
-(hay còn gọi là goroutine chính đọc nó),
+(tức là goroutine chính đọc nó),
 tuy nhiên instance đó lại được sửa đổi trong một goroutine mới được tạo.
 
 Các output sau xác minh rằng code mới có data race:
@@ -994,7 +994,7 @@ Mặc dù output của chương trình có data race có thể trông đúng tro
 điều này che giấu một vấn đề sâu hơn: data race có thể không bị phát hiện trong thời gian dài hơn.
 Điều này có thể làm chậm đáng kể việc xác định và giải quyết vấn đề!
 
-Nghiêm trọng hơn, một số code đồng thời tốt cũ sẽ trở nên có vấn đề.
+Nghiêm trọng hơn, một số code concurrent cũ vốn tốt sẽ trở nên có vấn đề.
 Đây là một ví dụ:
 
 ''' Go
@@ -1083,7 +1083,7 @@ Làm thế nào để sửa code có data race (từ Go 1.22)?
 với ngữ nghĩa mới của `for;;` được giới thiệu trong Go 1.22.
 Có thể còn nhiều vấn đề khác, tôi không chắc.
 
-Dưới đây là một số recommendation bạn có thể làm theo trong thời đại Go 1.22+.
+Dưới đây là một số khuyến nghị bạn có thể làm theo trong thời đại Go 1.22+.
 
 @@@ #file-go-versions
 ###-------------------
@@ -1151,7 +1151,7 @@ Vì vậy, bạn phải tự xác định các vấn đề tiềm ẩn.
 *  Nếu bạn đang duy trì một Go module công khai mà các Go project khác phụ thuộc vào,
    hãy kiểm tra cẩn thận mọi chỗ dùng loop `for;;` trong code của module
    trước khi tăng version ngôn ngữ lên Go 1.22+ trong file `go.mod`,
-   đặc biệt chú ý đến các loop variable được khai báo mới
+   đặc biệt chú ý đến các loop variable mới được khai báo
    không được sửa đổi trong `postStatement`, để tránh làm hỏng các project
    phụ thuộc vào module này.
 
@@ -1171,7 +1171,7 @@ Vì vậy, bạn phải tự xác định các vấn đề tiềm ẩn.
 
 @@@ #avoid-freshly-declared-loop-vars
 ###-------------------
-    Tránh dùng các loop variable được khai báo mới trong các loop `for;;`
+    Tránh dùng các loop variable mới được khai báo trong các loop `for;;`
     nếu bạn lo bị mắc vào cạm bẫy của ngữ nghĩa mới
 
 Đừng quá lo lắng, :D.
@@ -1230,7 +1230,7 @@ Do tính ngầm định mang tính ma thuật được đưa vào, ngữ nghĩa 
 có thể đòi hỏi thêm thời gian debug khi viết code và thêm nỗ lực nhận thức
 trong một số trường hợp khi review và tìm hiểu code.
 
-Semantics mới của các loop `for;;` có thể gây ra suy giảm performance tiềm ẩn
+Ngữ nghĩa mới của các loop `for;;` có thể gây ra suy giảm performance tiềm ẩn
 và các vấn đề data race trong code hiện có, đòi hỏi review cẩn thận và điều chỉnh nếu cần.
 Tùy từng trường hợp cụ thể, các vấn đề như vậy có thể được phát hiện kịp thời hoặc không.
 
@@ -1255,6 +1255,6 @@ code Go chuyên nghiệp và dùng các Go library đúng cách trong thời đ�
 
 { %%
 @@@ #gotv
-GoTV (__https://go101.org/apps-and-libs/gotv.html__) là một tool được dùng để cài đặt và dùng đồng thời
-các installation của các version Go toolchain một cách hài hòa.
+GoTV (__https://go101.org/apps-and-libs/gotv.html__) là một tool dùng để cài đặt và sử dụng đồng thời
+các bản cài đặt của các version Go toolchain một cách hài hòa.
 }

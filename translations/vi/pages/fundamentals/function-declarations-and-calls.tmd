@@ -1,8 +1,8 @@
 ### Khai báo hàm và lời gọi hàm
 
-Ngoài các phép toán với toán tử được giới thiệu trong bài trước,
-các thao tác với hàm cũng là một loại thao tác phổ biến trong lập trình.
-Các thao tác này thường được gọi là lời gọi hàm.
+Ngoài các phép toán sử dụng toán tử được giới thiệu trong bài trước,
+các thao tác với hàm cũng là một dạng thao tác phổ biến trong lập trình.
+Các thao tác với hàm thường được gọi là các lời gọi hàm.
 Bài viết này giới thiệu cách khai báo và gọi hàm.
 
 @@@ #declaration
@@ -54,7 +54,7 @@ Tham số và kết quả được xem là các biến cục bộ bên trong
 thân hàm tương ứng.
 
 Các tên trong danh sách khai báo kết quả của một khai báo hàm
-có thể hoặc phải được viết đồng loạt, hoặc đồng loạt bị lược bỏ.
+hoặc phải cùng được ghi rõ, hoặc phải cùng được lược bỏ.
 Cả hai cách đều thường được dùng trong thực tế.
 Nếu một kết quả được khai báo kèm tên,
 thì đó được gọi là kết quả có tên;
@@ -80,7 +80,7 @@ Mặc dù trông như các biến tham số và kết quả được khai báo
 bên ngoài thân hàm, chúng vẫn được xem là các biến cục bộ thông thường bên trong thân hàm.
 Điểm khác biệt là các biến cục bộ có tên không phải `_` được khai báo
 trong thân hàm luôn phải được sử dụng trong thân hàm.
-Các tên khác `_` của biến cục bộ cấp package, tham số và kết quả
+Các tên không phải `_` của các biến cục bộ ở cấp cao nhất, tham số và kết quả
 trong một khai báo hàm không được trùng nhau.
 
 Go không hỗ trợ giá trị tham số mặc định.
@@ -134,7 +134,7 @@ func CompareLower4bits(m, n uint32) (r bool) {
 }
 
 // Hàm này không có tham số. Danh sách khai báo
-// kết quả chỉ gồm một kết quả không tên, vì vậy
+// kết quả chỉ gồm một khai báo kết quả không tên, vì vậy
 // không cần đặt danh sách trong ().
 func VersionString() string {
 	return "go1.0"
@@ -151,7 +151,7 @@ Một điều ta đã biết từ các bài viết trước trong Go 101 là
 hàm `main` làm điểm vào của mỗi chương trình Go được khai báo
 không có tham số và kết quả.
 
-Lưu ý rằng hàm phải được khai báo trực tiếp ở cấp package.
+Lưu ý rằng các hàm phải được khai báo trực tiếp ở cấp package.
 Nói cách khác, không thể khai báo một hàm bên trong thân của hàm khác.
 Ở phần sau, ta sẽ biết rằng có thể định nghĩa hàm ẩn danh bên trong thân các hàm khác.
 Tuy nhiên, hàm ẩn danh không phải là khai báo hàm.
@@ -217,8 +217,8 @@ func doNothing(string, int32) {
 Từ ví dụ trên, ta biết một hàm có thể được khai báo
 trước hoặc sau bất kỳ lời gọi nào đến hàm đó.
 
-Trong Go, lời gọi hàm có thể được trì hoãn hoặc được thực thi trong goroutine mới (luồng nhẹ).
-Hãy đọc __một bài viết sau__ để biết chi tiết.
+Trong Go, lời gọi hàm có thể được trì hoãn hoặc được thực thi trong một goroutine mới (green thread).
+Hãy đọc __một bài viết ở phần sau__ để biết chi tiết.
 
     === a later article :: control-flows-more.tmd
 
@@ -227,7 +227,7 @@ Hãy đọc __một bài viết sau__ để biết chi tiết.
 
 Trong Go, ngoài giai đoạn thực thi bình thường theo thứ tự,
 một lời gọi hàm còn có thể trải qua giai đoạn thoát (còn gọi là giai đoạn trả về).
-Giai đoạn thoát của lời gọi hàm bắt đầu khi hàm được gọi thực hiện trả về.
+Giai đoạn thoát của lời gọi hàm bắt đầu khi hàm được gọi trả về.
 Nói cách khác, khi lời gọi hàm trả về thì có thể hàm đó vẫn chưa thoát hẳn.
 
 Có thể xem giải thích chi tiết hơn về giai đoạn thoát của lời gọi hàm trong
@@ -280,7 +280,7 @@ các biến `x` và `y` được khai báo ở trên,
 nên có thể trực tiếp sử dụng hai biến này.
 Những hàm như vậy được gọi là closure.
 Trên thực tế, có thể xem mọi hàm do người dùng định nghĩa trong Go là closure.
-Đó là lý do các hàm Go linh hoạt như hàm trong nhiều ngôn ngữ động.
+Đó là lý do các hàm Go linh hoạt như các hàm trong nhiều ngôn ngữ động.
 
 Ở phần sau, ta sẽ biết rằng có thể gán một hàm ẩn danh
 cho một giá trị hàm rồi gọi nó vào bất kỳ lúc nào sau đó.

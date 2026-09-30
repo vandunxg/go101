@@ -55,8 +55,8 @@ Ví dụ sau tạo hai goroutine mới
 trong main goroutine.
 Trong ví dụ, `time.Duration` là một kiểu tùy chỉnh được định nghĩa
 trong package chuẩn `time`.
-Kiểu nền của nó là kiểu dựng sẵn `int64`.
-Kiểu nền sẽ được giải thích trong __bài viết tiếp theo__.
+Underlying type của nó là kiểu dựng sẵn `int64`.
+Underlying type sẽ được giải thích trong __bài viết tiếp theo__.
 
     === bài viết tiếp theo :: type-system-overview.tmd#underlying-type
 
@@ -106,8 +106,8 @@ kể cả khi các goroutine khác chưa kết thúc.
 
 Khác với các bài viết trước, chương trình này dùng hàm `Println`
 trong package chuẩn `log` thay cho hàm tương ứng trong package chuẩn `fmt`.
-Lý do là các hàm in trong package chuẩn `log` được đồng bộ
-(phần tiếp theo sẽ giải thích đồng bộ là gì),
+Lý do là các hàm in trong package chuẩn `log` được đồng bộ hóa
+(phần tiếp theo sẽ giải thích đồng bộ hóa là gì),
 nên văn bản do hai goroutine in ra sẽ không bị trộn vào cùng một dòng
 (dù khả năng văn bản bị trộn khi dùng các hàm in trong package chuẩn `fmt`
 ở chương trình cụ thể này là rất thấp).
@@ -141,7 +141,7 @@ Những nhiệm vụ khác trong lập trình đồng thời gồm:
    xác định cách phân chia khối lượng công việc giữa các phép tính đồng thời.
 
 Chương trình ở phần trước chưa hoàn hảo.
-Hai goroutine mới được tạo ra dự định in mỗi lời chào mười lần.
+Hai goroutine mới được tạo ra với mục đích mỗi goroutine in mười lời chào.
 Tuy nhiên, main goroutine sẽ kết thúc sau hai giây,
 nên nhiều lời chào không có cơ hội được in ra.
 Làm thế nào để main goroutine biết khi nào cả hai goroutine mới
@@ -201,7 +201,7 @@ func main() {
 '''
 
 Khi chạy chương trình, ta có thể thấy trước khi chương trình kết thúc,
-mỗi goroutine trong hai goroutine mới đều in mười lời chào.
+mỗi goroutine trong số hai goroutine mới đều in mười lời chào.
 
 @@@ #states-of-goroutine
 ###========== Các trạng thái của goroutine
@@ -221,7 +221,7 @@ Hình sau mô tả một vòng đời có thể có của goroutine.
 Lưu ý: goroutine vẫn được xem là đang 'running' nếu nó đang ngủ (sau khi gọi hàm `time.Sleep`)
 hoặc đang chờ phản hồi từ system call hay kết nối mạng.
 
-Khi được tạo, goroutine tự động chuyển sang trạng thái 'running'.
+Khi một goroutine mới được tạo, nó tự động chuyển sang trạng thái 'running'.
 Goroutine chỉ có thể kết thúc từ trạng thái running, không thể kết thúc từ trạng thái blocking.
 Nếu vì lý do nào đó goroutine ở trạng thái blocking mãi mãi,
 thì nó sẽ không bao giờ kết thúc.
@@ -231,12 +231,12 @@ ngoại trừ một vài trường hợp hiếm gặp.
 Goroutine đang bị chặn chỉ có thể được bỏ chặn bởi
 một thao tác được thực hiện trong goroutine khác.
 Nếu tất cả goroutine trong chương trình Go đều ở trạng thái blocking,
-thì tất cả sẽ bị chặn mãi mãi.
+thì tất cả sẽ ở trạng thái blocking mãi mãi.
 Đây có thể xem là deadlock toàn cục.
 Khi tình trạng này xảy ra trong chương trình, Go runtime tiêu chuẩn
-sẽ cố gắng làm chương trình gặp lỗi nghiêm trọng.
+sẽ cố làm chương trình crash.
 
-Chương trình sau sẽ gặp lỗi sau hai giây:
+Chương trình sau sẽ crash sau hai giây:
 @@@ .line-numbers
 ''' go
 package main
@@ -284,8 +284,8 @@ Go runtime phải thường xuyên chuyển đổi ngữ cảnh thực thi giữ
 
 Hình sau mô tả chi tiết hơn một vòng đời có thể có của goroutine.
 Trong hình, trạng thái running được chia thành một số trạng thái phụ.
-Goroutine ở trạng thái phụ chờ trong hàng đợi đang chờ được thực thi.
-Goroutine ở trạng thái phụ đang thực thi có thể quay lại trạng thái phụ chờ trong hàng đợi
+Goroutine ở trạng thái phụ xếp hàng đang chờ được thực thi.
+Goroutine ở trạng thái phụ đang thực thi có thể quay lại trạng thái phụ xếp hàng
 sau khi đã được thực thi một thời gian (một khoảng thời gian rất ngắn).
 
 { ><
@@ -294,7 +294,7 @@ sau khi đã được thực thi một thời gian (một khoảng thời gian r
 
 Để đơn giản, các trạng thái phụ trong hình trên sẽ không được nhắc đến
 trong những bài viết khác của Go 101.
-Và cũng như đã nói, trong Go 101, trạng thái ngủ và trạng thái gọi system call
+Và cũng như đã nói, trong Go 101, trạng thái ngủ và trạng thái thực hiện system call
 không được xem là trạng thái phụ của trạng thái blocking.
 
 Go runtime tiêu chuẩn sử dụng __mô hình M-P-G__
@@ -308,7 +308,7 @@ Mỗi OS thread tại một thời điểm chỉ có thể được gắn với 
 và mỗi goroutine tại một thời điểm chỉ có thể được gắn với tối đa một OS thread.
 Goroutine chỉ được thực thi khi đã được gắn với một OS thread.
 Sau khi được thực thi một lúc, goroutine sẽ cố tách khỏi OS thread tương ứng,
-để các goroutine đang chạy khác có cơ hội được gắn vào thread và thực thi.
+để các goroutine đang chạy khác có cơ hội được gắn vào OS thread và thực thi.
 
     === mô hình M-P-G :: https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw
 
@@ -339,7 +339,7 @@ và bước vào __giai đoạn thoát__,
 tất cả lời gọi hàm trì hoãn được đẩy vào stack lời gọi defer của nó
 sẽ được lấy khỏi stack và thực thi theo thứ tự vào trước, ra sau,
 tức theo thứ tự ngược với thứ tự chúng được đẩy vào stack.
-Khi mọi lời gọi trì hoãn đã chạy xong, lời gọi hàm `fc(...)` mới kết thúc hoàn toàn.
+Khi mọi lời gọi hàm trì hoãn đã chạy xong, lời gọi hàm `fc(...)` mới kết thúc hoàn toàn.
 
     === giai đoạn thoát :: function-declarations-and-calls.tmd#exiting-phase
 
@@ -427,9 +427,9 @@ func main() {
 
 Mọi đối số của lời gọi hàm trì hoãn
 đều được đánh giá tại thời điểm câu lệnh defer tương ứng được thực thi
-(còn gọi là thời điểm lời gọi trì hoãn được đẩy vào stack lời gọi defer).
-Kết quả đánh giá được dùng khi lời gọi trì hoãn được thực thi sau đó,
-trong giai đoạn thoát của lời gọi bao quanh (lời gọi chứa lời gọi trì hoãn).
+(còn gọi là thời điểm lời gọi hàm trì hoãn được đẩy vào stack lời gọi defer).
+Kết quả đánh giá được dùng khi lời gọi hàm trì hoãn được thực thi sau đó,
+trong giai đoạn thoát của lời gọi bao quanh (lời gọi chứa lời gọi hàm trì hoãn).
 
 Các biểu thức bên trong thân của một lời gọi hàm ẩn danh,
 dù đó là lời gọi thông thường hay lời gọi defer/goroutine,
@@ -468,7 +468,7 @@ func main() {
 
 Dùng các phiên bản Go Toolchain khác nhau để chạy mã (__gotv__ là công cụ dùng để
 quản lý và sử dụng nhiều bản cài đặt Go toolchain chính thức cùng tồn tại).
-Kết quả:
+Các kết quả đầu ra:
 @@@ .output
 '''
 $ gotv 1.21. run eval-moment.go
@@ -529,7 +529,7 @@ __tổng quan về đồng bộ hóa tính toán đồng thời__
 
     === tổng quan về đồng bộ hóa tính toán đồng thời :: concurrent-synchronization-overview.tmd
 
-###========== Vì sao cần tính năng hàm trì hoãn
+###========== Sự cần thiết của tính năng lời gọi hàm trì hoãn
 
 Trong các ví dụ trên, lời gọi hàm trì hoãn không thực sự bắt buộc.
 Tuy nhiên, tính năng lời gọi hàm trì hoãn là cần thiết cho cơ chế
@@ -538,10 +538,10 @@ panic và recover sẽ được giới thiệu dưới đây.
 Lời gọi hàm trì hoãn cũng giúp chúng ta viết mã rõ ràng và vững chắc hơn.
 Sau này, chúng ta có thể đọc thêm các ví dụ mã sử dụng lời gọi hàm trì hoãn
 và tìm hiểu thêm chi tiết trong bài viết
-__tìm hiểu thêm về hàm trì hoãn__. Còn bây giờ,
-chúng ta sẽ tìm hiểu vai trò của hàm trì hoãn đối với panic và recover.
+__tìm hiểu thêm về lời gọi hàm trì hoãn__. Còn bây giờ,
+chúng ta sẽ tìm hiểu vai trò của lời gọi hàm trì hoãn đối với panic và recover.
 
-    === tìm hiểu thêm về hàm trì hoãn :: defer-more.tmd
+    === tìm hiểu thêm về lời gọi hàm trì hoãn :: defer-more.tmd
 
 @@@ #panic-recover
 ###========== Panic và recover
@@ -558,11 +558,11 @@ Panicking là một cách khác để khiến hàm trả về.
 Ngay khi panic xảy ra trong một lời gọi hàm, lời gọi đó lập tức trả về
 và bước vào giai đoạn thoát.
 
-Khi gọi hàm dựng sẵn `recover` trong một lời gọi trì hoãn,
+Khi gọi hàm dựng sẵn `recover` trong một lời gọi hàm trì hoãn,
 có thể loại bỏ panic đang hoạt động trong goroutine hiện tại,
 để goroutine đó trở lại trạng thái bình thường.
 
-Nếu goroutine đang panicking kết thúc mà không được recover, toàn bộ chương trình sẽ gặp lỗi nghiêm trọng.
+Nếu goroutine đang panicking kết thúc mà không được recover, toàn bộ chương trình sẽ crash.
 
 Các hàm dựng sẵn `panic` và `recover` được khai báo như sau:
 @@@ .line-numbers
@@ -583,7 +583,7 @@ ta có thể truyền giá trị thuộc bất kỳ kiểu nào vào lời gọi
 Giá trị hàm `recover` trả về là giá trị
 mà lời gọi hàm `panic` đã nhận.
 
-Ví dụ dưới đây cho thấy cách tạo panic và cách recover nó.
+Ví dụ dưới đây cho thấy cách tạo panic và cách recover panic đó.
 
 @@@ .line-numbers
 ''' go
@@ -615,7 +615,7 @@ exit normally.
 '''
 
 Đây là ví dụ khác cho thấy một goroutine đang panicking kết thúc mà không được recover.
-Vì vậy, toàn bộ chương trình gặp lỗi nghiêm trọng.
+Vì vậy, toàn bộ chương trình sẽ crash.
 
 @@@ .line-numbers
 ''' go
@@ -695,4 +695,4 @@ và __cơ chế panic/recover chi tiết hơn__.
 
 Với trình biên dịch Go tiêu chuẩn, một số lỗi nghiêm trọng,
 chẳng hạn tràn stack và hết bộ nhớ, không thể recover.
-Khi xảy ra, chương trình sẽ gặp lỗi nghiêm trọng.
+Khi xảy ra, chương trình sẽ crash.
